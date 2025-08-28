@@ -1,6 +1,6 @@
 {
   "name": "cursor-ai-pr-reviewer",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "AI-powered PR reviewer that respects Cursor AI rules",
   "main": "dist/main.js",
   "scripts": {
