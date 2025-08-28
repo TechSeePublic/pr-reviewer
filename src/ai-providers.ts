@@ -13,6 +13,7 @@ import {
   ActionInputs 
 } from './types';
 import { DEFAULT_MODELS } from './config';
+import { logger } from './logger';
 
 export class OpenAIProvider implements AIProvider {
   public readonly name = 'openai';
@@ -47,7 +48,7 @@ export class OpenAIProvider implements AIProvider {
 
       return this.parseAIResponse(result);
     } catch (error) {
-      console.error('OpenAI API error:', error);
+      logger.error('OpenAI API error:', error);
       throw new Error(`OpenAI review failed: ${error}`);
     }
   }
@@ -68,7 +69,7 @@ export class OpenAIProvider implements AIProvider {
 
       return response.choices[0]?.message?.content || 'Summary generation failed';
     } catch (error) {
-      console.error('OpenAI summary generation error:', error);
+      logger.error('OpenAI summary generation error:', error);
       return 'Failed to generate summary';
     }
   }
@@ -138,7 +139,7 @@ Please analyze this code against the Cursor rules and return any violations or s
       const parsed: AIResponse = JSON.parse(response);
       return parsed.issues || [];
     } catch (error) {
-      console.warn('Failed to parse AI response as JSON:', error);
+      logger.warn('Failed to parse AI response as JSON:', error);
       // Try to extract issues from malformed JSON
       return this.extractIssuesFromText(response);
     }
@@ -222,7 +223,7 @@ export class AnthropicProvider implements AIProvider {
 
       return this.parseAIResponse(result.text);
     } catch (error) {
-      console.error('Anthropic API error:', error);
+      logger.error('Anthropic API error:', error);
       throw new Error(`Anthropic review failed: ${error}`);
     }
   }
@@ -244,7 +245,7 @@ export class AnthropicProvider implements AIProvider {
       const result = response.content[0];
       return result && result.type === 'text' ? result.text : 'Summary generation failed';
     } catch (error) {
-      console.error('Anthropic summary generation error:', error);
+      logger.error('Anthropic summary generation error:', error);
       return 'Failed to generate summary';
     }
   }

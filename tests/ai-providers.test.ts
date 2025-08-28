@@ -10,6 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 // Mock the AI libraries
 jest.mock('openai');
 jest.mock('@anthropic-ai/sdk');
+jest.mock('../src/logger');
 
 const MockedOpenAI = OpenAI as jest.MockedClass<typeof OpenAI>;
 const MockedAnthropic = Anthropic as jest.MockedClass<typeof Anthropic>;

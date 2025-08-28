@@ -7,6 +7,7 @@ import * as path from 'path';
 import matter from 'gray-matter';
 import { minimatch } from 'minimatch';
 import { CursorRule, CursorRulesConfig, ParsedMDCRule } from './types';
+import { logger } from './logger';
 
 export class CursorRulesParser {
   private basePath: string;
@@ -78,7 +79,7 @@ export class CursorRulesParser {
         }
       }
     } catch (error) {
-      console.warn(`Warning: Could not read rules directory ${dir}:`, error);
+      logger.warn(`Warning: Could not read rules directory ${dir}:`, error);
     }
   }
 
@@ -113,7 +114,7 @@ export class CursorRulesParser {
 
       return rule;
     } catch (error) {
-      console.warn(`Warning: Could not parse rule file ${filePath}:`, error);
+      logger.warn(`Warning: Could not parse rule file ${filePath}:`, error);
       return null;
     }
   }
@@ -198,7 +199,7 @@ export class CursorRulesParser {
     try {
       return fs.readFileSync(agentsPath, 'utf-8');
     } catch (error) {
-      console.warn('Warning: Could not read AGENTS.md:', error);
+      logger.warn('Warning: Could not read AGENTS.md:', error);
       return undefined;
     }
   }
@@ -216,7 +217,7 @@ export class CursorRulesParser {
     try {
       return fs.readFileSync(legacyPath, 'utf-8');
     } catch (error) {
-      console.warn('Warning: Could not read .cursorrules:', error);
+      logger.warn('Warning: Could not read .cursorrules:', error);
       return undefined;
     }
   }
@@ -260,7 +261,7 @@ export class CursorRulesParser {
           files[filename] = fs.readFileSync(filePath, 'utf-8');
         }
       } catch (error) {
-        console.warn(`Warning: Could not read referenced file ${filename}:`, error);
+        logger.warn(`Warning: Could not read referenced file ${filename}:`, error);
       }
     }
 

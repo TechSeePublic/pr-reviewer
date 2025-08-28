@@ -12,6 +12,7 @@ import OpenAI from 'openai';
 jest.mock('fs');
 jest.mock('@actions/github');
 jest.mock('openai');
+jest.mock('../src/logger');
 
 const mockFs = fs as jest.Mocked<typeof fs>;
 const MockedOpenAI = OpenAI as jest.MockedClass<typeof OpenAI>;

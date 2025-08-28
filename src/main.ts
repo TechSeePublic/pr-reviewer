@@ -5,6 +5,7 @@
 import * as core from '@actions/core';
 import { getActionInputs, validateInputs } from './config';
 import { PRReviewer } from './pr-reviewer';
+import { logger } from './logger';
 
 async function run(): Promise<void> {
   try {
@@ -49,6 +50,6 @@ async function run(): Promise<void> {
 
 // Run the action
 run().catch(error => {
-  console.error('Unhandled error:', error);
+  logger.error('Unhandled error:', error);
   process.exit(1);
 });

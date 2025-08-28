@@ -15,6 +15,7 @@ import {
   RateLimitInfo 
 } from './types';
 import { COMMENT_MARKERS } from './config';
+import { logger } from './logger';
 
 export class GitHubClient {
   private octokit: ReturnType<typeof github.getOctokit>;
@@ -182,7 +183,7 @@ export class GitHubClient {
       }
       return result;
     } catch (error) {
-      console.warn('Warning: Could not fetch existing comments:', error);
+      logger.warn('Warning: Could not fetch existing comments:', error);
       return { inlineComments: [] };
     }
   }
@@ -241,7 +242,7 @@ export class GitHubClient {
         });
       }
     } catch (error) {
-      console.warn(`Warning: Could not post inline comment: ${error}`);
+      logger.warn(`Warning: Could not post inline comment: ${error}`);
       // Don't throw - inline comments might fail due to line positioning
     }
   }
@@ -285,7 +286,7 @@ ${comment.body}`;
         });
       }
     } catch (error) {
-      console.warn(`Warning: Could not delete comment ${commentId}:`, error);
+      logger.warn(`Warning: Could not delete comment ${commentId}:`, error);
     }
   }
 
@@ -319,7 +320,7 @@ ${comment.body}`;
     const remainingPercentage = (rateLimit.remaining / rateLimit.limit) * 100;
     
     if (remainingPercentage < 10) {
-      console.warn(`Warning: GitHub API rate limit low (${rateLimit.remaining}/${rateLimit.limit})`);
+      logger.warn(`Warning: GitHub API rate limit low (${rateLimit.remaining}/${rateLimit.limit})`);
       return false;
     }
     

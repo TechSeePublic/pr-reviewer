@@ -14,6 +14,7 @@ import {
 } from './types';
 import { GitHubClient } from './github-client';
 import { SEVERITY_LEVELS } from './config';
+import { logger } from './logger';
 
 export class CommentManager {
   private githubClient: GitHubClient;
@@ -66,20 +67,20 @@ export class CommentManager {
     for (const [locationKey, locationIssues] of Object.entries(issuesByLocation)) {
       const [file, lineStr] = locationKey.split(':');
       if (!file || !lineStr) {
-        console.warn(`Invalid location key: ${locationKey}`);
+        logger.warn(`Invalid location key: ${locationKey}`);
         continue;
       }
       const line = parseInt(lineStr, 10);
 
       // Validate that the line exists in the PR changes
       if (!this.isValidCommentLocation(file, line, fileChanges)) {
-        console.warn(`Skipping inline comment for ${file}:${line} - not in PR diff`);
+        logger.warn(`Skipping inline comment for ${file}:${line} - not in PR diff`);
         continue;
       }
 
       // Create inline comment
       if (locationIssues.length === 0) {
-        console.warn(`No issues for location ${locationKey}`);
+        logger.warn(`No issues for location ${locationKey}`);
         continue;
       }
       
@@ -101,7 +102,7 @@ export class CommentManager {
       try {
         await this.githubClient.postInlineComment(comment, existingComment?.id);
       } catch (error) {
-        console.warn(`Failed to post inline comment for ${file}:${line}:`, error);
+        logger.warn(`Failed to post inline comment for ${file}:${line}:`, error);
       }
     }
   }
@@ -118,7 +119,7 @@ export class CommentManager {
     try {
       await this.githubClient.postSummaryComment(comment, existingComment?.id);
     } catch (error) {
-      console.error('Failed to post summary comment:', error);
+      logger.error('Failed to post summary comment:', error);
       throw error;
     }
   }
