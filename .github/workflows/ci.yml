@@ -59,7 +59,7 @@ jobs:
     - name: Test action (self-test)
       uses: ./
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.GH_TOKEN }}
         openai_api_key: ${{ secrets.OPENAI_API_KEY }}
         review_level: 'light'
         comment_style: 'summary'
