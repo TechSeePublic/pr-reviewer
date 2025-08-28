@@ -21,7 +21,16 @@ npx tsc
 
 # Package with ncc (bundles all dependencies)
 echo "📦 Packaging with ncc..."
-npx ncc build dist/main.js -o dist --source-map --license licenses.txt
+npx ncc build dist/main.js -o dist-bundle --source-map --license licenses.txt
+
+# Replace main.js with the bundled version
+echo "🔄 Replacing main.js with bundled version..."
+mv dist-bundle/index.js dist/main.js
+mv dist-bundle/index.js.map dist/main.js.map
+cp dist-bundle/licenses.txt dist/licenses.txt
+
+# Clean up temporary bundle directory
+rm -rf dist-bundle
 
 # Create build info
 echo "📋 Creating build info..."
