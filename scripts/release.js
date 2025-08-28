@@ -85,13 +85,17 @@ class ReleaseManager {
       console.log('🏷️  Creating tags...');
       this.createTags(newVersion);
 
-      // Push to GitHub
+            // Push to GitHub
       console.log('🌐 Pushing to GitHub...');
       this.runCommand('git push origin main');
 
       // Push only the specific version tag, not all tags
       const specificTag = `v${newVersion}`;
       this.runCommand(`git push origin ${specificTag}`);
+
+      // Clean up the release branch
+      console.log('🧹 Cleaning up release branch...');
+      this.cleanupReleaseBranch(newVersion);
 
       console.log('✅ Release completed successfully!');
       console.log(`🎉 Version ${newVersion} is now available`);
@@ -205,13 +209,33 @@ class ReleaseManager {
     this.runCommand(`git tag -a ${specificTag} refs/heads/${releaseBranch} -m "Release ${specificTag}"`);
   }
 
-  updateDistPackageJson(version) {
+    updateDistPackageJson(version) {
     const distPackageJsonPath = path.join(__dirname, '../dist/package.json');
 
     if (fs.existsSync(distPackageJsonPath)) {
       const distPackageJson = JSON.parse(fs.readFileSync(distPackageJsonPath, 'utf8'));
       distPackageJson.version = version;
       fs.writeFileSync(distPackageJsonPath, JSON.stringify(distPackageJson, null, 2));
+    }
+  }
+
+  cleanupReleaseBranch(version) {
+    const releaseBranch = `release-v${version}`;
+
+    try {
+      // Delete the local release branch
+      console.log(`🗑️  Deleting local release branch: ${releaseBranch}`);
+      this.runCommand(`git branch -D ${releaseBranch}`, { silent: true });
+
+      // Delete the remote release branch
+      console.log(`🗑️  Deleting remote release branch: ${releaseBranch}`);
+      this.runCommand(`git push origin --delete ${releaseBranch}`, { silent: true });
+
+      console.log(`✨ Release branch ${releaseBranch} cleaned up successfully`);
+    } catch (error) {
+      // If cleanup fails, it's not critical - just log a warning
+      console.warn(`⚠️  Warning: Could not clean up release branch ${releaseBranch}: ${error.message}`);
+      console.warn('   You may need to clean it up manually later');
     }
   }
 
