@@ -88,7 +88,10 @@ class ReleaseManager {
       // Push to GitHub
       console.log('🌐 Pushing to GitHub...');
       this.runCommand('git push origin main');
-      this.runCommand('git push --tags');
+
+      // Push only the specific version tag, not all tags
+      const specificTag = `v${newVersion}`;
+      this.runCommand(`git push origin ${specificTag}`);
 
       console.log('✅ Release completed successfully!');
       console.log(`🎉 Version ${newVersion} is now available`);
