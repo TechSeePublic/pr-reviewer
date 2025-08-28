@@ -35,6 +35,7 @@ describe('PR Reviewer Integration', () => {
     updateExistingComments: true,
     enableAutoFix: false,
     autoFixSeverity: 'error',
+    requestDelay: 1000,
   };
 
   beforeEach(() => {
@@ -165,7 +166,7 @@ Always use explicit types for variables.`;
     expect(result.summary).toContain('No Cursor rules found');
   });
 
-  it('should handle AI provider errors gracefully', async () => {
+  it('should fail immediately on AI provider errors', async () => {
     // Setup basic cursor rules
     mockFs.existsSync.mockReturnValue(true);
     mockFs.readdirSync.mockReturnValue([
@@ -184,10 +185,7 @@ Always use explicit types for variables.`;
 
     const reviewer = new PRReviewer(mockInputs, '/mock/workspace');
 
-    // Should not throw, but handle error gracefully
-    const result = await reviewer.reviewPR();
-
-    expect(result.status).toBe('passed'); // No issues found due to error
-    expect(result.issues).toHaveLength(0);
+    // Should throw immediately on AI provider error
+    await expect(reviewer.reviewPR()).rejects.toThrow('AI provider error reviewing file src/test.ts: Error: OpenAI review failed: API Error');
   });
 });

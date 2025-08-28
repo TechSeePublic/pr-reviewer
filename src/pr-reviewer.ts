@@ -186,31 +186,33 @@ export class PRReviewer {
    */
   private async reviewFiles(fileChanges: FileChange[], rules: CursorRule[]): Promise<CodeIssue[]> {
     const allIssues: CodeIssue[] = [];
-    const maxConcurrentReviews = 3; // Limit concurrent AI requests
 
-    // Process files in batches to avoid rate limits
-    for (let i = 0; i < fileChanges.length; i += maxConcurrentReviews) {
-      const batch = fileChanges.slice(i, i + maxConcurrentReviews);
+    // Process files one by one to avoid rate limits
+    for (let i = 0; i < fileChanges.length; i++) {
+      const fileChange = fileChanges[i];
 
-      const batchPromises = batch.map(async fileChange => {
-        try {
-          return await this.reviewSingleFile(fileChange, rules);
-        } catch (error) {
-          core.error(`AI provider error reviewing file ${fileChange.filename}: ${error}`);
-          // Handle AI provider errors gracefully by returning empty issues
-          return [];
-        }
-      });
-
-      const batchResults = await Promise.all(batchPromises);
-
-      for (const issues of batchResults) {
-        allIssues.push(...issues);
+      if (!fileChange) {
+        core.warning(`Skipping undefined file at index ${i}`);
+        continue;
       }
 
-      // Add delay between batches to respect rate limits
-      if (i + maxConcurrentReviews < fileChanges.length) {
-        await this.delay(1000); // 1 second delay
+      try {
+        core.info(`Reviewing file ${i + 1}/${fileChanges.length}: ${fileChange.filename}`);
+        const issues = await this.reviewSingleFile(fileChange, rules);
+        allIssues.push(...issues);
+
+        // Add delay between each file to respect rate limits
+        if (i < fileChanges.length - 1) {
+          const delayMs = this.inputs.requestDelay;
+          core.info(`Waiting ${delayMs}ms before next request to avoid rate limits...`);
+          await this.delay(delayMs);
+        }
+      } catch (error) {
+        // Fail the action when AI provider errors occur
+        const errorMessage = `AI provider error reviewing file ${fileChange.filename}: ${error}`;
+        core.error(errorMessage);
+        core.setFailed(errorMessage);
+        throw new Error(errorMessage);
       }
     }
 
@@ -327,9 +329,11 @@ export class PRReviewer {
     try {
       summary = await this.aiProvider.generateSummary(issues, reviewContext);
     } catch (error) {
-      core.error(`AI provider error generating summary: ${error}`);
-      // Use fallback summary instead of failing
-      summary = this.generateFallbackSummary(issues, fileChanges.length);
+      // Fail the action when AI summary generation fails
+      const errorMessage = `AI provider error generating summary: ${error}`;
+      core.error(errorMessage);
+      core.setFailed(errorMessage);
+      throw new Error(errorMessage);
     }
 
     return {

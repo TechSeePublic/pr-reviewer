@@ -53,6 +53,7 @@ export function getActionInputs(): ActionInputs {
     enableAutoFix: core.getBooleanInput('enable_auto_fix') ?? false,
     autoFixSeverity:
       (core.getInput('auto_fix_severity') as 'error' | 'warning' | 'info' | 'all') || 'error',
+    requestDelay: parseInt(core.getInput('request_delay') || '2000', 10),
   };
 
   // Add optional properties only if they have values
@@ -98,6 +99,11 @@ export function validateInputs(inputs: ActionInputs): void {
   // Validate numeric inputs
   if (inputs.maxFiles < 1 || inputs.maxFiles > 200) {
     throw new Error('max_files must be between 1 and 200');
+  }
+
+  // Validate request delay
+  if (inputs.requestDelay < 0 || inputs.requestDelay > 60000) {
+    throw new Error('request_delay must be between 0 and 60000 milliseconds');
   }
 
   // Validate patterns

@@ -11,8 +11,20 @@ An AI-powered GitHub Action that automatically reviews pull requests according t
 - 🚀 **Zero Infrastructure** - Runs entirely on GitHub Actions, no servers needed
 - 🛡️ **Secure** - Code never leaves GitHub's infrastructure
 - 📊 **Comprehensive Reporting** - Detailed review statistics and rule application tracking
+- 🚨 **Fail-Fast Error Handling** - Action fails immediately on AI provider errors for better debugging
+- ⏱️ **Smart Rate Limiting** - Sequential file processing with configurable delays to avoid AI provider rate limits
 
 ## 🚀 Quick Start
+
+### Rate Limiting & Error Handling
+
+The action now processes files **one by one** (instead of in batches) with configurable delays between AI provider requests to avoid rate limits. If any AI provider request fails, the action will **fail immediately** instead of continuing with fallback behavior.
+
+**Key Changes:**
+- ⚡ **Sequential Processing**: Files are reviewed one at a time to prevent overwhelming AI providers
+- ⏱️ **Configurable Delays**: Use `request_delay` to set milliseconds between requests (default: 2000ms)
+- 🚨 **Fail-Fast**: Action stops immediately on AI provider errors for better debugging
+- 📊 **Progress Tracking**: Clear logging shows which file is being reviewed and when delays occur
 
 ### 1. Add to Your Workflow
 
@@ -42,6 +54,7 @@ jobs:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           review_level: 'standard'
           comment_style: 'both'
+          request_delay: '3000'  # 3 seconds between requests to avoid rate limits
 ```
 
 ### 2. Set Up API Keys
@@ -76,6 +89,7 @@ The bot automatically detects and applies Cursor rules from:
 | `enable_suggestions` | Enable code suggestions | `true` | ❌ |
 | `skip_if_no_rules` | Skip review if no rules found | `false` | ❌ |
 | `update_existing_comments` | Update existing bot comments | `true` | ❌ |
+| `request_delay` | Delay in milliseconds between AI provider requests to avoid rate limits | `2000` | ❌ |
 
 ⚠️ *At least one AI provider API key is required*
 
@@ -115,6 +129,7 @@ The action can automatically select the best model based on your `review_level`:
     model: 'auto'              # Let the action choose
     review_level: 'thorough'   # This will select premium models
     ai_provider: 'auto'        # Choose provider automatically
+    request_delay: '5000'      # 5 seconds between requests for thorough reviews
 ```
 
 ## 🎨 Comment Examples
@@ -356,6 +371,8 @@ npm run release 1.2.3
 **Rate limit issues**
 - The action automatically handles GitHub API rate limits
 - For AI provider rate limits, consider using `review_level: 'light'`
+- Adjust `request_delay` to increase delays between AI requests (default: 2000ms)
+- The action now processes files sequentially (one by one) instead of in batches to prevent rate limiting
 
 **Model compatibility issues**
 - Ensure the model name matches exactly (case-sensitive)

@@ -21,6 +21,7 @@ export interface ActionInputs {
   updateExistingComments: boolean;
   enableAutoFix: boolean;
   autoFixSeverity: 'error' | 'warning' | 'info' | 'all';
+  requestDelay: number; // Delay in milliseconds between AI provider requests
 }
 
 export interface PRContext {

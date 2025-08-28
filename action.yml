@@ -93,6 +93,11 @@ inputs:
     description: 'Minimum severity for auto-fix (error, warning, info, all)'
     required: false
     default: 'error'
+    
+  request_delay:
+    description: 'Delay in milliseconds between AI provider requests to avoid rate limits (default: 2000)'
+    required: false
+    default: '2000'
 
 outputs:
   review_summary:
