@@ -52,6 +52,10 @@ class ReleaseManager {
       this.runCommand('git add .');
       this.runCommand(`git commit -m "chore: release v${newVersion}"`);
 
+      // Create release branch with built files
+      console.log('🌿 Creating release branch with built files...');
+      this.createReleaseBranch(newVersion);
+
       // Create tags
       console.log('🏷️  Creating tags...');
       this.createTags(newVersion);
@@ -139,12 +143,41 @@ class ReleaseManager {
     return true;
   }
 
+  createReleaseBranch(version) {
+    const releaseBranch = `release-v${version}`;
+    const currentBranch = this.runCommand('git branch --show-current', { silent: true }).trim();
+    
+    try {
+      // Create a new branch for the release
+      console.log(`📦 Creating release branch: ${releaseBranch}`);
+      this.runCommand(`git checkout -b ${releaseBranch}`);
+      
+      // Add the built files to this branch
+      this.runCommand('git add dist/ --force');
+      this.runCommand(`git commit -m "chore: add built files for release v${version}"`);
+      
+      // Push the release branch
+      this.runCommand(`git push origin ${releaseBranch}`);
+      
+      // Switch back to the original branch
+      this.runCommand(`git checkout ${currentBranch}`);
+      
+    } catch (error) {
+      // If something goes wrong, try to get back to the original branch
+      try {
+        this.runCommand(`git checkout ${currentBranch}`, { silent: true });
+      } catch {}
+      throw error;
+    }
+  }
+
   createTags(version) {
     const specificTag = `v${version}`;
     const majorTag = `v${version.split('.')[0]}`;
+    const releaseBranch = `release-v${version}`;
 
-    // Create specific version tag
-    this.runCommand(`git tag -a ${specificTag} -m "Release ${specificTag}"`);
+    // Create specific version tag pointing to the release branch
+    this.runCommand(`git tag -a ${specificTag} refs/heads/${releaseBranch} -m "Release ${specificTag}"`);
 
     // Update/create major version tag (for auto-updates)
     try {
@@ -155,8 +188,8 @@ class ReleaseManager {
       // Tag might not exist, that's okay
     }
 
-    // Create new major tag pointing to current commit
-    this.runCommand(`git tag -a ${majorTag} -m "Update ${majorTag} to ${specificTag}"`);
+    // Create new major tag pointing to the release branch
+    this.runCommand(`git tag -a ${majorTag} refs/heads/${releaseBranch} -m "Update ${majorTag} to ${specificTag}"`);
   }
 
   updateDistPackageJson(version) {
