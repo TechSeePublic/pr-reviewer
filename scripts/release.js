@@ -181,23 +181,11 @@ class ReleaseManager {
 
   createTags(version) {
     const specificTag = `v${version}`;
-    const majorTag = `v${version.split('.')[0]}`;
     const releaseBranch = `release-v${version}`;
 
     // Create specific version tag pointing to the release branch
+    // The major version tag will be handled by GitHub Actions workflow
     this.runCommand(`git tag -a ${specificTag} refs/heads/${releaseBranch} -m "Release ${specificTag}"`);
-
-    // Update/create major version tag (for auto-updates)
-    try {
-      // Delete existing major tag if it exists
-      this.runCommand(`git tag -d ${majorTag}`, { silent: true });
-      this.runCommand(`git push origin :refs/tags/${majorTag}`, { silent: true });
-    } catch {
-      // Tag might not exist, that's okay
-    }
-
-    // Create new major tag pointing to the release branch
-    this.runCommand(`git tag -a ${majorTag} refs/heads/${releaseBranch} -m "Update ${majorTag} to ${specificTag}"`);
   }
 
   updateDistPackageJson(version) {
