@@ -71,6 +71,11 @@ export function validateInputs(inputs: ActionInputs): void {
     throw new Error('At least one AI provider API key is required (openai_api_key or anthropic_api_key)');
   }
 
+  // Validate model selection
+  if (inputs.model && inputs.model !== 'auto') {
+    validateModelChoice(inputs.model, inputs.aiProvider, inputs);
+  }
+
   // Validate numeric inputs
   if (inputs.maxFiles < 1 || inputs.maxFiles > 200) {
     throw new Error('max_files must be between 1 and 200');
@@ -82,9 +87,140 @@ export function validateInputs(inputs: ActionInputs): void {
   }
 }
 
+export function validateModelChoice(model: string, provider: string, inputs: ActionInputs): void {
+  // If provider is auto, check which providers are available
+  if (provider === 'auto') {
+    const hasOpenAI = !!inputs.openaiApiKey;
+    const hasAnthropic = !!inputs.anthropicApiKey;
+    
+    const modelInfo = MODEL_CAPABILITIES[model as keyof typeof MODEL_CAPABILITIES];
+    if (modelInfo) {
+      if (modelInfo.provider === 'openai' && !hasOpenAI) {
+        throw new Error(`Model "${model}" requires OpenAI API key, but none provided`);
+      }
+      if (modelInfo.provider === 'anthropic' && !hasAnthropic) {
+        throw new Error(`Model "${model}" requires Anthropic API key, but none provided`);
+      }
+    }
+    return;
+  }
+
+  // Check if model is supported by the specified provider
+  const supportedModels = SUPPORTED_MODELS[provider as keyof typeof SUPPORTED_MODELS];
+  if (!supportedModels || !supportedModels.includes(model)) {
+    const suggestions = supportedModels ? supportedModels.slice(0, 3).join(', ') : 'none available';
+    throw new Error(
+      `Model "${model}" is not supported by provider "${provider}". ` +
+      `Supported models: ${suggestions}. ` +
+      `See documentation for full list.`
+    );
+  }
+}
+
+export function getRecommendedModel(provider: string, reviewLevel: string): string {
+  const recommendations = {
+    light: {
+      openai: 'gpt-4o-mini',
+      anthropic: 'claude-3-haiku-20240307'
+    },
+    standard: {
+      openai: 'gpt-4',
+      anthropic: 'claude-3-sonnet-20240229'
+    },
+    thorough: {
+      openai: 'gpt-4o',
+      anthropic: 'claude-3-5-sonnet-20241022'
+    }
+  };
+
+  return recommendations[reviewLevel as keyof typeof recommendations]?.[provider as keyof typeof recommendations.standard] || 
+         DEFAULT_MODELS[provider as keyof typeof DEFAULT_MODELS];
+}
+
+export function getModelInfo(model: string) {
+  return MODEL_CAPABILITIES[model as keyof typeof MODEL_CAPABILITIES];
+}
+
 export const DEFAULT_MODELS = {
-  openai: 'gpt-4',
+  openai: 'gpt-4o-mini', // Use gpt-4o-mini which supports JSON mode and is more cost-effective
   anthropic: 'claude-3-sonnet-20240229',
+} as const;
+
+// Supported models by provider
+export const SUPPORTED_MODELS = {
+  openai: [
+    'gpt-4',
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4-turbo',
+    'gpt-4-turbo-preview',
+    'gpt-3.5-turbo',
+    'gpt-3.5-turbo-16k',
+  ] as string[],
+  anthropic: [
+    'claude-3-opus-20240229',
+    'claude-3-sonnet-20240229', 
+    'claude-3-haiku-20240307',
+    'claude-3-5-sonnet-20241022',
+  ] as string[],
+};
+
+// Model capabilities and recommendations
+export const MODEL_CAPABILITIES = {
+  'gpt-4o': { 
+    provider: 'openai', 
+    tier: 'premium', 
+    description: 'Latest GPT-4 with improved reasoning and speed',
+    bestFor: ['complex-code-analysis', 'detailed-reviews']
+  },
+  'gpt-4': { 
+    provider: 'openai', 
+    tier: 'premium', 
+    description: 'Original GPT-4 with excellent reasoning',
+    bestFor: ['complex-code-analysis', 'detailed-reviews']
+  },
+  'gpt-4o-mini': { 
+    provider: 'openai', 
+    tier: 'standard', 
+    description: 'Fast and cost-effective GPT-4 variant',
+    bestFor: ['quick-reviews', 'large-prs']
+  },
+  'gpt-4-turbo': { 
+    provider: 'openai', 
+    tier: 'premium', 
+    description: 'Enhanced GPT-4 with larger context window',
+    bestFor: ['complex-code-analysis', 'detailed-reviews', 'large-files']
+  },
+  'gpt-3.5-turbo': { 
+    provider: 'openai', 
+    tier: 'standard', 
+    description: 'Fast and reliable for most code reviews',
+    bestFor: ['quick-reviews', 'standard-reviews']
+  },
+  'claude-3-opus-20240229': { 
+    provider: 'anthropic', 
+    tier: 'premium', 
+    description: 'Most capable Claude model for complex reasoning',
+    bestFor: ['complex-code-analysis', 'detailed-reviews']
+  },
+  'claude-3-sonnet-20240229': { 
+    provider: 'anthropic', 
+    tier: 'premium', 
+    description: 'Balanced Claude model for comprehensive reviews',
+    bestFor: ['detailed-reviews', 'balanced-cost-quality']
+  },
+  'claude-3-5-sonnet-20241022': { 
+    provider: 'anthropic', 
+    tier: 'premium', 
+    description: 'Latest Claude with enhanced code understanding',
+    bestFor: ['complex-code-analysis', 'detailed-reviews']
+  },
+  'claude-3-haiku-20240307': { 
+    provider: 'anthropic', 
+    tier: 'standard', 
+    description: 'Fast and cost-effective Claude model',
+    bestFor: ['quick-reviews', 'large-prs']
+  },
 } as const;
 
 export const SEVERITY_LEVELS = {

@@ -1,0 +1,124 @@
+# Example workflows showing different AI model configurations
+# This file demonstrates various ways to configure AI models for different use cases
+
+name: AI Model Configuration Examples
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  # Example 1: Auto-selection based on review level
+  auto-model-selection:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: AI Review with Auto Model Selection
+        uses: ./
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          ai_provider: 'auto'           # Choose provider automatically  
+          model: 'auto'                 # Choose model based on review_level
+          review_level: 'standard'      # Will select balanced models
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  # Example 2: Premium model for thorough reviews
+  premium-model-review:
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, 'needs-thorough-review')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Thorough AI Review with Premium Model
+        uses: ./
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          ai_provider: 'openai'
+          model: 'gpt-4o'              # Latest premium model
+          review_level: 'thorough'
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+
+  # Example 3: Cost-effective model for large PRs
+  cost-effective-review:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.changed_files > 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Quick AI Review for Large PR
+        uses: ./
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          ai_provider: 'openai'
+          model: 'gpt-4o-mini'         # Fast and cost-effective
+          review_level: 'light'
+          max_files: 30
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+
+  # Example 4: Anthropic Claude for complex analysis
+  claude-analysis:
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, 'complex-logic')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Complex Analysis with Claude
+        uses: ./
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          ai_provider: 'anthropic'
+          model: 'claude-3-5-sonnet-20241022'  # Latest Claude model
+          review_level: 'thorough'
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  # Example 5: Different models for different file types
+  specialized-review:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: "TypeScript Files"
+            patterns: "**/*.ts,**/*.tsx"
+            model: "gpt-4"
+            provider: "openai"
+          - name: "Python Files" 
+            patterns: "**/*.py"
+            model: "claude-3-sonnet-20240229"
+            provider: "anthropic"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Specialized Review for ${{ matrix.name }}
+        uses: ./
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          ai_provider: ${{ matrix.provider }}
+          model: ${{ matrix.model }}
+          include_patterns: ${{ matrix.patterns }}
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  # Example 6: Fallback configuration
+  fallback-review:
+    runs-on: ubuntu-latest
+    if: failure() # Run if other jobs fail
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Fallback Review with Reliable Model
+        uses: ./
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          ai_provider: 'openai'
+          model: 'gpt-3.5-turbo'       # Most reliable and fast
+          review_level: 'light'
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}

@@ -75,6 +75,44 @@ The bot automatically detects and applies Cursor rules from:
 
 ⚠️ *At least one AI provider API key is required*
 
+## 🤖 Supported AI Models
+
+### OpenAI Models
+
+| Model | Description | Best For | Cost |
+|-------|-------------|----------|------|
+| `gpt-4o` | Latest GPT-4 with improved reasoning and speed | Complex analysis, detailed reviews | Premium |
+| `gpt-4` | Original GPT-4 with excellent reasoning | Complex analysis, detailed reviews | Premium |
+| `gpt-4o-mini` | Fast and cost-effective GPT-4 variant | Quick reviews, large PRs | Standard |
+| `gpt-4-turbo` | Enhanced GPT-4 with larger context window | Complex analysis, large files | Premium |
+| `gpt-3.5-turbo` | Fast and reliable for most code reviews | Quick reviews, standard reviews | Standard |
+
+### Anthropic Models
+
+| Model | Description | Best For | Cost |
+|-------|-------------|----------|------|
+| `claude-3-5-sonnet-20241022` | Latest Claude with enhanced code understanding | Complex analysis, detailed reviews | Premium |
+| `claude-3-opus-20240229` | Most capable Claude model for complex reasoning | Complex analysis, detailed reviews | Premium |
+| `claude-3-sonnet-20240229` | Balanced Claude model for comprehensive reviews | Detailed reviews, balanced cost-quality | Premium |
+| `claude-3-haiku-20240307` | Fast and cost-effective Claude model | Quick reviews, large PRs | Standard |
+
+### Smart Model Selection
+
+The action can automatically select the best model based on your `review_level`:
+
+- **Light reviews** → Fast, cost-effective models (`gpt-4o-mini`, `claude-3-haiku`)
+- **Standard reviews** → Balanced models (`gpt-4`, `claude-3-sonnet`)  
+- **Thorough reviews** → Premium models (`gpt-4o`, `claude-3-5-sonnet`)
+
+```yaml
+# Automatic model selection
+- uses: amit.wagner/pr-reviewer@v1
+  with:
+    model: 'auto'              # Let the action choose
+    review_level: 'thorough'   # This will select premium models
+    ai_provider: 'auto'        # Choose provider automatically
+```
+
 ## 🎨 Comment Examples
 
 ### Inline Comments
@@ -155,6 +193,44 @@ Great work on the new feature! Just a few TypeScript type annotations needed to 
   with:
     include_patterns: '**/*.ts,**/*.tsx'
     exclude_patterns: '**/*.test.ts,**/*.spec.ts'
+```
+
+### Specific AI Models
+
+```yaml
+# Use latest GPT-4 model for premium quality
+- uses: amit.wagner/pr-reviewer@v1
+  with:
+    ai_provider: 'openai'
+    model: 'gpt-4o'
+    openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+
+# Use cost-effective model for large PRs
+- uses: amit.wagner/pr-reviewer@v1
+  with:
+    ai_provider: 'openai'
+    model: 'gpt-4o-mini'
+    openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+
+# Use latest Claude model for complex analysis
+- uses: amit.wagner/pr-reviewer@v1
+  with:
+    ai_provider: 'anthropic'
+    model: 'claude-3-5-sonnet-20241022'
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+### Smart Model Selection
+
+```yaml
+# Auto-select best model based on review level
+- uses: amit.wagner/pr-reviewer@v1
+  with:
+    ai_provider: 'auto'           # Choose provider automatically
+    model: 'auto'                 # Choose model based on review_level
+    review_level: 'thorough'      # Will select premium models
+    openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
 ### Multiple AI Providers
@@ -276,6 +352,16 @@ npm run release 1.2.3
 **Rate limit issues**
 - The action automatically handles GitHub API rate limits
 - For AI provider rate limits, consider using `review_level: 'light'`
+
+**Model compatibility issues**
+- Ensure the model name matches exactly (case-sensitive)
+- Check that the model is supported by your chosen provider
+- Use `model: 'auto'` if unsure which model to choose
+
+**"Model X is not supported by provider Y"**
+- Verify the model name spelling and provider compatibility
+- See the [Supported AI Models](#-supported-ai-models) section for valid combinations
+- Use the automatic model selection feature for best results
 
 ### Debug Mode
 
