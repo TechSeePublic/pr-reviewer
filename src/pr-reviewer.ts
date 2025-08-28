@@ -95,7 +95,7 @@ export class PRReviewer {
       if (this.inputs.enableAutoFix) {
         core.info('🔧 Applying auto-fixes...');
         const autoFixResults = await this.autoFixManager.applyAutoFixes(allIssues, fileChanges);
-        
+
         if (autoFixResults.length > 0) {
           const appliedFixes = autoFixResults.filter(result => result.applied);
           if (appliedFixes.length > 0) {
@@ -276,7 +276,7 @@ export class PRReviewer {
     // Include patch information for context
     if (fileChange.patch) {
       context += `Diff patch (focus your analysis ONLY on these changes):\n${fileChange.patch}\n\n`;
-      
+
       // Extract changed line numbers for more precise analysis
       const changedLines = this.extractChangedLines(fileChange.patch);
       if (changedLines.length > 0) {

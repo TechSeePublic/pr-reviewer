@@ -235,7 +235,7 @@ export class CursorRulesParser {
       // Auto-attached rules based on glob patterns
       if (rule.type === 'auto_attached' && rule.globs) {
         return filePaths.some(filePath =>
-          rule.globs!.some(glob => minimatch(filePath, glob))
+          rule.globs?.some(glob => minimatch(filePath, glob))
         );
       }
 

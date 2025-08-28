@@ -91,6 +91,7 @@ export class CommentManager {
           line,
           side: 'RIGHT', // Always comment on new code
         },
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         issue: locationIssues[0]!, // Store primary issue for reference (already validated above)
       };
 
@@ -213,7 +214,7 @@ export class CommentManager {
 
     const categoryIcon = this.getCategoryIcon(primaryIssue.category);
     const typeIcon = this.getIssueIcon(primaryIssue.type);
-    
+
     let body = `## ${categoryIcon} Code Review Finding\n\n`;
 
     // Primary issue with category badge
@@ -289,9 +290,9 @@ export class CommentManager {
     if (issues.length > 0) {
       const issuesByCategory = this.groupIssuesByCategory(issues);
       const issuesByType = this.groupIssuesByType(issues);
-      
+
       body += `### 🎯 **Issues Breakdown**\n\n`;
-      
+
       // By category
       body += `**By Category:**\n`;
       const categoryOrder = ['bug', 'security', 'performance', 'rule_violation', 'best_practice'];
@@ -301,7 +302,7 @@ export class CommentManager {
           body += `- ${categoryIcon} **${this.formatCategoryName(category)}:** ${issuesByCategory[category].length}\n`;
         }
       }
-      
+
       body += `\n**By Severity:**\n`;
       const typeOrder = ['error', 'warning', 'info', 'suggestion'];
       for (const type of typeOrder) {
@@ -374,11 +375,11 @@ export class CommentManager {
     // Next steps
     if (issues.length > 0) {
       body += `### 🛠️ **Recommended Actions**\n`;
-      
+
       const hasCritical = issues.some(i => i.type === 'error' || i.severity === 'high');
       const hasSecurityIssues = issues.some(i => i.category === 'security');
       const hasBugs = issues.some(i => i.category === 'bug');
-      
+
       if (hasCritical) {
         body += `1. **🚨 Address critical issues immediately** - These may prevent successful deployment\n`;
       }
@@ -388,7 +389,7 @@ export class CommentManager {
       if (hasBugs) {
         body += `3. **🐛 Resolve bugs** - These may cause unexpected behavior\n`;
       }
-      
+
       body += `${hasCritical || hasSecurityIssues || hasBugs ? '' : '1. '}Review inline comments for detailed suggestions\n`;
       body += `${hasCritical || hasSecurityIssues || hasBugs ? '' : '2. '}Apply recommended fixes where appropriate\n`;
       body += `${hasCritical || hasSecurityIssues || hasBugs ? '' : '3. '}Push changes to trigger a new review\n\n`;
@@ -450,6 +451,7 @@ export class CommentManager {
       if (!grouped[issue.type]) {
         grouped[issue.type] = [];
       }
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       grouped[issue.type]!.push(issue);
     }
 
@@ -466,6 +468,7 @@ export class CommentManager {
       if (!grouped[issue.category]) {
         grouped[issue.category] = [];
       }
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       grouped[issue.category]!.push(issue);
     }
 

@@ -9,14 +9,14 @@ export const logger = {
     core.info(message);
   },
 
-  warn: (message: string, error?: any) => {
+  warn: (message: string, error?: unknown) => {
     core.warning(message);
     if (error) {
       core.debug(`Warning details: ${error}`);
     }
   },
 
-  error: (message: string, error?: any) => {
+  error: (message: string, error?: unknown) => {
     core.error(message);
     if (error) {
       core.debug(`Error details: ${error}`);

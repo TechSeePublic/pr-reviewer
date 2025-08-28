@@ -7,11 +7,13 @@ import * as github from '@actions/github';
 import { minimatch } from 'minimatch';
 import {
   ActionInputs,
+  CodeIssue,
   FileChange,
   GitHubFile,
   InlineComment,
   PRContext,
   RateLimitInfo,
+  ReviewResult,
   SummaryComment
 } from './types';
 import { COMMENT_MARKERS } from './config';
@@ -161,7 +163,7 @@ export class GitHubClient {
         .map(comment => ({
           id: comment.id,
           body: comment.body || '',
-          reviewResult: {} as any, // Will be populated when needed
+          reviewResult: {} as ReviewResult, // Will be populated when needed
         }))[0];
 
       const inlineComments = reviewComments
@@ -175,7 +177,7 @@ export class GitHubClient {
             line: comment.line || comment.original_line || 0,
             side: (comment.side || 'RIGHT') as 'RIGHT' | 'LEFT',
           },
-          issue: {} as any, // Will be populated when needed
+          issue: {} as CodeIssue, // Will be populated when needed
         }));
 
       const result: { summaryComment?: SummaryComment; inlineComments: InlineComment[]; } = { inlineComments };

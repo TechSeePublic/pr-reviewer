@@ -11,7 +11,8 @@ import {
   CodeIssue,
   CommitResult,
   FileChange,
-  PRContext
+  PRContext,
+  ReviewResult
 } from './types';
 import { GitHubClient } from './github-client';
 import { logger } from './logger';
@@ -155,6 +156,7 @@ export class AutoFixManager {
         grouped[issue.file] = [];
       }
       // TypeScript knows grouped[issue.file] is defined here due to the check above
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       grouped[issue.file]!.push(issue);
     }
 
@@ -167,7 +169,7 @@ export class AutoFixManager {
   private async applyFixesToFile(
     fileName: string,
     issues: CodeIssue[],
-    fileChanges: FileChange[]
+    _fileChanges: FileChange[]
   ): Promise<AutoFixResult[]> {
     const results: AutoFixResult[] = [];
 
@@ -255,7 +257,7 @@ export class AutoFixManager {
     content: string,
     issue: CodeIssue,
     lines: string[],
-    fileName: string
+    _fileName: string
   ): Promise<{ success: boolean; content: string; error?: string }> {
     if (!issue.line) {
       return { success: false, content, error: 'No line number specified' };
@@ -372,7 +374,7 @@ export class AutoFixManager {
 
     try {
       await this.githubClient.postSummaryComment(
-        { body, reviewResult: {} as any },
+        { body, reviewResult: {} as ReviewResult },
         undefined
       );
     } catch (error) {

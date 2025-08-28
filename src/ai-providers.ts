@@ -52,7 +52,7 @@ export class OpenAIProvider implements AIProvider {
       const userPrompt = this.buildUserPrompt(prompt, code);
 
       // Build the request configuration
-      const requestConfig: any = {
+      const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
         model: this.model,
         messages: [
           { role: 'system', content: systemPrompt },
