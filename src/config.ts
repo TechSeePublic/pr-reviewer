@@ -6,38 +6,53 @@ import * as core from '@actions/core';
 import { ActionInputs } from './types';
 
 export function getActionInputs(): ActionInputs {
-  const includePatterns = core.getInput('include_patterns')
+  const includePatterns = core
+    .getInput('include_patterns')
     .split(',')
     .map(p => p.trim())
     .filter(p => p.length > 0);
 
-  const excludePatterns = core.getInput('exclude_patterns')
+  const excludePatterns = core
+    .getInput('exclude_patterns')
     .split(',')
     .map(p => p.trim())
     .filter(p => p.length > 0);
 
   const inputs: ActionInputs = {
     githubToken: core.getInput('gh_token', { required: true }),
-    aiProvider: core.getInput('ai_provider') as 'openai' | 'anthropic' | 'auto' || 'auto',
+    aiProvider: (core.getInput('ai_provider') as 'openai' | 'anthropic' | 'auto') || 'auto',
     model: core.getInput('model') || 'auto',
-    reviewLevel: core.getInput('review_level') as 'light' | 'standard' | 'thorough' || 'standard',
-    includePatterns: includePatterns.length > 0 ? includePatterns : [
-      '**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx',
-      '**/*.py', '**/*.go', '**/*.rs', '**/*.java', '**/*.cs'
-    ],
-    excludePatterns: excludePatterns.length > 0 ? excludePatterns : [
-      'node_modules/**', 'dist/**', 'build/**', 'coverage/**',
-      '*.min.js', '*.bundle.js'
-    ],
+    reviewLevel: (core.getInput('review_level') as 'light' | 'standard' | 'thorough') || 'standard',
+    includePatterns:
+      includePatterns.length > 0
+        ? includePatterns
+        : [
+            '**/*.ts',
+            '**/*.tsx',
+            '**/*.js',
+            '**/*.jsx',
+            '**/*.py',
+            '**/*.go',
+            '**/*.rs',
+            '**/*.java',
+            '**/*.cs',
+          ],
+    excludePatterns:
+      excludePatterns.length > 0
+        ? excludePatterns
+        : ['node_modules/**', 'dist/**', 'build/**', 'coverage/**', '*.min.js', '*.bundle.js'],
     maxFiles: parseInt(core.getInput('max_files') || '50', 10),
-    commentStyle: core.getInput('comment_style') as 'inline' | 'summary' | 'both' || 'both',
-    inlineSeverity: core.getInput('inline_severity') as 'error' | 'warning' | 'info' | 'all' || 'warning',
-    summaryFormat: core.getInput('summary_format') as 'brief' | 'detailed' | 'minimal' || 'detailed',
+    commentStyle: (core.getInput('comment_style') as 'inline' | 'summary' | 'both') || 'both',
+    inlineSeverity:
+      (core.getInput('inline_severity') as 'error' | 'warning' | 'info' | 'all') || 'warning',
+    summaryFormat:
+      (core.getInput('summary_format') as 'brief' | 'detailed' | 'minimal') || 'detailed',
     enableSuggestions: core.getBooleanInput('enable_suggestions') ?? true,
     skipIfNoRules: core.getBooleanInput('skip_if_no_rules') ?? false,
     updateExistingComments: core.getBooleanInput('update_existing_comments') ?? true,
     enableAutoFix: core.getBooleanInput('enable_auto_fix') ?? false,
-    autoFixSeverity: core.getInput('auto_fix_severity') as 'error' | 'warning' | 'info' | 'all' || 'error',
+    autoFixSeverity:
+      (core.getInput('auto_fix_severity') as 'error' | 'warning' | 'info' | 'all') || 'error',
   };
 
   // Add optional properties only if they have values
@@ -70,7 +85,9 @@ export function validateInputs(inputs: ActionInputs): void {
   }
 
   if (inputs.aiProvider === 'auto' && !inputs.openaiApiKey && !inputs.anthropicApiKey) {
-    throw new Error('At least one AI provider API key is required (openai_api_key or anthropic_api_key)');
+    throw new Error(
+      'At least one AI provider API key is required (openai_api_key or anthropic_api_key)'
+    );
   }
 
   // Validate model selection
@@ -113,8 +130,8 @@ export function validateModelChoice(model: string, provider: string, inputs: Act
     const suggestions = supportedModels ? supportedModels.slice(0, 3).join(', ') : 'none available';
     throw new Error(
       `Model "${model}" is not supported by provider "${provider}". ` +
-      `Supported models: ${suggestions}. ` +
-      `See documentation for full list.`
+        `Supported models: ${suggestions}. ` +
+        `See documentation for full list.`
     );
   }
 }
@@ -123,20 +140,23 @@ export function getRecommendedModel(provider: string, reviewLevel: string): stri
   const recommendations = {
     light: {
       openai: 'gpt-4o-mini',
-      anthropic: 'claude-3-haiku-20240307'
+      anthropic: 'claude-3-haiku-20240307',
     },
     standard: {
       openai: 'gpt-4',
-      anthropic: 'claude-3-sonnet-20240229'
+      anthropic: 'claude-3-sonnet-20240229',
     },
     thorough: {
       openai: 'gpt-4o',
-      anthropic: 'claude-3-5-sonnet-20241022'
-    }
+      anthropic: 'claude-3-5-sonnet-20241022',
+    },
   };
 
-  return recommendations[reviewLevel as keyof typeof recommendations]?.[provider as keyof typeof recommendations.standard] ||
-         DEFAULT_MODELS[provider as keyof typeof DEFAULT_MODELS];
+  return (
+    recommendations[reviewLevel as keyof typeof recommendations]?.[
+      provider as keyof typeof recommendations.standard
+    ] || DEFAULT_MODELS[provider as keyof typeof DEFAULT_MODELS]
+  );
 }
 
 export function getModelInfo(model: string) {
@@ -173,55 +193,55 @@ export const MODEL_CAPABILITIES = {
     provider: 'openai',
     tier: 'premium',
     description: 'Latest GPT-4 with improved reasoning and speed',
-    bestFor: ['complex-code-analysis', 'detailed-reviews']
+    bestFor: ['complex-code-analysis', 'detailed-reviews'],
   },
   'gpt-4': {
     provider: 'openai',
     tier: 'premium',
     description: 'Original GPT-4 with excellent reasoning',
-    bestFor: ['complex-code-analysis', 'detailed-reviews']
+    bestFor: ['complex-code-analysis', 'detailed-reviews'],
   },
   'gpt-4o-mini': {
     provider: 'openai',
     tier: 'standard',
     description: 'Fast and cost-effective GPT-4 variant',
-    bestFor: ['quick-reviews', 'large-prs']
+    bestFor: ['quick-reviews', 'large-prs'],
   },
   'gpt-4-turbo': {
     provider: 'openai',
     tier: 'premium',
     description: 'Enhanced GPT-4 with larger context window',
-    bestFor: ['complex-code-analysis', 'detailed-reviews', 'large-files']
+    bestFor: ['complex-code-analysis', 'detailed-reviews', 'large-files'],
   },
   'gpt-3.5-turbo': {
     provider: 'openai',
     tier: 'standard',
     description: 'Fast and reliable for most code reviews',
-    bestFor: ['quick-reviews', 'standard-reviews']
+    bestFor: ['quick-reviews', 'standard-reviews'],
   },
   'claude-3-opus-20240229': {
     provider: 'anthropic',
     tier: 'premium',
     description: 'Most capable Claude model for complex reasoning',
-    bestFor: ['complex-code-analysis', 'detailed-reviews']
+    bestFor: ['complex-code-analysis', 'detailed-reviews'],
   },
   'claude-3-sonnet-20240229': {
     provider: 'anthropic',
     tier: 'premium',
     description: 'Balanced Claude model for comprehensive reviews',
-    bestFor: ['detailed-reviews', 'balanced-cost-quality']
+    bestFor: ['detailed-reviews', 'balanced-cost-quality'],
   },
   'claude-3-5-sonnet-20241022': {
     provider: 'anthropic',
     tier: 'premium',
     description: 'Latest Claude with enhanced code understanding',
-    bestFor: ['complex-code-analysis', 'detailed-reviews']
+    bestFor: ['complex-code-analysis', 'detailed-reviews'],
   },
   'claude-3-haiku-20240307': {
     provider: 'anthropic',
     tier: 'standard',
     description: 'Fast and cost-effective Claude model',
-    bestFor: ['quick-reviews', 'large-prs']
+    bestFor: ['quick-reviews', 'large-prs'],
   },
 } as const;
 

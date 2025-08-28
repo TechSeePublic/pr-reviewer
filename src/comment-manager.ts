@@ -8,7 +8,7 @@ import {
   FileChange,
   InlineComment,
   ReviewResult,
-  SummaryComment
+  SummaryComment,
   // CursorRule, // Currently unused
   // PRContext, // Currently unused
 } from './types';
@@ -29,11 +29,15 @@ export class CommentManager {
    * Post all review comments (inline and summary)
    */
   async postReviewComments(reviewResult: ReviewResult, fileChanges: FileChange[]): Promise<void> {
-    const shouldPostInline = this.inputs.commentStyle === 'inline' || this.inputs.commentStyle === 'both';
-    const shouldPostSummary = this.inputs.commentStyle === 'summary' || this.inputs.commentStyle === 'both';
+    const shouldPostInline =
+      this.inputs.commentStyle === 'inline' || this.inputs.commentStyle === 'both';
+    const shouldPostSummary =
+      this.inputs.commentStyle === 'summary' || this.inputs.commentStyle === 'both';
 
     // Get existing comments if we should update them
-    let existingComments: { inlineComments: InlineComment[]; summaryComment?: SummaryComment; } = { inlineComments: [] };
+    let existingComments: { inlineComments: InlineComment[]; summaryComment?: SummaryComment } = {
+      inlineComments: [],
+    };
 
     if (this.inputs.updateExistingComments) {
       existingComments = await this.githubClient.getExistingBotComments();
@@ -41,7 +45,11 @@ export class CommentManager {
 
     // Post inline comments
     if (shouldPostInline) {
-      await this.postInlineComments(reviewResult.issues, fileChanges, existingComments.inlineComments);
+      await this.postInlineComments(
+        reviewResult.issues,
+        fileChanges,
+        existingComments.inlineComments
+      );
     }
 
     // Post summary comment
@@ -111,7 +119,10 @@ export class CommentManager {
   /**
    * Post summary comment
    */
-  private async postSummaryComment(reviewResult: ReviewResult, existingComment?: SummaryComment): Promise<void> {
+  private async postSummaryComment(
+    reviewResult: ReviewResult,
+    existingComment?: SummaryComment
+  ): Promise<void> {
     const comment: SummaryComment = {
       body: this.formatSummaryCommentBody(reviewResult),
       reviewResult,
@@ -223,7 +234,8 @@ export class CommentManager {
     body += `${primaryIssue.description}\n\n`;
 
     // Severity indicator
-    const severityIcon = primaryIssue.severity === 'high' ? '🚨' : primaryIssue.severity === 'medium' ? '⚠️' : 'ℹ️';
+    const severityIcon =
+      primaryIssue.severity === 'high' ? '🚨' : primaryIssue.severity === 'medium' ? '⚠️' : 'ℹ️';
     body += `**${severityIcon} Severity:** ${primaryIssue.severity.toUpperCase()}\n\n`;
 
     // Rule information
@@ -314,7 +326,9 @@ export class CommentManager {
       body += '\n';
 
       // Critical issues first
-      const criticalIssues = issues.filter(issue => issue.type === 'error' || issue.severity === 'high');
+      const criticalIssues = issues.filter(
+        issue => issue.type === 'error' || issue.severity === 'high'
+      );
       if (criticalIssues.length > 0) {
         body += `### 🚨 **Critical Issues Requiring Immediate Attention**\n`;
         for (const issue of criticalIssues.slice(0, 5)) {
@@ -408,10 +422,14 @@ export class CommentManager {
    */
   private getStatusIcon(status: string): string {
     switch (status) {
-      case 'passed': return '✅';
-      case 'needs_attention': return '⚠️';
-      case 'failed': return '❌';
-      default: return '🔍';
+      case 'passed':
+        return '✅';
+      case 'needs_attention':
+        return '⚠️';
+      case 'failed':
+        return '❌';
+      default:
+        return '🔍';
     }
   }
 
@@ -420,11 +438,16 @@ export class CommentManager {
    */
   private getIssueIcon(type: string): string {
     switch (type) {
-      case 'error': return '❌';
-      case 'warning': return '⚠️';
-      case 'info': return 'ℹ️';
-      case 'suggestion': return '💡';
-      default: return '🔍';
+      case 'error':
+        return '❌';
+      case 'warning':
+        return '⚠️';
+      case 'info':
+        return 'ℹ️';
+      case 'suggestion':
+        return '💡';
+      default:
+        return '🔍';
     }
   }
 
@@ -433,11 +456,16 @@ export class CommentManager {
    */
   private getRuleTypeEmoji(type: string): string {
     switch (type) {
-      case 'always': return '🔒';
-      case 'auto_attached': return '📎';
-      case 'agent_requested': return '🤖';
-      case 'manual': return '👤';
-      default: return '📝';
+      case 'always':
+        return '🔒';
+      case 'auto_attached':
+        return '📎';
+      case 'agent_requested':
+        return '🤖';
+      case 'manual':
+        return '👤';
+      default:
+        return '📝';
     }
   }
 
@@ -480,12 +508,18 @@ export class CommentManager {
    */
   private getCategoryIcon(category: string): string {
     switch (category) {
-      case 'bug': return '🐛';
-      case 'security': return '🔒';
-      case 'performance': return '⚡';
-      case 'rule_violation': return '📏';
-      case 'best_practice': return '💡';
-      default: return '🔍';
+      case 'bug':
+        return '🐛';
+      case 'security':
+        return '🔒';
+      case 'performance':
+        return '⚡';
+      case 'rule_violation':
+        return '📏';
+      case 'best_practice':
+        return '💡';
+      default:
+        return '🔍';
     }
   }
 
@@ -494,12 +528,18 @@ export class CommentManager {
    */
   private formatCategoryName(category: string): string {
     switch (category) {
-      case 'bug': return 'Bugs';
-      case 'security': return 'Security Issues';
-      case 'performance': return 'Performance Issues';
-      case 'rule_violation': return 'Rule Violations';
-      case 'best_practice': return 'Best Practices';
-      default: return 'Other';
+      case 'bug':
+        return 'Bugs';
+      case 'security':
+        return 'Security Issues';
+      case 'performance':
+        return 'Performance Issues';
+      case 'rule_violation':
+        return 'Rule Violations';
+      case 'best_practice':
+        return 'Best Practices';
+      default:
+        return 'Other';
     }
   }
 }

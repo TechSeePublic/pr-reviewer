@@ -10,7 +10,7 @@ import {
   AIResponse,
   CodeIssue,
   CursorRule,
-  ReviewContext
+  ReviewContext,
 } from './types';
 import { DEFAULT_MODELS, getModelInfo, getRecommendedModel } from './config';
 import { logger } from './logger';
@@ -38,12 +38,10 @@ export class OpenAIProvider implements AIProvider {
       'gpt-4o-mini',
       'gpt-4o-mini-2024-07-18',
       'gpt-3.5-turbo-1106',
-      'gpt-3.5-turbo-0125'
+      'gpt-3.5-turbo-0125',
     ];
 
-    return supportedModels.some(supportedModel =>
-      this.model.startsWith(supportedModel)
-    );
+    return supportedModels.some(supportedModel => this.model.startsWith(supportedModel));
   }
 
   async reviewCode(prompt: string, code: string, rules: CursorRule[]): Promise<CodeIssue[]> {
@@ -88,7 +86,11 @@ export class OpenAIProvider implements AIProvider {
       const response = await this.client.chat.completions.create({
         model: this.model,
         messages: [
-          { role: 'system', content: 'You are a helpful code review assistant that creates concise, actionable PR review summaries.' },
+          {
+            role: 'system',
+            content:
+              'You are a helpful code review assistant that creates concise, actionable PR review summaries.',
+          },
           { role: 'user', content: prompt },
         ],
         temperature: 0.2,
@@ -104,8 +106,8 @@ export class OpenAIProvider implements AIProvider {
 
   private buildSystemPrompt(rules: CursorRule[]): string {
     const jsonInstructions = this.supportsJsonMode()
-      ? "5. Return responses in valid JSON format only"
-      : "5. Return responses in valid JSON format only (start your response with { and end with })";
+      ? '5. Return responses in valid JSON format only'
+      : '5. Return responses in valid JSON format only (start your response with { and end with })';
 
     let prompt = `You are a comprehensive code review assistant that analyzes code changes for:
 1. Violations of provided Cursor AI rules
@@ -265,9 +267,7 @@ export class AnthropicProvider implements AIProvider {
         max_tokens: 4000,
         temperature: 0.1,
         system: systemPrompt,
-        messages: [
-          { role: 'user', content: userPrompt },
-        ],
+        messages: [{ role: 'user', content: userPrompt }],
       });
 
       const result = response.content[0];
@@ -290,10 +290,9 @@ export class AnthropicProvider implements AIProvider {
         model: this.model,
         max_tokens: 1500,
         temperature: 0.2,
-        system: 'You are a helpful code review assistant that creates concise, actionable PR review summaries.',
-        messages: [
-          { role: 'user', content: prompt },
-        ],
+        system:
+          'You are a helpful code review assistant that creates concise, actionable PR review summaries.',
+        messages: [{ role: 'user', content: prompt }],
       });
 
       const result = response.content[0];
@@ -493,7 +492,7 @@ export class AIProviderFactory {
       if (modelInfo && modelInfo.provider !== provider) {
         throw new Error(
           `Model "${model}" is not compatible with provider "${provider}". ` +
-          `This model requires provider "${modelInfo.provider}".`
+            `This model requires provider "${modelInfo.provider}".`
         );
       }
     } else {

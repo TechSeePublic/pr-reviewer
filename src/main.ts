@@ -30,13 +30,14 @@ async function run(): Promise<void> {
     core.info(`  - Status: ${result.status}`);
 
     if (result.status === 'failed') {
-      core.setFailed(`Review failed with ${result.issues.filter(i => i.type === 'error').length} error(s)`);
+      core.setFailed(
+        `Review failed with ${result.issues.filter(i => i.type === 'error').length} error(s)`
+      );
     } else if (result.status === 'needs_attention') {
       core.warning(`Review completed with ${result.issues.length} issue(s) that need attention`);
     } else {
       core.info('✅ Review passed successfully!');
     }
-
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     core.setFailed(`Action failed: ${errorMessage}`);

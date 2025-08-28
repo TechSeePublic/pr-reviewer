@@ -25,5 +25,5 @@ export const logger = {
 
   debug: (message: string) => {
     core.debug(message);
-  }
+  },
 };

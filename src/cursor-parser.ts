@@ -128,7 +128,7 @@ export class CursorRulesParser {
     // Extract referenced files (@filename.ext)
     const referencedFiles = this.extractReferencedFiles(ruleContent);
 
-    const parsedMetadata: { description?: string; globs?: string[]; alwaysApply?: boolean; } = {
+    const parsedMetadata: { description?: string; globs?: string[]; alwaysApply?: boolean } = {
       alwaysApply: Boolean(metadata.alwaysApply),
     };
 
@@ -234,9 +234,7 @@ export class CursorRulesParser {
 
       // Auto-attached rules based on glob patterns
       if (rule.type === 'auto_attached' && rule.globs) {
-        return filePaths.some(filePath =>
-          rule.globs?.some(glob => minimatch(filePath, glob))
-        );
+        return filePaths.some(filePath => rule.globs?.some(glob => minimatch(filePath, glob)));
       }
 
       // Agent requested and manual rules (let AI decide)

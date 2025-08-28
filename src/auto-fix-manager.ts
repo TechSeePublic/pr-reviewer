@@ -12,7 +12,7 @@ import {
   CommitResult,
   FileChange,
   PRContext,
-  ReviewResult
+  ReviewResult,
 } from './types';
 import { GitHubClient } from './github-client';
 import { logger } from './logger';
@@ -197,12 +197,7 @@ export class AutoFixManager {
 
     for (const issue of sortedIssues) {
       try {
-        const fixResult = await this.applyIndividualFix(
-          modifiedContent,
-          issue,
-          lines,
-          fileName
-        );
+        const fixResult = await this.applyIndividualFix(modifiedContent, issue, lines, fileName);
 
         if (fixResult.success) {
           modifiedContent = fixResult.content;
@@ -287,7 +282,10 @@ export class AutoFixManager {
       const originalLine = lines[lineIndex];
 
       // Simple heuristic: if suggestion looks like a complete line replacement
-      if (originalLine && (issue.suggestion.includes('\n') || issue.suggestion.length > originalLine.length * 0.5)) {
+      if (
+        originalLine &&
+        (issue.suggestion.includes('\n') || issue.suggestion.length > originalLine.length * 0.5)
+      ) {
         const newLines = [...lines];
         newLines[lineIndex] = issue.suggestion;
         return { success: true, content: newLines.join('\n') };
@@ -387,12 +385,18 @@ export class AutoFixManager {
    */
   private formatCategoryName(category: string): string {
     switch (category) {
-      case 'bug': return 'Bug Fixes';
-      case 'security': return 'Security Issues';
-      case 'performance': return 'Performance Improvements';
-      case 'rule_violation': return 'Rule Violations';
-      case 'best_practice': return 'Best Practices';
-      default: return 'Other';
+      case 'bug':
+        return 'Bug Fixes';
+      case 'security':
+        return 'Security Issues';
+      case 'performance':
+        return 'Performance Improvements';
+      case 'rule_violation':
+        return 'Rule Violations';
+      case 'best_practice':
+        return 'Best Practices';
+      default:
+        return 'Other';
     }
   }
 }

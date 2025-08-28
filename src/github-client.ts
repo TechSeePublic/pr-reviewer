@@ -14,7 +14,7 @@ import {
   PRContext,
   RateLimitInfo,
   ReviewResult,
-  SummaryComment
+  SummaryComment,
 } from './types';
 import { COMMENT_MARKERS } from './config';
 import { logger } from './logger';
@@ -180,7 +180,9 @@ export class GitHubClient {
           issue: {} as CodeIssue, // Will be populated when needed
         }));
 
-      const result: { summaryComment?: SummaryComment; inlineComments: InlineComment[]; } = { inlineComments };
+      const result: { summaryComment?: SummaryComment; inlineComments: InlineComment[] } = {
+        inlineComments,
+      };
       if (summaryComment) {
         result.summaryComment = summaryComment;
       }

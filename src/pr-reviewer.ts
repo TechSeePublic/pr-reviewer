@@ -15,7 +15,7 @@ import {
   FileChange,
   PRContext,
   ReviewContext,
-  ReviewResult
+  ReviewResult,
 } from './types';
 import { CursorRulesParser } from './cursor-parser';
 import { GitHubClient } from './github-client';
@@ -43,7 +43,12 @@ export class PRReviewer {
     this.githubClient = new GitHubClient(inputs.githubToken, this.prContext);
     this.aiProvider = AIProviderFactory.create(inputs);
     this.commentManager = new CommentManager(this.githubClient, inputs);
-    this.autoFixManager = new AutoFixManager(this.githubClient, inputs, this.prContext, this.workspacePath);
+    this.autoFixManager = new AutoFixManager(
+      this.githubClient,
+      inputs,
+      this.prContext,
+      this.workspacePath
+    );
   }
 
   /**
@@ -116,7 +121,6 @@ export class PRReviewer {
 
       core.info(`✅ Review completed: ${reviewResult.status} (${allIssues.length} issues found)`);
       return reviewResult;
-
     } catch (error) {
       core.setFailed(`PR review failed: ${error}`);
       throw error;
@@ -158,11 +162,8 @@ export class PRReviewer {
       return false;
     }
 
-    const hasRules = (
-      cursorRules.projectRules.length > 0 ||
-      cursorRules.agentsMarkdown ||
-      cursorRules.legacyRules
-    );
+    const hasRules =
+      cursorRules.projectRules.length > 0 || cursorRules.agentsMarkdown || cursorRules.legacyRules;
 
     return !hasRules;
   }
@@ -170,7 +171,10 @@ export class PRReviewer {
   /**
    * Filter rules that apply to the changed files
    */
-  private filterApplicableRules(cursorRules: CursorRulesConfig, fileChanges: FileChange[]): CursorRule[] {
+  private filterApplicableRules(
+    cursorRules: CursorRulesConfig,
+    fileChanges: FileChange[]
+  ): CursorRule[] {
     const parser = new CursorRulesParser(this.workspacePath);
     const changedFiles = fileChanges.map(fc => fc.filename);
 
@@ -188,7 +192,7 @@ export class PRReviewer {
     for (let i = 0; i < fileChanges.length; i += maxConcurrentReviews) {
       const batch = fileChanges.slice(i, i + maxConcurrentReviews);
 
-      const batchPromises = batch.map(async (fileChange) => {
+      const batchPromises = batch.map(async fileChange => {
         try {
           return await this.reviewSingleFile(fileChange, rules);
         } catch (error) {
@@ -215,7 +219,10 @@ export class PRReviewer {
   /**
    * Review a single file
    */
-  private async reviewSingleFile(fileChange: FileChange, rules: CursorRule[]): Promise<CodeIssue[]> {
+  private async reviewSingleFile(
+    fileChange: FileChange,
+    rules: CursorRule[]
+  ): Promise<CodeIssue[]> {
     // Skip binary files or very large files
     if (fileChange.changes > 1000) {
       core.warning(`Skipping large file ${fileChange.filename} (${fileChange.changes} changes)`);
