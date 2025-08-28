@@ -19,6 +19,8 @@ export interface ActionInputs {
   enableSuggestions: boolean;
   skipIfNoRules: boolean;
   updateExistingComments: boolean;
+  enableAutoFix: boolean;
+  autoFixSeverity: 'error' | 'warning' | 'info' | 'all';
 }
 
 export interface PRContext {
@@ -59,9 +61,11 @@ export interface FileChange {
 
 export interface CodeIssue {
   type: 'error' | 'warning' | 'info' | 'suggestion';
+  category: 'rule_violation' | 'bug' | 'security' | 'performance' | 'best_practice';
   message: string;
   description: string;
   suggestion?: string;
+  fixedCode?: string; // Complete code fix for auto-application
   ruleId: string;
   ruleName: string;
   file: string;
@@ -147,4 +151,17 @@ export interface ActionOutputs {
   filesReviewed: number;
   issuesFound: number;
   rulesApplied: number;
+}
+
+export interface AutoFixResult {
+  file: string;
+  issue: CodeIssue;
+  applied: boolean;
+  error?: string;
+}
+
+export interface CommitResult {
+  sha: string;
+  message: string;
+  filesChanged: number;
 }

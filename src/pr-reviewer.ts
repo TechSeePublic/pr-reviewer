@@ -21,6 +21,7 @@ import { CursorRulesParser } from './cursor-parser';
 import { GitHubClient } from './github-client';
 import { AIProviderFactory } from './ai-providers';
 import { CommentManager } from './comment-manager';
+import { AutoFixManager } from './auto-fix-manager';
 
 export class PRReviewer {
   private inputs: ActionInputs;
@@ -28,6 +29,7 @@ export class PRReviewer {
   private githubClient: GitHubClient;
   private aiProvider: AIProvider;
   private commentManager: CommentManager;
+  private autoFixManager: AutoFixManager;
   private workspacePath: string;
 
   constructor(inputs: ActionInputs, workspacePath: string = process.cwd()) {
@@ -41,6 +43,7 @@ export class PRReviewer {
     this.githubClient = new GitHubClient(inputs.githubToken, this.prContext);
     this.aiProvider = AIProviderFactory.create(inputs);
     this.commentManager = new CommentManager(this.githubClient, inputs);
+    this.autoFixManager = new AutoFixManager(this.githubClient, inputs, this.prContext, this.workspacePath);
   }
 
   /**
@@ -88,11 +91,27 @@ export class PRReviewer {
         cursorRules
       );
 
-      // Step 6: Post comments
+      // Step 6: Apply auto-fixes if enabled
+      if (this.inputs.enableAutoFix) {
+        core.info('🔧 Applying auto-fixes...');
+        const autoFixResults = await this.autoFixManager.applyAutoFixes(allIssues, fileChanges);
+        
+        if (autoFixResults.length > 0) {
+          const appliedFixes = autoFixResults.filter(result => result.applied);
+          if (appliedFixes.length > 0) {
+            core.info(`✅ Applied ${appliedFixes.length} auto-fixes`);
+            await this.autoFixManager.commitFixes(autoFixResults);
+          } else {
+            core.info('ℹ️ No auto-fixes could be applied');
+          }
+        }
+      }
+
+      // Step 7: Post comments
       core.info('💬 Posting review comments...');
       await this.commentManager.postReviewComments(reviewResult, fileChanges);
 
-      // Step 7: Set outputs
+      // Step 8: Set outputs
       this.setActionOutputs(reviewResult);
 
       core.info(`✅ Review completed: ${reviewResult.status} (${allIssues.length} issues found)`);
@@ -256,11 +275,21 @@ export class PRReviewer {
 
     // Include patch information for context
     if (fileChange.patch) {
-      context += `Diff patch:\n${fileChange.patch}\n\n`;
+      context += `Diff patch (focus your analysis ONLY on these changes):\n${fileChange.patch}\n\n`;
+      
+      // Extract changed line numbers for more precise analysis
+      const changedLines = this.extractChangedLines(fileChange.patch);
+      if (changedLines.length > 0) {
+        context += `Changed line numbers: ${changedLines.join(', ')}\n\n`;
+      }
     }
 
-    context += `Please review this ${fileChange.status} file according to the Cursor rules provided.\n`;
-    context += `Focus on the actual changes and ensure they follow the established patterns.\n\n`;
+    context += `IMPORTANT: Only flag issues that are directly related to the code changes shown in the diff above.\n`;
+    context += `Do NOT comment on pre-existing code unless it's directly impacted by the current changes.\n`;
+    context += `Focus your analysis specifically on:\n`;
+    context += `1. Lines that were added (marked with +)\n`;
+    context += `2. Lines that were modified (context around changes)\n`;
+    context += `3. Logic that is directly affected by the changes\n\n`;
 
     return context;
   }
@@ -370,6 +399,35 @@ export class PRReviewer {
     core.setOutput('files_reviewed', result.filesReviewed.toString());
     core.setOutput('issues_found', result.issues.length.toString());
     core.setOutput('rules_applied', result.rulesApplied.length.toString());
+  }
+
+  /**
+   * Extract changed line numbers from patch
+   */
+  private extractChangedLines(patch: string): number[] {
+    const changedLines: number[] = [];
+    const lines = patch.split('\n');
+    let currentLine = 0;
+
+    for (const line of lines) {
+      if (line.startsWith('@@')) {
+        // Parse hunk header: @@ -oldStart,oldLines +newStart,newLines @@
+        const match = line.match(/\+(\d+)/);
+        if (match && match[1]) {
+          currentLine = parseInt(match[1], 10) - 1;
+        }
+      } else if (line.startsWith('+') && !line.startsWith('+++')) {
+        // Added line
+        currentLine++;
+        changedLines.push(currentLine);
+      } else if (line.startsWith(' ')) {
+        // Context line
+        currentLine++;
+      }
+      // Ignore deleted lines (-)
+    }
+
+    return changedLines;
   }
 
   /**

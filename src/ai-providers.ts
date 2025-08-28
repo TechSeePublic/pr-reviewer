@@ -104,17 +104,24 @@ export class OpenAIProvider implements AIProvider {
 
   private buildSystemPrompt(rules: CursorRule[]): string {
     const jsonInstructions = this.supportsJsonMode()
-      ? "4. Return responses in valid JSON format only"
-      : "4. Return responses in valid JSON format only (start your response with { and end with })";
+      ? "5. Return responses in valid JSON format only"
+      : "5. Return responses in valid JSON format only (start your response with { and end with })";
 
-    let prompt = `You are a code review assistant that analyzes code changes according to specific Cursor AI rules.
+    let prompt = `You are a comprehensive code review assistant that analyzes code changes for:
+1. Violations of provided Cursor AI rules
+2. General code quality issues and potential bugs
+3. Security vulnerabilities
+4. Performance issues
+5. Best practices violations
 
 IMPORTANT INSTRUCTIONS:
-1. Only flag violations of the provided Cursor rules - do not invent new rules
-2. Focus on the actual code changes, not existing code unless it's directly related
-3. Provide specific, actionable feedback with line numbers when possible
+1. Prioritize violations of the provided Cursor rules when they exist
+2. Also identify potential bugs, security issues, and code quality problems
+3. Focus on the actual code changes, not existing code unless it's directly related to the changes
+4. Provide specific, actionable feedback with line numbers when possible
 ${jsonInstructions}
-5. Be concise but helpful in your explanations
+6. Be concise but helpful in your explanations
+7. Only flag issues that are related to the actual changes in the PR
 
 CURSOR RULES TO FOLLOW:
 `;
@@ -138,11 +145,13 @@ Return a JSON object with this structure:
   "issues": [
     {
       "type": "error|warning|info|suggestion",
+      "category": "rule_violation|bug|security|performance|best_practice",
       "message": "Brief issue description",
       "description": "Detailed explanation",
       "suggestion": "Specific fix suggestion (optional)",
-      "ruleId": "cursor_rule_id",
-      "ruleName": "Human readable rule name",
+      "fixedCode": "Complete corrected code for auto-fix (optional)",
+      "ruleId": "cursor_rule_id or general_code_review",
+      "ruleName": "Human readable rule name or issue category",
       "file": "filename",
       "line": 0,
       "severity": "high|medium|low"
@@ -199,6 +208,7 @@ Please analyze this code against the Cursor rules and return any violations or s
       if (line.toLowerCase().includes('violation') || line.toLowerCase().includes('issue')) {
         issues.push({
           type: 'warning',
+          category: 'best_practice',
           message: line.trim(),
           description: line.trim(),
           ruleId: 'unknown',
@@ -296,14 +306,21 @@ export class AnthropicProvider implements AIProvider {
 
   // Anthropic doesn't support JSON mode, so we need our own methods
   private buildSystemPrompt(rules: CursorRule[]): string {
-    let prompt = `You are a code review assistant that analyzes code changes according to specific Cursor AI rules.
+    let prompt = `You are a comprehensive code review assistant that analyzes code changes for:
+1. Violations of provided Cursor AI rules
+2. General code quality issues and potential bugs
+3. Security vulnerabilities
+4. Performance issues
+5. Best practices violations
 
 IMPORTANT INSTRUCTIONS:
-1. Only flag violations of the provided Cursor rules - do not invent new rules
-2. Focus on the actual code changes, not existing code unless it's directly related
-3. Provide specific, actionable feedback with line numbers when possible
-4. Return responses in valid JSON format only (start your response with { and end with })
-5. Be concise but helpful in your explanations
+1. Prioritize violations of the provided Cursor rules when they exist
+2. Also identify potential bugs, security issues, and code quality problems
+3. Focus on the actual code changes, not existing code unless it's directly related to the changes
+4. Provide specific, actionable feedback with line numbers when possible
+5. Return responses in valid JSON format only (start your response with { and end with })
+6. Be concise but helpful in your explanations
+7. Only flag issues that are related to the actual changes in the PR
 
 CURSOR RULES TO FOLLOW:
 `;
@@ -327,11 +344,13 @@ Return a JSON object with this structure:
   "issues": [
     {
       "type": "error|warning|info|suggestion",
+      "category": "rule_violation|bug|security|performance|best_practice",
       "message": "Brief issue description",
       "description": "Detailed explanation",
       "suggestion": "Specific fix suggestion (optional)",
-      "ruleId": "cursor_rule_id",
-      "ruleName": "Human readable rule name",
+      "fixedCode": "Complete corrected code for auto-fix (optional)",
+      "ruleId": "cursor_rule_id or general_code_review",
+      "ruleName": "Human readable rule name or issue category",
       "file": "filename",
       "line": 0,
       "severity": "high|medium|low"
@@ -388,6 +407,7 @@ Please analyze this code against the Cursor rules and return any violations or s
       if (line.toLowerCase().includes('violation') || line.toLowerCase().includes('issue')) {
         issues.push({
           type: 'warning',
+          category: 'best_practice',
           message: line.trim(),
           description: line.trim(),
           ruleId: 'unknown',

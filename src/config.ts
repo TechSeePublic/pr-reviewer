@@ -36,6 +36,8 @@ export function getActionInputs(): ActionInputs {
     enableSuggestions: core.getBooleanInput('enable_suggestions') ?? true,
     skipIfNoRules: core.getBooleanInput('skip_if_no_rules') ?? false,
     updateExistingComments: core.getBooleanInput('update_existing_comments') ?? true,
+    enableAutoFix: core.getBooleanInput('enable_auto_fix') ?? false,
+    autoFixSeverity: core.getInput('auto_fix_severity') as 'error' | 'warning' | 'info' | 'all' || 'error',
   };
 
   // Add optional properties only if they have values

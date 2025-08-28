@@ -83,6 +83,16 @@ inputs:
     description: 'Update existing bot comments instead of creating new ones'
     required: false
     default: 'true'
+    
+  enable_auto_fix:
+    description: 'Enable automatic fixing of eligible issues'
+    required: false
+    default: 'false'
+    
+  auto_fix_severity:
+    description: 'Minimum severity for auto-fix (error, warning, info, all)'
+    required: false
+    default: 'error'
 
 outputs:
   review_summary:

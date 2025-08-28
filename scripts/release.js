@@ -36,6 +36,14 @@ class ReleaseManager {
       console.log('🔨 Building project...');
       this.runCommand('npm run build');
 
+      // Run linting
+      console.log('🔍 Running linting...');
+      this.runCommand('npm run lint');
+
+      // Check code formatting
+      console.log('✨ Checking code formatting...');
+      this.runCommand('npm run format:check');
+
       // Run tests
       console.log('🧪 Running tests...');
       this.runCommand('npm test');
