@@ -196,8 +196,8 @@ export class PRReviewer {
         try {
           return await this.reviewSingleFile(fileChange, rules);
         } catch (error) {
-          core.warning(`Failed to review file ${fileChange.filename}: ${error}`);
-          return [];
+          core.error(`AI provider error reviewing file ${fileChange.filename}: ${error}`);
+          throw error; // Re-throw all AI errors to fail the action
         }
       });
 
@@ -326,8 +326,8 @@ export class PRReviewer {
     try {
       summary = await this.aiProvider.generateSummary(issues, reviewContext);
     } catch (error) {
-      core.warning(`Failed to generate AI summary: ${error}`);
-      summary = this.generateFallbackSummary(issues, fileChanges.length);
+      core.error(`AI provider error generating summary: ${error}`);
+      throw error; // Re-throw all AI errors to fail the action
     }
 
     return {
