@@ -12,7 +12,7 @@ import {
   CursorRule,
   ReviewContext
 } from './types';
-import { DEFAULT_MODELS, getRecommendedModel, getModelInfo } from './config';
+import { DEFAULT_MODELS, getModelInfo, getRecommendedModel } from './config';
 import { logger } from './logger';
 
 export class OpenAIProvider implements AIProvider {
@@ -29,7 +29,7 @@ export class OpenAIProvider implements AIProvider {
     // Models that support response_format: { type: 'json_object' }
     const supportedModels = [
       'gpt-4-1106-preview',
-      'gpt-4-0125-preview', 
+      'gpt-4-0125-preview',
       'gpt-4-turbo-preview',
       'gpt-4-turbo',
       'gpt-4o',
@@ -40,8 +40,8 @@ export class OpenAIProvider implements AIProvider {
       'gpt-3.5-turbo-1106',
       'gpt-3.5-turbo-0125'
     ];
-    
-    return supportedModels.some(supportedModel => 
+
+    return supportedModels.some(supportedModel =>
       this.model.startsWith(supportedModel)
     );
   }
@@ -103,7 +103,7 @@ export class OpenAIProvider implements AIProvider {
   }
 
   private buildSystemPrompt(rules: CursorRule[]): string {
-    const jsonInstructions = this.supportsJsonMode() 
+    const jsonInstructions = this.supportsJsonMode()
       ? "4. Return responses in valid JSON format only"
       : "4. Return responses in valid JSON format only (start your response with { and end with })";
 
@@ -170,7 +170,7 @@ Please analyze this code against the Cursor rules and return any violations or s
     try {
       // Clean up the response for better JSON parsing
       let cleanedResponse = response.trim();
-      
+
       // If response doesn't start with {, try to find JSON content
       if (!cleanedResponse.startsWith('{')) {
         const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
@@ -178,7 +178,7 @@ Please analyze this code against the Cursor rules and return any violations or s
           cleanedResponse = jsonMatch[0];
         }
       }
-      
+
       const parsed: AIResponse = JSON.parse(cleanedResponse);
       return parsed.issues || [];
     } catch (error) {
@@ -359,7 +359,7 @@ Please analyze this code against the Cursor rules and return any violations or s
     try {
       // Clean up the response for better JSON parsing
       let cleanedResponse = response.trim();
-      
+
       // If response doesn't start with {, try to find JSON content
       if (!cleanedResponse.startsWith('{')) {
         const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
@@ -367,7 +367,7 @@ Please analyze this code against the Cursor rules and return any violations or s
           cleanedResponse = jsonMatch[0];
         }
       }
-      
+
       const parsed: AIResponse = JSON.parse(cleanedResponse);
       return parsed.issues || [];
     } catch (error) {
@@ -427,9 +427,9 @@ Keep it professional, constructive, and actionable. Use markdown formatting.`;
 export class AIProviderFactory {
   static create(inputs: ActionInputs): AIProvider {
     const { provider, model } = this.resolveProviderAndModel(inputs);
-    
+
     logger.info(`Using AI provider: ${provider}, model: ${model}`);
-    
+
     if (provider === 'openai') {
       if (!inputs.openaiApiKey) {
         throw new Error('OpenAI API key is required');

@@ -92,7 +92,7 @@ export function validateModelChoice(model: string, provider: string, inputs: Act
   if (provider === 'auto') {
     const hasOpenAI = !!inputs.openaiApiKey;
     const hasAnthropic = !!inputs.anthropicApiKey;
-    
+
     const modelInfo = MODEL_CAPABILITIES[model as keyof typeof MODEL_CAPABILITIES];
     if (modelInfo) {
       if (modelInfo.provider === 'openai' && !hasOpenAI) {
@@ -133,7 +133,7 @@ export function getRecommendedModel(provider: string, reviewLevel: string): stri
     }
   };
 
-  return recommendations[reviewLevel as keyof typeof recommendations]?.[provider as keyof typeof recommendations.standard] || 
+  return recommendations[reviewLevel as keyof typeof recommendations]?.[provider as keyof typeof recommendations.standard] ||
          DEFAULT_MODELS[provider as keyof typeof DEFAULT_MODELS];
 }
 
@@ -159,7 +159,7 @@ export const SUPPORTED_MODELS = {
   ] as string[],
   anthropic: [
     'claude-3-opus-20240229',
-    'claude-3-sonnet-20240229', 
+    'claude-3-sonnet-20240229',
     'claude-3-haiku-20240307',
     'claude-3-5-sonnet-20241022',
   ] as string[],
@@ -167,57 +167,57 @@ export const SUPPORTED_MODELS = {
 
 // Model capabilities and recommendations
 export const MODEL_CAPABILITIES = {
-  'gpt-4o': { 
-    provider: 'openai', 
-    tier: 'premium', 
+  'gpt-4o': {
+    provider: 'openai',
+    tier: 'premium',
     description: 'Latest GPT-4 with improved reasoning and speed',
     bestFor: ['complex-code-analysis', 'detailed-reviews']
   },
-  'gpt-4': { 
-    provider: 'openai', 
-    tier: 'premium', 
+  'gpt-4': {
+    provider: 'openai',
+    tier: 'premium',
     description: 'Original GPT-4 with excellent reasoning',
     bestFor: ['complex-code-analysis', 'detailed-reviews']
   },
-  'gpt-4o-mini': { 
-    provider: 'openai', 
-    tier: 'standard', 
+  'gpt-4o-mini': {
+    provider: 'openai',
+    tier: 'standard',
     description: 'Fast and cost-effective GPT-4 variant',
     bestFor: ['quick-reviews', 'large-prs']
   },
-  'gpt-4-turbo': { 
-    provider: 'openai', 
-    tier: 'premium', 
+  'gpt-4-turbo': {
+    provider: 'openai',
+    tier: 'premium',
     description: 'Enhanced GPT-4 with larger context window',
     bestFor: ['complex-code-analysis', 'detailed-reviews', 'large-files']
   },
-  'gpt-3.5-turbo': { 
-    provider: 'openai', 
-    tier: 'standard', 
+  'gpt-3.5-turbo': {
+    provider: 'openai',
+    tier: 'standard',
     description: 'Fast and reliable for most code reviews',
     bestFor: ['quick-reviews', 'standard-reviews']
   },
-  'claude-3-opus-20240229': { 
-    provider: 'anthropic', 
-    tier: 'premium', 
+  'claude-3-opus-20240229': {
+    provider: 'anthropic',
+    tier: 'premium',
     description: 'Most capable Claude model for complex reasoning',
     bestFor: ['complex-code-analysis', 'detailed-reviews']
   },
-  'claude-3-sonnet-20240229': { 
-    provider: 'anthropic', 
-    tier: 'premium', 
+  'claude-3-sonnet-20240229': {
+    provider: 'anthropic',
+    tier: 'premium',
     description: 'Balanced Claude model for comprehensive reviews',
     bestFor: ['detailed-reviews', 'balanced-cost-quality']
   },
-  'claude-3-5-sonnet-20241022': { 
-    provider: 'anthropic', 
-    tier: 'premium', 
+  'claude-3-5-sonnet-20241022': {
+    provider: 'anthropic',
+    tier: 'premium',
     description: 'Latest Claude with enhanced code understanding',
     bestFor: ['complex-code-analysis', 'detailed-reviews']
   },
-  'claude-3-haiku-20240307': { 
-    provider: 'anthropic', 
-    tier: 'standard', 
+  'claude-3-haiku-20240307': {
+    provider: 'anthropic',
+    tier: 'standard',
     description: 'Fast and cost-effective Claude model',
     bestFor: ['quick-reviews', 'large-prs']
   },
