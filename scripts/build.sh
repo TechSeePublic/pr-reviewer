@@ -27,6 +27,7 @@ npx ncc build dist/main.js -o dist-bundle --source-map --license licenses.txt
 echo "🔄 Replacing main.js with bundled version..."
 mv dist-bundle/index.js dist/main.js
 mv dist-bundle/index.js.map dist/main.js.map
+cp dist-bundle/sourcemap-register.js dist/sourcemap-register.js
 cp dist-bundle/licenses.txt dist/licenses.txt
 
 # Clean up temporary bundle directory
