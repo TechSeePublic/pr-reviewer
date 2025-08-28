@@ -17,16 +17,16 @@ export function getActionInputs(): ActionInputs {
     .filter(p => p.length > 0);
 
   const inputs: ActionInputs = {
-    githubToken: core.getInput('github_token', { required: true }),
+    githubToken: core.getInput('gh_token', { required: true }),
     aiProvider: core.getInput('ai_provider') as 'openai' | 'anthropic' | 'auto' || 'auto',
     model: core.getInput('model') || 'auto',
     reviewLevel: core.getInput('review_level') as 'light' | 'standard' | 'thorough' || 'standard',
     includePatterns: includePatterns.length > 0 ? includePatterns : [
-      '**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', 
+      '**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx',
       '**/*.py', '**/*.go', '**/*.rs', '**/*.java', '**/*.cs'
     ],
     excludePatterns: excludePatterns.length > 0 ? excludePatterns : [
-      'node_modules/**', 'dist/**', 'build/**', 'coverage/**', 
+      'node_modules/**', 'dist/**', 'build/**', 'coverage/**',
       '*.min.js', '*.bundle.js'
     ],
     maxFiles: parseInt(core.getInput('max_files') || '50', 10),
@@ -62,11 +62,11 @@ export function validateInputs(inputs: ActionInputs): void {
   if (inputs.aiProvider === 'openai' && !inputs.openaiApiKey) {
     throw new Error('OpenAI API key is required when ai_provider is set to "openai"');
   }
-  
+
   if (inputs.aiProvider === 'anthropic' && !inputs.anthropicApiKey) {
     throw new Error('Anthropic API key is required when ai_provider is set to "anthropic"');
   }
-  
+
   if (inputs.aiProvider === 'auto' && !inputs.openaiApiKey && !inputs.anthropicApiKey) {
     throw new Error('At least one AI provider API key is required (openai_api_key or anthropic_api_key)');
   }

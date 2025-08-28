@@ -4,13 +4,13 @@
 
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
-import { 
-  AIProvider, 
-  CodeIssue, 
-  CursorRule, 
-  ReviewContext, 
+import {
+  ActionInputs,
+  AIProvider,
   AIResponse,
-  ActionInputs 
+  CodeIssue,
+  CursorRule,
+  ReviewContext
 } from './types';
 import { DEFAULT_MODELS } from './config';
 import { logger } from './logger';
@@ -148,7 +148,7 @@ Please analyze this code against the Cursor rules and return any violations or s
   private extractIssuesFromText(text: string): CodeIssue[] {
     // Fallback: try to extract issues from non-JSON response
     const issues: CodeIssue[] = [];
-    
+
     // Look for common patterns in text responses
     const lines = text.split('\n');
     for (const line of lines) {
@@ -170,7 +170,7 @@ Please analyze this code against the Cursor rules and return any violations or s
 
   private buildSummaryPrompt(issues: CodeIssue[], context: ReviewContext): string {
     const { prContext, fileChanges, cursorRules } = context;
-    
+
     return `Generate a comprehensive PR review summary for:
 Repository: ${prContext.owner}/${prContext.repo}
 PR #${prContext.pullNumber}
@@ -291,15 +291,15 @@ export class AIProviderFactory {
 
   static getAvailableProviders(inputs: ActionInputs): string[] {
     const providers: string[] = [];
-    
+
     if (inputs.openaiApiKey) {
       providers.push('openai');
     }
-    
+
     if (inputs.anthropicApiKey) {
       providers.push('anthropic');
     }
-    
+
     return providers;
   }
 }

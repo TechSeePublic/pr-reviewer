@@ -7,7 +7,7 @@ branding:
   color: 'blue'
 
 inputs:
-  github_token:
+  gh_token:
     description: 'GitHub token for API access'
     required: true
     default: ${{ github.token }}

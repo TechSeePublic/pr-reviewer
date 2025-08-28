@@ -90,7 +90,7 @@ export class CursorRulesParser {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
       const parsed = this.parseMDCContent(content);
-      
+
       const relativePath = path.relative(this.basePath, filePath);
       const ruleId = this.generateRuleId(relativePath);
 
@@ -124,7 +124,7 @@ export class CursorRulesParser {
    */
   private parseMDCContent(content: string): ParsedMDCRule {
     const { data: metadata, content: ruleContent } = matter(content);
-    
+
     // Extract referenced files (@filename.ext)
     const referencedFiles = this.extractReferencedFiles(ruleContent);
 
@@ -191,7 +191,7 @@ export class CursorRulesParser {
    */
   private async parseAgentsMarkdown(): Promise<string | undefined> {
     const agentsPath = path.join(this.basePath, 'AGENTS.md');
-    
+
     if (!fs.existsSync(agentsPath)) {
       return undefined;
     }
@@ -209,7 +209,7 @@ export class CursorRulesParser {
    */
   private async parseLegacyRules(): Promise<string | undefined> {
     const legacyPath = path.join(this.basePath, '.cursorrules');
-    
+
     if (!fs.existsSync(legacyPath)) {
       return undefined;
     }
@@ -234,7 +234,7 @@ export class CursorRulesParser {
 
       // Auto-attached rules based on glob patterns
       if (rule.type === 'auto_attached' && rule.globs) {
-        return filePaths.some(filePath => 
+        return filePaths.some(filePath =>
           rule.globs!.some(glob => minimatch(filePath, glob))
         );
       }
@@ -273,21 +273,21 @@ export class CursorRulesParser {
    */
   findNestedRulesDirectories(): string[] {
     const directories: string[] = [];
-    
+
     const findDirs = (dir: string) => {
       try {
         const entries = fs.readdirSync(dir, { withFileTypes: true });
-        
+
         for (const entry of entries) {
           if (!entry.isDirectory()) continue;
-          
+
           const fullPath = path.join(dir, entry.name);
           const rulesPath = path.join(fullPath, '.cursor', 'rules');
-          
+
           if (fs.existsSync(rulesPath)) {
             directories.push(rulesPath);
           }
-          
+
           // Recursively search subdirectories
           findDirs(fullPath);
         }

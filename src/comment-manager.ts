@@ -2,15 +2,15 @@
  * Comment management system for inline and summary comments
  */
 
-import { 
-  CodeIssue, 
-  ReviewResult, 
-  InlineComment, 
-  SummaryComment, 
+import {
   ActionInputs,
+  CodeIssue,
   FileChange,
-  CursorRule,
-  PRContext
+  InlineComment,
+  ReviewResult,
+  SummaryComment
+  // CursorRule, // Currently unused
+  // PRContext, // Currently unused
 } from './types';
 import { GitHubClient } from './github-client';
 import { SEVERITY_LEVELS } from './config';
@@ -34,7 +34,7 @@ export class CommentManager {
 
     // Get existing comments if we should update them
     let existingComments: { inlineComments: InlineComment[]; summaryComment?: SummaryComment; } = { inlineComments: [] };
-    
+
     if (this.inputs.updateExistingComments) {
       existingComments = await this.githubClient.getExistingBotComments();
     }
@@ -54,13 +54,13 @@ export class CommentManager {
    * Post inline comments for specific issues
    */
   private async postInlineComments(
-    issues: CodeIssue[], 
-    fileChanges: FileChange[], 
+    issues: CodeIssue[],
+    fileChanges: FileChange[],
     existingComments: InlineComment[]
   ): Promise<void> {
     // Filter issues based on severity
     const filteredIssues = this.filterIssuesBySeverity(issues);
-    
+
     // Group issues by file and line
     const issuesByLocation = this.groupIssuesByLocation(filteredIssues);
 
@@ -83,7 +83,7 @@ export class CommentManager {
         logger.warn(`No issues for location ${locationKey}`);
         continue;
       }
-      
+
       const comment: InlineComment = {
         body: this.formatInlineCommentBody(locationIssues),
         location: {
@@ -129,7 +129,7 @@ export class CommentManager {
    */
   private filterIssuesBySeverity(issues: CodeIssue[]): CodeIssue[] {
     const minSeverityLevel = SEVERITY_LEVELS[this.inputs.inlineSeverity];
-    
+
     return issues.filter(issue => {
       const issueSeverityLevel = SEVERITY_LEVELS[issue.type as keyof typeof SEVERITY_LEVELS] || 1;
       return issueSeverityLevel >= minSeverityLevel;
@@ -162,7 +162,7 @@ export class CommentManager {
    */
   private isValidCommentLocation(file: string, line: number, fileChanges: FileChange[]): boolean {
     const fileChange = fileChanges.find(fc => fc.filename === file);
-    
+
     if (!fileChange || !fileChange.patch) {
       return false;
     }
@@ -210,7 +210,7 @@ export class CommentManager {
     if (!primaryIssue) {
       return '## 🤖 Cursor Rule Violation\n\nNo issues detected.';
     }
-    
+
     let body = `## 🤖 Cursor Rule Violation\n\n`;
 
     // Primary issue
@@ -247,7 +247,7 @@ export class CommentManager {
    */
   private formatSummaryCommentBody(reviewResult: ReviewResult): string {
     const { issues, filesReviewed, totalFiles, rulesApplied, summary, status } = reviewResult;
-    
+
     let body = `## 🤖 Cursor AI PR Review Summary\n\n`;
 
     // Status indicator
@@ -264,7 +264,7 @@ export class CommentManager {
     if (issues.length > 0) {
       const issuesByType = this.groupIssuesByType(issues);
       body += `### ⚠️ **Issues by Type**\n`;
-      
+
       for (const [type, typeIssues] of Object.entries(issuesByType)) {
         const icon = this.getIssueIcon(type);
         body += `- **${icon} ${type.toUpperCase()}:** ${typeIssues.length}\n`;
@@ -274,11 +274,11 @@ export class CommentManager {
       // Detailed format for detailed summary
       if (this.inputs.summaryFormat === 'detailed' && issues.length <= 10) {
         body += `### 📋 **Issue Details**\n`;
-        
+
         for (const issue of issues.slice(0, 10)) {
           body += `- ${this.getIssueIcon(issue.type)} **${issue.file}:${issue.line || '?'}** - ${issue.message}\n`;
         }
-        
+
         if (issues.length > 10) {
           body += `- ... and ${issues.length - 10} more issues\n`;
         }
@@ -289,7 +289,7 @@ export class CommentManager {
     // Rules applied
     if (rulesApplied.length > 0) {
       body += `### 📝 **Cursor Rules Applied**\n`;
-      
+
       for (const rule of rulesApplied) {
         const typeEmoji = this.getRuleTypeEmoji(rule.type);
         body += `- ${typeEmoji} \`${rule.id}\``;

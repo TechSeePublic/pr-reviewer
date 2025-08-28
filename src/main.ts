@@ -40,7 +40,7 @@ async function run(): Promise<void> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     core.setFailed(`Action failed: ${errorMessage}`);
-    
+
     // Log stack trace for debugging
     if (error instanceof Error && error.stack) {
       core.debug(`Stack trace: ${error.stack}`);

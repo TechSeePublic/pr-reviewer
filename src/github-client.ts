@@ -3,16 +3,16 @@
  */
 
 import * as github from '@actions/github';
-import { Octokit } from '@octokit/rest';
+// import { Octokit } from '@octokit/rest'; // Currently unused
 import { minimatch } from 'minimatch';
-import { 
-  PRContext, 
-  FileChange, 
-  InlineComment, 
-  SummaryComment, 
-  GitHubFile,
+import {
   ActionInputs,
-  RateLimitInfo 
+  FileChange,
+  GitHubFile,
+  InlineComment,
+  PRContext,
+  RateLimitInfo,
+  SummaryComment
 } from './types';
 import { COMMENT_MARKERS } from './config';
 import { logger } from './logger';
@@ -31,7 +31,8 @@ export class GitHubClient {
    */
   async getPRChanges(inputs: ActionInputs): Promise<FileChange[]> {
     try {
-      const { data: pullRequest } = await this.octokit.rest.pulls.get({
+      // Get PR metadata (not currently used but available for future features)
+      await this.octokit.rest.pulls.get({
         owner: this.context.owner,
         repo: this.context.repo,
         pull_number: this.context.pullNumber,
@@ -56,15 +57,15 @@ export class GitHubClient {
             deletions: file.deletions,
             changes: file.changes,
           };
-          
+
           if (file.patch !== undefined) {
             fileChange.patch = file.patch;
           }
-          
+
           if (file.previous_filename !== undefined) {
             fileChange.previousFilename = file.previous_filename;
           }
-          
+
           return fileChange;
         });
 
@@ -296,7 +297,7 @@ ${comment.body}`;
   async getRateLimit(): Promise<RateLimitInfo> {
     try {
       const { data } = await this.octokit.rest.rateLimit.get();
-      
+
       return {
         remaining: data.rate.remaining,
         resetTime: new Date(data.rate.reset * 1000),
@@ -318,12 +319,12 @@ ${comment.body}`;
   async checkRateLimit(): Promise<boolean> {
     const rateLimit = await this.getRateLimit();
     const remainingPercentage = (rateLimit.remaining / rateLimit.limit) * 100;
-    
+
     if (remainingPercentage < 10) {
       logger.warn(`Warning: GitHub API rate limit low (${rateLimit.remaining}/${rateLimit.limit})`);
       return false;
     }
-    
+
     return true;
   }
 

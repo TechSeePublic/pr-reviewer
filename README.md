@@ -34,7 +34,7 @@ jobs:
       - name: AI Code Review
         uses: amit.wagner/pr-reviewer@v1
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          gh_token: ${{ secrets.GH_TOKEN }}
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           review_level: 'standard'
           comment_style: 'both'
@@ -57,7 +57,7 @@ The bot automatically detects and applies Cursor rules from:
 
 | Input | Description | Default | Required |
 |-------|-------------|---------|----------|
-| `github_token` | GitHub token for API access | `${{ github.token }}` | ✅ |
+| `gh_token` | GitHub token for API access | `${{ github.token }}` | ✅ |
 | `openai_api_key` | OpenAI API key | - | ⚠️ |
 | `anthropic_api_key` | Anthropic API key | - | ⚠️ |
 | `ai_provider` | AI provider (`openai`, `anthropic`, `auto`) | `auto` | ❌ |

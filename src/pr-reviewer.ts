@@ -6,16 +6,16 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import * as fs from 'fs';
 import * as path from 'path';
-import { 
-  ActionInputs, 
-  PRContext, 
-  ReviewResult, 
-  ReviewContext, 
-  CursorRulesConfig,
-  FileChange,
+import {
+  ActionInputs,
+  AIProvider,
   CodeIssue,
   CursorRule,
-  AIProvider
+  CursorRulesConfig,
+  FileChange,
+  PRContext,
+  ReviewContext,
+  ReviewResult
 } from './types';
 import { CursorRulesParser } from './cursor-parser';
 import { GitHubClient } from './github-client';
@@ -33,10 +33,10 @@ export class PRReviewer {
   constructor(inputs: ActionInputs, workspacePath: string = process.cwd()) {
     this.inputs = inputs;
     this.workspacePath = workspacePath;
-    
+
     // Extract PR context from GitHub context
     this.prContext = this.extractPRContext();
-    
+
     // Initialize clients
     this.githubClient = new GitHubClient(inputs.githubToken, this.prContext);
     this.aiProvider = AIProviderFactory.create(inputs);
@@ -53,7 +53,7 @@ export class PRReviewer {
       // Step 1: Parse Cursor rules
       core.info('📋 Parsing Cursor rules...');
       const cursorRules = await this.parseCursorRules();
-      
+
       if (this.shouldSkipReview(cursorRules)) {
         return this.createSkippedResult('No Cursor rules found');
       }
@@ -61,7 +61,7 @@ export class PRReviewer {
       // Step 2: Get PR file changes
       core.info('📁 Analyzing PR file changes...');
       const fileChanges = await this.githubClient.getPRChanges(this.inputs);
-      
+
       if (fileChanges.length === 0) {
         return this.createSkippedResult('No files to review');
       }
@@ -82,8 +82,8 @@ export class PRReviewer {
 
       // Step 5: Generate review result
       const reviewResult = await this.generateReviewResult(
-        allIssues, 
-        fileChanges, 
+        allIssues,
+        fileChanges,
         applicableRules,
         cursorRules
       );
@@ -109,7 +109,7 @@ export class PRReviewer {
    */
   private extractPRContext(): PRContext {
     const context = github.context;
-    
+
     if (!context.payload.pull_request) {
       throw new Error('This action can only be run on pull request events');
     }
@@ -154,7 +154,7 @@ export class PRReviewer {
   private filterApplicableRules(cursorRules: CursorRulesConfig, fileChanges: FileChange[]): CursorRule[] {
     const parser = new CursorRulesParser(this.workspacePath);
     const changedFiles = fileChanges.map(fc => fc.filename);
-    
+
     return parser.filterRulesForFiles(cursorRules.projectRules, changedFiles);
   }
 
@@ -168,7 +168,7 @@ export class PRReviewer {
     // Process files in batches to avoid rate limits
     for (let i = 0; i < fileChanges.length; i += maxConcurrentReviews) {
       const batch = fileChanges.slice(i, i + maxConcurrentReviews);
-      
+
       const batchPromises = batch.map(async (fileChange) => {
         try {
           return await this.reviewSingleFile(fileChange, rules);
@@ -179,7 +179,7 @@ export class PRReviewer {
       });
 
       const batchResults = await Promise.all(batchPromises);
-      
+
       for (const issues of batchResults) {
         allIssues.push(...issues);
       }
@@ -211,7 +211,7 @@ export class PRReviewer {
 
     // Build context for AI review
     const context = this.buildReviewContext(fileChange, fileContent);
-    
+
     // Get AI review
     const issues = await this.aiProvider.reviewCode(context, fileContent, rules);
 
@@ -229,7 +229,7 @@ export class PRReviewer {
     try {
       // For new files or modified files, get the latest content
       const file = await this.githubClient.getFileContent(fileChange.filename);
-      
+
       if (!file) {
         // Try to read from local workspace if available
         const localPath = path.join(this.workspacePath, fileChange.filename);
@@ -249,7 +249,7 @@ export class PRReviewer {
   /**
    * Build review context for AI
    */
-  private buildReviewContext(fileChange: FileChange, fileContent: string): string {
+  private buildReviewContext(fileChange: FileChange, _fileContent: string): string {
     let context = `Reviewing file: ${fileChange.filename}\n`;
     context += `Change type: ${fileChange.status}\n`;
     context += `Changes: +${fileChange.additions} -${fileChange.deletions}\n\n`;
@@ -269,8 +269,8 @@ export class PRReviewer {
    * Generate comprehensive review result
    */
   private async generateReviewResult(
-    issues: CodeIssue[], 
-    fileChanges: FileChange[], 
+    issues: CodeIssue[],
+    fileChanges: FileChange[],
     appliedRules: CursorRule[],
     cursorRules: CursorRulesConfig
   ): Promise<ReviewResult> {
@@ -332,11 +332,11 @@ export class PRReviewer {
     const warningCount = issues.filter(i => i.type === 'warning').length;
 
     let summary = `Found ${issues.length} issue${issues.length === 1 ? '' : 's'} across ${filesReviewed} files. `;
-    
+
     if (errorCount > 0) {
       summary += `${errorCount} error${errorCount === 1 ? '' : 's'} need immediate attention. `;
     }
-    
+
     if (warningCount > 0) {
       summary += `${warningCount} warning${warningCount === 1 ? '' : 's'} should be addressed. `;
     }
@@ -351,7 +351,7 @@ export class PRReviewer {
    */
   private createSkippedResult(reason: string): ReviewResult {
     core.info(`Skipping review: ${reason}`);
-    
+
     return {
       issues: [],
       filesReviewed: 0,
