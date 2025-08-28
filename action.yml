@@ -1,0 +1,99 @@
+name: 'Cursor AI PR Reviewer'
+description: 'AI-powered PR reviewer that respects Cursor AI rules'
+author: 'Amit Wagner'
+
+branding:
+  icon: 'eye'
+  color: 'blue'
+
+inputs:
+  github_token:
+    description: 'GitHub token for API access'
+    required: true
+    default: ${{ github.token }}
+  
+  openai_api_key:
+    description: 'OpenAI API key for AI reviews'
+    required: false
+    
+  anthropic_api_key:
+    description: 'Anthropic API key for AI reviews'
+    required: false
+    
+  ai_provider:
+    description: 'AI provider to use (openai, anthropic, or auto)'
+    required: false
+    default: 'auto'
+    
+  model:
+    description: 'AI model to use (gpt-4, gpt-3.5-turbo, claude-3-sonnet, etc.)'
+    required: false
+    default: 'auto'
+    
+  review_level:
+    description: 'Review intensity level (light, standard, thorough)'
+    required: false
+    default: 'standard'
+    
+  rules_path:
+    description: 'Custom path to cursor rules (if not in standard locations)'
+    required: false
+    
+  include_patterns:
+    description: 'File patterns to include in review (comma-separated)'
+    required: false
+    default: '**/*.ts,**/*.tsx,**/*.js,**/*.jsx,**/*.py,**/*.go,**/*.rs,**/*.java,**/*.cs'
+    
+  exclude_patterns:
+    description: 'File patterns to exclude from review (comma-separated)'
+    required: false
+    default: 'node_modules/**,dist/**,build/**,coverage/**,*.min.js,*.bundle.js'
+    
+  max_files:
+    description: 'Maximum number of files to review in a single PR'
+    required: false
+    default: '50'
+    
+  comment_style:
+    description: 'Style of review comments (inline, summary, both)'
+    required: false
+    default: 'both'
+    
+  inline_severity:
+    description: 'Minimum severity for inline comments (error, warning, info, all)'
+    required: false
+    default: 'warning'
+    
+  summary_format:
+    description: 'Format of summary comment (brief, detailed, minimal)'
+    required: false
+    default: 'detailed'
+    
+  enable_suggestions:
+    description: 'Enable code suggestions in reviews'
+    required: false
+    default: 'true'
+    
+  skip_if_no_rules:
+    description: 'Skip review if no cursor rules are found'
+    required: false
+    default: 'false'
+    
+  update_existing_comments:
+    description: 'Update existing bot comments instead of creating new ones'
+    required: false
+    default: 'true'
+
+outputs:
+  review_summary:
+    description: 'Summary of the review results'
+  files_reviewed:
+    description: 'Number of files reviewed'
+  issues_found:
+    description: 'Number of potential issues found'
+  rules_applied:
+    description: 'Number of cursor rules applied'
+
+runs:
+  using: 'node20'
+  main: 'dist/main.js'

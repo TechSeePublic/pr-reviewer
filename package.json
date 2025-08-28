@@ -1,0 +1,72 @@
+{
+  "name": "cursor-ai-pr-reviewer",
+  "version": "1.0.0",
+  "description": "AI-powered PR reviewer that respects Cursor AI rules",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc && npm run package",
+    "package": "ncc build dist/main.js -o dist --source-map --license licenses.txt",
+    "build:watch": "tsc --watch",
+    "clean": "rm -rf dist/",
+    "prebuild": "npm run clean",
+    "dev": "ts-node src/main.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write src/**/*.ts",
+    "format:check": "prettier --check src/**/*.ts",
+    "release": "node scripts/release.js",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major"
+  },
+  "keywords": [
+    "github-action",
+    "pr-review",
+    "cursor-ai",
+    "code-review",
+    "typescript",
+    "ai",
+    "automation"
+  ],
+  "author": "Amit Wagner",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.10.1",
+    "@actions/github": "^6.0.0",
+    "@anthropic-ai/sdk": "^0.60.0",
+    "@octokit/rest": "^20.0.2",
+    "gray-matter": "^4.0.3",
+    "js-yaml": "^4.1.0",
+    "markdown-it": "^13.0.2",
+    "minimatch": "^9.0.3",
+    "openai": "^4.20.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.5",
+    "@types/js-yaml": "^4.0.8",
+    "@types/markdown-it": "^13.0.6",
+    "@types/node": "^20.8.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.5",
+    "@typescript-eslint/parser": "^6.7.5",
+    "@vercel/ncc": "^0.38.1",
+    "eslint": "^8.51.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.0.3",
+    "ts-jest": "^29.1.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amit.wagner/pr-reviewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/amit.wagner/pr-reviewer/issues"
+  },
+  "homepage": "https://github.com/amit.wagner/pr-reviewer#readme"
+}
