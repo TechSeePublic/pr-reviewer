@@ -197,7 +197,8 @@ export class PRReviewer {
           return await this.reviewSingleFile(fileChange, rules);
         } catch (error) {
           core.error(`AI provider error reviewing file ${fileChange.filename}: ${error}`);
-          throw error; // Re-throw all AI errors to fail the action
+          // Handle AI provider errors gracefully by returning empty issues
+          return [];
         }
       });
 
@@ -327,7 +328,8 @@ export class PRReviewer {
       summary = await this.aiProvider.generateSummary(issues, reviewContext);
     } catch (error) {
       core.error(`AI provider error generating summary: ${error}`);
-      throw error; // Re-throw all AI errors to fail the action
+      // Use fallback summary instead of failing
+      summary = this.generateFallbackSummary(issues, fileChanges.length);
     }
 
     return {
