@@ -75,7 +75,7 @@ export class OpenAIProvider implements AIProvider {
       return this.parseAIResponse(result);
     } catch (error) {
       logger.error('OpenAI API error:', error);
-      
+
       // Extract specific error message from OpenAI error
       let errorMessage = 'Unknown error';
       if (error && typeof error === 'object') {
@@ -85,7 +85,7 @@ export class OpenAIProvider implements AIProvider {
           errorMessage = String(error.error.message);
         }
       }
-      
+
       throw new Error(`OpenAI review failed: ${errorMessage}`);
     }
   }
@@ -111,7 +111,7 @@ export class OpenAIProvider implements AIProvider {
       return response.choices[0]?.message?.content || 'Summary generation failed';
     } catch (error) {
       logger.error('OpenAI summary generation error:', error);
-      
+
       // Extract specific error message from OpenAI error
       let errorMessage = 'Unknown error';
       if (error && typeof error === 'object') {
@@ -121,7 +121,7 @@ export class OpenAIProvider implements AIProvider {
           errorMessage = String(error.error.message);
         }
       }
-      
+
       throw new Error(`OpenAI summary generation error: ${errorMessage}`);
     }
   }
@@ -300,7 +300,7 @@ export class AnthropicProvider implements AIProvider {
       return this.parseAIResponse(result.text);
     } catch (error) {
       logger.error('Anthropic API error:', error);
-      
+
       // Extract specific error message from Anthropic error
       let errorMessage = 'Unknown error';
       if (error && typeof error === 'object') {
@@ -310,7 +310,7 @@ export class AnthropicProvider implements AIProvider {
           errorMessage = String(error.error.message);
         }
       }
-      
+
       throw new Error(`Anthropic review failed: ${errorMessage}`);
     }
   }
@@ -332,7 +332,7 @@ export class AnthropicProvider implements AIProvider {
       return result && result.type === 'text' ? result.text : 'Summary generation failed';
     } catch (error) {
       logger.error('Anthropic summary generation error:', error);
-      
+
       // Extract specific error message from Anthropic error
       let errorMessage = 'Unknown error';
       if (error && typeof error === 'object') {
@@ -342,7 +342,7 @@ export class AnthropicProvider implements AIProvider {
           errorMessage = String(error.error.message);
         }
       }
-      
+
       throw new Error(`Anthropic summary generation error: ${errorMessage}`);
     }
   }
