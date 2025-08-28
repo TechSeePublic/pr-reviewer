@@ -33,6 +33,8 @@ describe('PR Reviewer Integration', () => {
     enableSuggestions: true,
     skipIfNoRules: false,
     updateExistingComments: true,
+    enableAutoFix: false,
+    autoFixSeverity: 'error',
   };
 
   beforeEach(() => {

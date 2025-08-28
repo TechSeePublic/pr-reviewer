@@ -87,16 +87,16 @@ export class AutoFixManager {
     try {
       // Get unique files that were modified
       const modifiedFiles = [...new Set(successfulFixes.map(fix => fix.file))];
-      
+
       // Create commit message
       const commitMessage = this.generateCommitMessage(successfulFixes);
-      
+
       core.info(`Committing ${successfulFixes.length} auto-fixes to ${modifiedFiles.length} files`);
-      
+
       // For now, we'll create a comment suggesting the fixes rather than auto-committing
       // This is safer and allows for human review
       await this.createAutoFixSummaryComment(successfulFixes);
-      
+
       return {
         sha: '', // Would be populated in actual commit
         message: commitMessage,
@@ -154,7 +154,8 @@ export class AutoFixManager {
       if (!grouped[issue.file]) {
         grouped[issue.file] = [];
       }
-      grouped[issue.file].push(issue);
+      // TypeScript knows grouped[issue.file] is defined here due to the check above
+      grouped[issue.file]!.push(issue);
     }
 
     return grouped;
@@ -213,7 +214,7 @@ export class AutoFixManager {
             file: fileName,
             issue,
             applied: false,
-            error: fixResult.error,
+            error: fixResult.error || 'Unknown error occurred',
           });
         }
       } catch (error) {
@@ -268,7 +269,7 @@ export class AutoFixManager {
     if (issue.fixedCode) {
       // Apply complete fixed code
       const newLines = [...lines];
-      
+
       if (issue.endLine) {
         // Replace range of lines
         const endIndex = issue.endLine - 1;
@@ -277,14 +278,14 @@ export class AutoFixManager {
         // Replace single line
         newLines[lineIndex] = issue.fixedCode;
       }
-      
+
       return { success: true, content: newLines.join('\n') };
     } else if (issue.suggestion) {
       // Try to apply suggestion intelligently
       const originalLine = lines[lineIndex];
-      
+
       // Simple heuristic: if suggestion looks like a complete line replacement
-      if (issue.suggestion.includes('\n') || issue.suggestion.length > originalLine.length * 0.5) {
+      if (originalLine && (issue.suggestion.includes('\n') || issue.suggestion.length > originalLine.length * 0.5)) {
         const newLines = [...lines];
         newLines[lineIndex] = issue.suggestion;
         return { success: true, content: newLines.join('\n') };
@@ -324,9 +325,9 @@ export class AutoFixManager {
   private generateCommitMessage(fixes: AutoFixResult[]): string {
     const fixCount = fixes.length;
     const fileCount = new Set(fixes.map(fix => fix.file)).size;
-    
+
     let message = `🤖 Auto-fix: Applied ${fixCount} code improvements`;
-    
+
     if (fileCount > 1) {
       message += ` across ${fileCount} files`;
     }
@@ -347,13 +348,13 @@ export class AutoFixManager {
    */
   private async createAutoFixSummaryComment(fixes: AutoFixResult[]): Promise<void> {
     const fileCount = new Set(fixes.map(fix => fix.file)).size;
-    
+
     let body = `## 🤖 Auto-Fix Summary\n\n`;
     body += `✅ **${fixes.length} fixes applied** across **${fileCount} files**\n\n`;
 
     // Group fixes by file
     const fixesByFile = this.groupIssuesByFile(fixes.map(fix => fix.issue));
-    
+
     body += `### 📝 Files Modified:\n`;
     for (const [fileName, fileIssues] of Object.entries(fixesByFile)) {
       body += `- **${fileName}** (${fileIssues.length} fixes)\n`;
