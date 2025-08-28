@@ -3,6 +3,11 @@
 /**
  * Release script for Cursor AI PR Reviewer
  * Handles building, tagging, and publishing releases
+ *
+ * The release process now includes:
+ * - Automatic linting and formatting fixes
+ * - Committing any style changes before release
+ * - Verification that all issues are resolved
  */
 
 const fs = require('fs');
@@ -36,13 +41,25 @@ class ReleaseManager {
       console.log('🔨 Building project...');
       this.runCommand('npm run build');
 
-      // Run linting
-      console.log('🔍 Running linting...');
-      this.runCommand('npm run lint');
+      // Run linting and formatting fixes
+      console.log('🔧 Running linting and formatting fixes...');
+      this.runCommand('npm run fix');
 
-      // Check code formatting
-      console.log('✨ Checking code formatting...');
-      this.runCommand('npm run format:check');
+      // Check if any files were changed by the fixes
+      console.log('🔍 Checking for any file changes...');
+      const statusBeforeCommit = this.runCommand('git status --porcelain', { silent: true });
+
+      if (statusBeforeCommit.trim()) {
+        console.log('📝 Files were modified by linting/formatting fixes. Committing changes...');
+        this.runCommand('git add .');
+        this.runCommand('git commit -m "style: apply linting and formatting fixes"');
+      } else {
+        console.log('✨ No files were modified by linting/formatting fixes');
+      }
+
+      // Verify that all issues are fixed
+      console.log('✅ Verifying all linting and formatting issues are resolved...');
+      this.runCommand('npm run fix:check');
 
       // Run tests
       console.log('🧪 Running tests...');
@@ -102,17 +119,14 @@ class ReleaseManager {
       throw new Error('Not in a git repository');
     }
 
-    // Check for uncommitted changes
-    const status = this.runCommand('git status --porcelain', { silent: true });
-    if (status.trim()) {
-      throw new Error('Working directory is not clean. Commit or stash changes first.');
-    }
-
     // Check if we're on main/master branch
     const branch = this.runCommand('git branch --show-current', { silent: true }).trim();
     if (!['main', 'master'].includes(branch)) {
       console.warn(`⚠️  Warning: Releasing from branch '${branch}' instead of main/master`);
     }
+
+    // Note: We don't check for uncommitted changes here anymore because
+    // the release process will handle linting/formatting fixes and commit them
   }
 
   determineNewVersion(versionType) {
@@ -154,22 +168,22 @@ class ReleaseManager {
   createReleaseBranch(version) {
     const releaseBranch = `release-v${version}`;
     const currentBranch = this.runCommand('git branch --show-current', { silent: true }).trim();
-    
+
     try {
       // Create a new branch for the release
       console.log(`📦 Creating release branch: ${releaseBranch}`);
       this.runCommand(`git checkout -b ${releaseBranch}`);
-      
+
       // Add the built files to this branch
       this.runCommand('git add dist/ --force');
       this.runCommand(`git commit -m "chore: add built files for release v${version}"`);
-      
+
       // Push the release branch
       this.runCommand(`git push origin ${releaseBranch}`);
-      
+
       // Switch back to the original branch
       this.runCommand(`git checkout ${currentBranch}`);
-      
+
     } catch (error) {
       // If something goes wrong, try to get back to the original branch
       try {
@@ -190,7 +204,7 @@ class ReleaseManager {
 
   updateDistPackageJson(version) {
     const distPackageJsonPath = path.join(__dirname, '../dist/package.json');
-    
+
     if (fs.existsSync(distPackageJsonPath)) {
       const distPackageJson = JSON.parse(fs.readFileSync(distPackageJsonPath, 'utf8'));
       distPackageJson.version = version;

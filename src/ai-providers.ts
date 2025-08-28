@@ -81,7 +81,12 @@ export class OpenAIProvider implements AIProvider {
       if (error && typeof error === 'object') {
         if ('message' in error) {
           errorMessage = String(error.message);
-        } else if ('error' in error && error.error && typeof error.error === 'object' && 'message' in error.error) {
+        } else if (
+          'error' in error &&
+          error.error &&
+          typeof error.error === 'object' &&
+          'message' in error.error
+        ) {
           errorMessage = String(error.error.message);
         }
       }
@@ -117,7 +122,12 @@ export class OpenAIProvider implements AIProvider {
       if (error && typeof error === 'object') {
         if ('message' in error) {
           errorMessage = String(error.message);
-        } else if ('error' in error && error.error && typeof error.error === 'object' && 'message' in error.error) {
+        } else if (
+          'error' in error &&
+          error.error &&
+          typeof error.error === 'object' &&
+          'message' in error.error
+        ) {
           errorMessage = String(error.error.message);
         }
       }
@@ -306,7 +316,12 @@ export class AnthropicProvider implements AIProvider {
       if (error && typeof error === 'object') {
         if ('message' in error) {
           errorMessage = String(error.message);
-        } else if ('error' in error && error.error && typeof error.error === 'object' && 'message' in error.error) {
+        } else if (
+          'error' in error &&
+          error.error &&
+          typeof error.error === 'object' &&
+          'message' in error.error
+        ) {
           errorMessage = String(error.error.message);
         }
       }
@@ -338,7 +353,12 @@ export class AnthropicProvider implements AIProvider {
       if (error && typeof error === 'object') {
         if ('message' in error) {
           errorMessage = String(error.message);
-        } else if ('error' in error && error.error && typeof error.error === 'object' && 'message' in error.error) {
+        } else if (
+          'error' in error &&
+          error.error &&
+          typeof error.error === 'object' &&
+          'message' in error.error
+        ) {
           errorMessage = String(error.error.message);
         }
       }
