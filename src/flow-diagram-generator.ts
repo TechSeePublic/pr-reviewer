@@ -57,7 +57,11 @@ export class FlowDiagramGenerator {
   private aiProvider: AIProvider | undefined;
   private githubClient?: any; // Optional GitHub client for getting complete file contents
 
-  constructor(config: Partial<FlowDiagramConfig> = {}, aiProvider?: AIProvider, githubClient?: any) {
+  constructor(
+    config: Partial<FlowDiagramConfig> = {},
+    aiProvider?: AIProvider,
+    githubClient?: any
+  ) {
     this.config = {
       maxNodes: 15,
       includeFileTypes: [
@@ -314,7 +318,7 @@ Focus on the COMPLETE USER EXPERIENCE - from when they want something to when th
 Remember: Think like a USER, not a developer. What is their journey and experience?`;
   }
 
-    /**
+  /**
    * Get complete file context with change markers for AI analysis
    */
   private async getCodeContext(files: FileChange[]): Promise<string> {
@@ -331,15 +335,16 @@ Remember: Think like a USER, not a developer. What is their journey and experien
 **What this does:** ${functionality}
 **Changes:** ${file.additions} additions, ${file.deletions} deletions
 
-${completeContent ?
-  `**COMPLETE FILE CONTENT:**
+${
+  completeContent
+    ? `**COMPLETE FILE CONTENT:**
 \`\`\`${this.getFileExtension(file.filename)}
 ${completeContent}
 \`\`\`
 
 **WHAT CHANGED IN THIS FILE:**
-${changes}` :
-  `**CHANGES ONLY (complete file not available):**
+${changes}`
+    : `**CHANGES ONLY (complete file not available):**
 ${changes}`
 }
 
@@ -451,17 +456,29 @@ ${changes}`
   private getFileExtension(filename: string): string {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
-      case 'ts': return 'typescript';
-      case 'tsx': return 'tsx';
-      case 'js': return 'javascript';
-      case 'jsx': return 'jsx';
-      case 'py': return 'python';
-      case 'java': return 'java';
-      case 'go': return 'go';
-      case 'rs': return 'rust';
-      case 'cpp': case 'c': return 'cpp';
-      case 'cs': return 'csharp';
-      default: return ext || 'text';
+      case 'ts':
+        return 'typescript';
+      case 'tsx':
+        return 'tsx';
+      case 'js':
+        return 'javascript';
+      case 'jsx':
+        return 'jsx';
+      case 'py':
+        return 'python';
+      case 'java':
+        return 'java';
+      case 'go':
+        return 'go';
+      case 'rs':
+        return 'rust';
+      case 'cpp':
+      case 'c':
+        return 'cpp';
+      case 'cs':
+        return 'csharp';
+      default:
+        return ext || 'text';
     }
   }
 
