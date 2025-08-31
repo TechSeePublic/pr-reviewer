@@ -20,7 +20,9 @@ export function getActionInputs(): ActionInputs {
 
   const inputs: ActionInputs = {
     githubToken: core.getInput('gh_token', { required: true }),
-    aiProvider: (core.getInput('ai_provider') as 'openai' | 'anthropic' | 'gemini' | 'azure' | 'auto') || 'auto',
+    aiProvider:
+      (core.getInput('ai_provider') as 'openai' | 'anthropic' | 'gemini' | 'azure' | 'auto') ||
+      'auto',
     model: core.getInput('model') || 'auto',
     reviewLevel: (core.getInput('review_level') as 'light' | 'standard' | 'thorough') || 'standard',
     includePatterns:
@@ -101,10 +103,17 @@ export function validateInputs(inputs: ActionInputs): void {
   }
 
   if (inputs.aiProvider === 'azure' && (!inputs.azureOpenaiApiKey || !inputs.azureOpenaiEndpoint)) {
-    throw new Error('Azure OpenAI API key and endpoint are required when ai_provider is set to "azure"');
+    throw new Error(
+      'Azure OpenAI API key and endpoint are required when ai_provider is set to "azure"'
+    );
   }
 
-  if (inputs.aiProvider === 'auto' && !inputs.openaiApiKey && !inputs.anthropicApiKey && !inputs.azureOpenaiApiKey) {
+  if (
+    inputs.aiProvider === 'auto' &&
+    !inputs.openaiApiKey &&
+    !inputs.anthropicApiKey &&
+    !inputs.azureOpenaiApiKey
+  ) {
     throw new Error(
       'At least one AI provider API key is required (openai_api_key, anthropic_api_key, or azure_openai_api_key)'
     );
@@ -147,7 +156,9 @@ export function validateModelChoice(model: string, provider: string, inputs: Act
         throw new Error(`Model "${model}" requires Anthropic API key, but none provided`);
       }
       if (modelInfo.provider === 'azure' && !hasAzure) {
-        throw new Error(`Model "${model}" requires Azure OpenAI API key and endpoint, but none provided`);
+        throw new Error(
+          `Model "${model}" requires Azure OpenAI API key and endpoint, but none provided`
+        );
       }
     }
     return;
@@ -282,7 +293,7 @@ export const MODEL_CAPABILITIES = {
     description: 'Tailored for advanced, natural, and context-aware conversations',
     bestFor: ['interactive-reviews', 'conversational-analysis'],
   },
-  'o3': {
+  o3: {
     provider: 'openai',
     tier: 'premium',
     description: 'Advanced reasoning model excelling in coding, math, and science',
@@ -386,7 +397,8 @@ export const MODEL_CAPABILITIES = {
     provider: 'azure',
     tier: 'premium',
     description: 'xAI Grok 3 for real-time conversational AI and reasoning',
-    bestFor: ['conversational-analysis', 'real-time-reviews'],\n  },
+    bestFor: ['conversational-analysis', 'real-time-reviews'],
+  },
   'grok-3-mini': {
     provider: 'azure',
     tier: 'standard',
