@@ -77,7 +77,10 @@ The bot automatically detects and applies Cursor rules from:
 | `gh_token` | GitHub token for API access | `${{ github.token }}` | ✅ |
 | `openai_api_key` | OpenAI API key | - | ⚠️ |
 | `anthropic_api_key` | Anthropic API key | - | ⚠️ |
-| `ai_provider` | AI provider (`openai`, `anthropic`, `auto`) | `auto` | ❌ |
+| `azure_openai_api_key` | Azure OpenAI API key | - | ⚠️ |
+| `azure_openai_endpoint` | Azure OpenAI endpoint URL | - | ⚠️ |
+| `azure_openai_api_version` | Azure OpenAI API version | `2024-02-15-preview` | ❌ |
+| `ai_provider` | AI provider (`openai`, `anthropic`, `azure`, `auto`) | `auto` | ❌ |
 | `model` | AI model to use | `auto` | ❌ |
 | `review_level` | Review intensity (`light`, `standard`, `thorough`) | `standard` | ❌ |
 | `comment_style` | Comment style (`inline`, `summary`, `both`) | `both` | ❌ |
@@ -93,34 +96,67 @@ The bot automatically detects and applies Cursor rules from:
 
 ⚠️ *At least one AI provider API key is required*
 
+### Azure OpenAI Setup
+
+For Azure OpenAI, you'll need:
+
+1. **API Key**: Your Azure OpenAI service API key
+2. **Endpoint**: Your Azure OpenAI resource endpoint (e.g., `https://your-resource.openai.azure.com/`)
+3. **API Version**: The API version to use (default: `2024-02-15-preview`)
+4. **Model Deployment**: Ensure your chosen model is deployed in your Azure OpenAI resource
+
+**Note**: Azure OpenAI uses deployment names that may differ from OpenAI model names. For example, `gpt-3.5-turbo` becomes `gpt-35-turbo` in Azure.
+
 ## 🤖 Supported AI Models
 
-### OpenAI Models
+### OpenAI Models (2025)
 
 | Model | Description | Best For | Cost |
 |-------|-------------|----------|------|
-| `gpt-4o` | Latest GPT-4 with improved reasoning and speed | Complex analysis, detailed reviews | Premium |
-| `gpt-4` | Original GPT-4 with excellent reasoning | Complex analysis, detailed reviews | Premium |
-| `gpt-4o-mini` | Fast and cost-effective GPT-4 variant | Quick reviews, large PRs | Standard |
-| `gpt-4-turbo` | Enhanced GPT-4 with larger context window | Complex analysis, large files | Premium |
-| `gpt-3.5-turbo` | Fast and reliable for most code reviews | Quick reviews, standard reviews | Standard |
+| `gpt-5` | Latest multimodal model with advanced reasoning and 200K context | Complex analysis, multimodal tasks | Premium |
+| `gpt-5-mini` | Cost-effective GPT-5 variant with excellent performance | Standard reviews, balanced cost-quality | Standard |
+| `gpt-5-nano` | Optimized for speed and low-latency requirements | Quick reviews, real-time analysis | Standard |
+| `gpt-5-chat` | Tailored for advanced, natural conversations | Interactive reviews, conversational analysis | Premium |
+| `o3` | Advanced reasoning model excelling in coding, math, science | Complex reasoning, scientific code analysis | Premium |
+| `o4-mini` | Efficient reasoning model for real-time applications | Quick reasoning, agentic solutions | Standard |
+| `gpt-4.1` | Enhanced GPT-4 with 1M token context | Large codebases, creative tasks | Premium |
+| `gpt-4.1-mini` | Balanced GPT-4.1 variant | Standard reviews, medium complexity | Standard |
+| `gpt-4.1-nano` | Cost-efficient GPT-4.1 | Cost-sensitive reviews, lightweight analysis | Standard |
 
-### Anthropic Models
+### Anthropic Models (2025)
 
 | Model | Description | Best For | Cost |
 |-------|-------------|----------|------|
-| `claude-3-5-sonnet-20241022` | Latest Claude with enhanced code understanding | Complex analysis, detailed reviews | Premium |
-| `claude-3-opus-20240229` | Most capable Claude model for complex reasoning | Complex analysis, detailed reviews | Premium |
-| `claude-3-sonnet-20240229` | Balanced Claude model for comprehensive reviews | Detailed reviews, balanced cost-quality | Premium |
-| `claude-3-haiku-20240307` | Fast and cost-effective Claude model | Quick reviews, large PRs | Standard |
+| `claude-4-opus` | Most advanced Claude with Level 3 safety classification | Complex reasoning, advanced code analysis | Premium |
+| `claude-4-sonnet` | Enhanced Claude 4 with superior coding abilities | Code generation, detailed reviews | Premium |
+| `claude-3-5-sonnet` | Previous generation Claude (legacy) | Complex analysis, detailed reviews | Premium |
+| `claude-3-opus` | Previous most capable Claude (legacy) | Complex analysis, detailed reviews | Premium |
+| `claude-3-sonnet` | Balanced Claude 3 model (legacy) | Detailed reviews, balanced cost-quality | Premium |
+| `claude-3-haiku` | Fast and cost-effective Claude 3 (legacy) | Quick reviews, large PRs | Standard |
+
+### Azure OpenAI Models (2025)
+
+| Model | Description | Best For | Cost |
+|-------|-------------|----------|------|
+| `gpt-5` | Latest multimodal model with advanced reasoning (Azure) | Complex analysis, multimodal tasks | Premium |
+| `gpt-5-mini` | Cost-effective GPT-5 variant (Azure) | Standard reviews, balanced cost-quality | Standard |
+| `gpt-5-nano` | Optimized for speed and low-latency (Azure) | Quick reviews, real-time analysis | Standard |
+| `o3` | Advanced reasoning model (Azure) | Complex reasoning, scientific code analysis | Premium |
+| `o4-mini` | Efficient reasoning model (Azure) | Quick reasoning, agentic solutions | Standard |
+| `gpt-4.1` | Enhanced GPT-4 with 1M token context (Azure) | Large codebases, creative tasks | Premium |
+| `grok-3` | xAI Grok 3 for real-time conversational AI | Conversational analysis, real-time reviews | Premium |
+| `grok-3-mini` | Efficient Grok 3 variant | Quick reviews, cost-effective analysis | Standard |
+| `deepseek-r1` | Advanced reasoning model approaching o3 performance | Deep reasoning, research applications | Premium |
+| `codex-mini` | Lightweight coding assistant | Code generation, programming assistance | Standard |
+| `gpt-35-turbo` | Fast and reliable for most code reviews (legacy) | Quick reviews, standard reviews | Standard |
 
 ### Smart Model Selection
 
 The action can automatically select the best model based on your `review_level`:
 
-- **Light reviews** → Fast, cost-effective models (`gpt-4o-mini`, `claude-3-haiku`)
-- **Standard reviews** → Balanced models (`gpt-4`, `claude-3-sonnet`)  
-- **Thorough reviews** → Premium models (`gpt-4o`, `claude-3-5-sonnet`)
+- **Light reviews** → Fast, cost-effective models (`gpt-5-nano`, `claude-3-haiku`, `gpt-5-nano` for Azure)
+- **Standard reviews** → Balanced models (`gpt-5-mini`, `claude-4-sonnet`, `gpt-5-mini` for Azure)  
+- **Thorough reviews** → Premium models (`gpt-5`, `claude-4-opus`, `o3` for Azure)
 
 ```yaml
 # Automatic model selection
@@ -228,15 +264,24 @@ Great work on the new feature! Just a few TypeScript type annotations needed to 
 - uses: amit.wagner/pr-reviewer@v1
   with:
     ai_provider: 'openai'
-    model: 'gpt-4o-mini'
+    model: 'gpt-5-nano'
     openai_api_key: ${{ secrets.OPENAI_API_KEY }}
 
 # Use latest Claude model for complex analysis
 - uses: amit.wagner/pr-reviewer@v1
   with:
     ai_provider: 'anthropic'
-    model: 'claude-3-5-sonnet-20241022'
+    model: 'claude-4-opus'
     anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+# Use Azure OpenAI for enterprise compliance
+- uses: amit.wagner/pr-reviewer@v1
+  with:
+    ai_provider: 'azure'
+    model: 'gpt-5'
+    azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+    azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+    azure_openai_api_version: '2024-02-15-preview'
 ```
 
 ### Smart Model Selection
@@ -250,6 +295,8 @@ Great work on the new feature! Just a few TypeScript type annotations needed to 
     review_level: 'thorough'      # Will select premium models
     openai_api_key: ${{ secrets.OPENAI_API_KEY }}
     anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+    azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
 ```
 
 ### Multiple AI Providers

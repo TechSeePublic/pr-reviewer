@@ -7,7 +7,10 @@ export interface ActionInputs {
   openaiApiKey?: string;
   anthropicApiKey?: string;
   geminiApiKey?: string;
-  aiProvider: 'openai' | 'anthropic' | 'gemini' | 'auto';
+  azureOpenaiApiKey?: string;
+  azureOpenaiEndpoint?: string;
+  azureOpenaiApiVersion?: string;
+  aiProvider: 'openai' | 'anthropic' | 'gemini' | 'azure' | 'auto';
   model: string;
   reviewLevel: 'light' | 'standard' | 'thorough';
   rulesPath?: string;

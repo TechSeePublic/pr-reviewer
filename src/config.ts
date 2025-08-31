@@ -20,7 +20,7 @@ export function getActionInputs(): ActionInputs {
 
   const inputs: ActionInputs = {
     githubToken: core.getInput('gh_token', { required: true }),
-    aiProvider: (core.getInput('ai_provider') as 'openai' | 'anthropic' | 'auto') || 'auto',
+    aiProvider: (core.getInput('ai_provider') as 'openai' | 'anthropic' | 'gemini' | 'azure' | 'auto') || 'auto',
     model: core.getInput('model') || 'auto',
     reviewLevel: (core.getInput('review_level') as 'light' | 'standard' | 'thorough') || 'standard',
     includePatterns:
@@ -67,6 +67,21 @@ export function getActionInputs(): ActionInputs {
     inputs.anthropicApiKey = anthropicApiKey;
   }
 
+  const azureOpenaiApiKey = core.getInput('azure_openai_api_key');
+  if (azureOpenaiApiKey) {
+    inputs.azureOpenaiApiKey = azureOpenaiApiKey;
+  }
+
+  const azureOpenaiEndpoint = core.getInput('azure_openai_endpoint');
+  if (azureOpenaiEndpoint) {
+    inputs.azureOpenaiEndpoint = azureOpenaiEndpoint;
+  }
+
+  const azureOpenaiApiVersion = core.getInput('azure_openai_api_version');
+  if (azureOpenaiApiVersion) {
+    inputs.azureOpenaiApiVersion = azureOpenaiApiVersion;
+  }
+
   const rulesPath = core.getInput('rules_path');
   if (rulesPath) {
     inputs.rulesPath = rulesPath;
@@ -85,9 +100,13 @@ export function validateInputs(inputs: ActionInputs): void {
     throw new Error('Anthropic API key is required when ai_provider is set to "anthropic"');
   }
 
-  if (inputs.aiProvider === 'auto' && !inputs.openaiApiKey && !inputs.anthropicApiKey) {
+  if (inputs.aiProvider === 'azure' && (!inputs.azureOpenaiApiKey || !inputs.azureOpenaiEndpoint)) {
+    throw new Error('Azure OpenAI API key and endpoint are required when ai_provider is set to "azure"');
+  }
+
+  if (inputs.aiProvider === 'auto' && !inputs.openaiApiKey && !inputs.anthropicApiKey && !inputs.azureOpenaiApiKey) {
     throw new Error(
-      'At least one AI provider API key is required (openai_api_key or anthropic_api_key)'
+      'At least one AI provider API key is required (openai_api_key, anthropic_api_key, or azure_openai_api_key)'
     );
   }
 
@@ -117,6 +136,7 @@ export function validateModelChoice(model: string, provider: string, inputs: Act
   if (provider === 'auto') {
     const hasOpenAI = !!inputs.openaiApiKey;
     const hasAnthropic = !!inputs.anthropicApiKey;
+    const hasAzure = !!(inputs.azureOpenaiApiKey && inputs.azureOpenaiEndpoint);
 
     const modelInfo = MODEL_CAPABILITIES[model as keyof typeof MODEL_CAPABILITIES];
     if (modelInfo) {
@@ -125,6 +145,9 @@ export function validateModelChoice(model: string, provider: string, inputs: Act
       }
       if (modelInfo.provider === 'anthropic' && !hasAnthropic) {
         throw new Error(`Model "${model}" requires Anthropic API key, but none provided`);
+      }
+      if (modelInfo.provider === 'azure' && !hasAzure) {
+        throw new Error(`Model "${model}" requires Azure OpenAI API key and endpoint, but none provided`);
       }
     }
     return;
@@ -145,16 +168,19 @@ export function validateModelChoice(model: string, provider: string, inputs: Act
 export function getRecommendedModel(provider: string, reviewLevel: string): string {
   const recommendations = {
     light: {
-      openai: 'gpt-4o-mini',
-      anthropic: 'claude-3-haiku-20240307',
+      openai: 'gpt-5-nano',
+      anthropic: 'claude-3-haiku',
+      azure: 'gpt-5-nano',
     },
     standard: {
-      openai: 'gpt-4',
-      anthropic: 'claude-3-sonnet-20240229',
+      openai: 'gpt-5-mini',
+      anthropic: 'claude-4-sonnet',
+      azure: 'gpt-5-mini',
     },
     thorough: {
-      openai: 'gpt-4o',
-      anthropic: 'claude-3-5-sonnet-20241022',
+      openai: 'gpt-5',
+      anthropic: 'claude-4-opus',
+      azure: 'o3',
     },
   };
 
@@ -170,35 +196,127 @@ export function getModelInfo(model: string) {
 }
 
 export const DEFAULT_MODELS = {
-  openai: 'gpt-4o-mini', // Use gpt-4o-mini which supports JSON mode and is more cost-effective
-  anthropic: 'claude-3-sonnet-20240229',
+  openai: 'gpt-5-mini', // Use gpt-5-mini - latest cost-effective model with enhanced capabilities
+  anthropic: 'claude-4-sonnet',
+  azure: 'gpt-5-mini', // Azure uses same models as OpenAI
 } as const;
 
 // Supported models by provider
 export const SUPPORTED_MODELS = {
   openai: [
-    'gpt-4',
+    // 2025 Models
+    'gpt-5',
+    'gpt-5-mini',
+    'gpt-5-nano',
+    'gpt-5-chat',
+    'o3',
+    'o4-mini',
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'gpt-4.1-nano',
+    // Legacy Models
     'gpt-4o',
     'gpt-4o-mini',
     'gpt-4-turbo',
-    'gpt-4-turbo-preview',
+    'gpt-4',
     'gpt-3.5-turbo',
-    'gpt-3.5-turbo-16k',
   ] as string[],
   anthropic: [
-    'claude-3-opus-20240229',
-    'claude-3-sonnet-20240229',
-    'claude-3-haiku-20240307',
-    'claude-3-5-sonnet-20241022',
+    // 2025 Models
+    'claude-4-opus',
+    'claude-4-sonnet',
+    // Legacy Models
+    'claude-3-5-sonnet',
+    'claude-3-opus',
+    'claude-3-sonnet',
+    'claude-3-haiku',
+  ] as string[],
+  azure: [
+    // 2025 Models
+    'gpt-5',
+    'gpt-5-mini',
+    'gpt-5-nano',
+    'gpt-5-chat',
+    'o3',
+    'o4-mini',
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'gpt-4.1-nano',
+    'grok-3',
+    'grok-3-mini',
+    'deepseek-r1',
+    'codex-mini',
+    // Legacy Models
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4-turbo',
+    'gpt-4',
+    'gpt-35-turbo', // Azure uses gpt-35-turbo instead of gpt-3.5-turbo
   ] as string[],
 };
 
 // Model capabilities and recommendations
 export const MODEL_CAPABILITIES = {
+  // 2025 OpenAI Models
+  'gpt-5': {
+    provider: 'openai',
+    tier: 'premium',
+    description: 'Latest multimodal model with advanced reasoning and 200K context',
+    bestFor: ['complex-code-analysis', 'detailed-reviews', 'multimodal-tasks'],
+  },
+  'gpt-5-mini': {
+    provider: 'openai',
+    tier: 'standard',
+    description: 'Cost-effective GPT-5 variant with excellent performance',
+    bestFor: ['standard-reviews', 'balanced-cost-quality'],
+  },
+  'gpt-5-nano': {
+    provider: 'openai',
+    tier: 'standard',
+    description: 'Optimized for speed and low-latency requirements',
+    bestFor: ['quick-reviews', 'real-time-analysis'],
+  },
+  'gpt-5-chat': {
+    provider: 'openai',
+    tier: 'premium',
+    description: 'Tailored for advanced, natural, and context-aware conversations',
+    bestFor: ['interactive-reviews', 'conversational-analysis'],
+  },
+  'o3': {
+    provider: 'openai',
+    tier: 'premium',
+    description: 'Advanced reasoning model excelling in coding, math, and science',
+    bestFor: ['complex-reasoning', 'scientific-code-analysis', 'mathematical-logic'],
+  },
+  'o4-mini': {
+    provider: 'openai',
+    tier: 'standard',
+    description: 'Efficient reasoning model for real-time applications',
+    bestFor: ['quick-reasoning', 'agentic-solutions'],
+  },
+  'gpt-4.1': {
+    provider: 'openai',
+    tier: 'premium',
+    description: 'Enhanced GPT-4 with 1M token context and improved intent understanding',
+    bestFor: ['large-codebases', 'creative-tasks', 'agentic-planning'],
+  },
+  'gpt-4.1-mini': {
+    provider: 'openai',
+    tier: 'standard',
+    description: 'Balanced GPT-4.1 variant with performance and efficiency',
+    bestFor: ['standard-reviews', 'medium-complexity-tasks'],
+  },
+  'gpt-4.1-nano': {
+    provider: 'openai',
+    tier: 'standard',
+    description: 'Cost-efficient GPT-4.1 for lower resource consumption',
+    bestFor: ['cost-sensitive-reviews', 'lightweight-analysis'],
+  },
+  // Legacy OpenAI Models
   'gpt-4o': {
     provider: 'openai',
     tier: 'premium',
-    description: 'Latest GPT-4 with improved reasoning and speed',
+    description: 'Previous generation GPT-4 with improved reasoning',
     bestFor: ['complex-code-analysis', 'detailed-reviews'],
   },
   'gpt-4': {
@@ -225,29 +343,74 @@ export const MODEL_CAPABILITIES = {
     description: 'Fast and reliable for most code reviews',
     bestFor: ['quick-reviews', 'standard-reviews'],
   },
-  'claude-3-opus-20240229': {
+  // 2025 Anthropic Models
+  'claude-4-opus': {
     provider: 'anthropic',
     tier: 'premium',
-    description: 'Most capable Claude model for complex reasoning',
+    description: 'Most advanced Claude model with Level 3 safety classification',
+    bestFor: ['complex-reasoning', 'advanced-code-analysis', 'high-risk-tasks'],
+  },
+  'claude-4-sonnet': {
+    provider: 'anthropic',
+    tier: 'premium',
+    description: 'Enhanced Claude 4 with superior coding and reasoning abilities',
+    bestFor: ['code-generation', 'detailed-reviews', 'complex-analysis'],
+  },
+  // Legacy Anthropic Models
+  'claude-3-5-sonnet': {
+    provider: 'anthropic',
+    tier: 'premium',
+    description: 'Previous generation Claude with enhanced code understanding',
     bestFor: ['complex-code-analysis', 'detailed-reviews'],
   },
-  'claude-3-sonnet-20240229': {
+  'claude-3-opus': {
     provider: 'anthropic',
     tier: 'premium',
-    description: 'Balanced Claude model for comprehensive reviews',
+    description: 'Previous most capable Claude model for complex reasoning',
+    bestFor: ['complex-code-analysis', 'detailed-reviews'],
+  },
+  'claude-3-sonnet': {
+    provider: 'anthropic',
+    tier: 'premium',
+    description: 'Balanced Claude 3 model for comprehensive reviews',
     bestFor: ['detailed-reviews', 'balanced-cost-quality'],
   },
-  'claude-3-5-sonnet-20241022': {
-    provider: 'anthropic',
-    tier: 'premium',
-    description: 'Latest Claude with enhanced code understanding',
-    bestFor: ['complex-code-analysis', 'detailed-reviews'],
-  },
-  'claude-3-haiku-20240307': {
+  'claude-3-haiku': {
     provider: 'anthropic',
     tier: 'standard',
-    description: 'Fast and cost-effective Claude model',
+    description: 'Fast and cost-effective Claude 3 model',
     bestFor: ['quick-reviews', 'large-prs'],
+  },
+  // 2025 Azure-specific models
+  'grok-3': {
+    provider: 'azure',
+    tier: 'premium',
+    description: 'xAI Grok 3 for real-time conversational AI and reasoning',
+    bestFor: ['conversational-analysis', 'real-time-reviews'],\n  },
+  'grok-3-mini': {
+    provider: 'azure',
+    tier: 'standard',
+    description: 'Efficient Grok 3 variant for cost-effective reasoning',
+    bestFor: ['quick-reviews', 'cost-effective-analysis'],
+  },
+  'deepseek-r1': {
+    provider: 'azure',
+    tier: 'premium',
+    description: 'Advanced reasoning model approaching o3 performance',
+    bestFor: ['deep-reasoning', 'research-applications', 'intelligent-agents'],
+  },
+  'codex-mini': {
+    provider: 'azure',
+    tier: 'standard',
+    description: 'Lightweight coding assistant for embedded scenarios',
+    bestFor: ['code-generation', 'code-completion', 'programming-assistance'],
+  },
+  // Azure OpenAI legacy models
+  'gpt-35-turbo': {
+    provider: 'azure',
+    tier: 'standard',
+    description: 'Fast and reliable for most code reviews (Azure)',
+    bestFor: ['quick-reviews', 'standard-reviews'],
   },
 } as const;
 

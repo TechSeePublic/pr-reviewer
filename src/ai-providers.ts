@@ -29,17 +29,21 @@ export class OpenAIProvider implements AIProvider {
   private supportsJsonMode(): boolean {
     // Models that support response_format: { type: 'json_object' }
     const supportedModels = [
-      'gpt-4-1106-preview',
-      'gpt-4-0125-preview',
-      'gpt-4-turbo-preview',
+      // 2025 Models (all support JSON mode)
+      'gpt-5',
+      'gpt-5-mini',
+      'gpt-5-nano',
+      'gpt-5-chat',
+      'o3',
+      'o4-mini',
+      'gpt-4.1',
+      'gpt-4.1-mini',
+      'gpt-4.1-nano',
+      // Legacy Models
       'gpt-4-turbo',
       'gpt-4o',
-      'gpt-4o-2024-05-13',
-      'gpt-4o-2024-08-06',
       'gpt-4o-mini',
-      'gpt-4o-mini-2024-07-18',
-      'gpt-3.5-turbo-1106',
-      'gpt-3.5-turbo-0125',
+      'gpt-3.5-turbo',
     ];
 
     return supportedModels.some(supportedModel => this.model.startsWith(supportedModel));
@@ -327,6 +331,193 @@ export class AnthropicProvider implements AIProvider {
   }
 }
 
+export class AzureOpenAIProvider implements AIProvider {
+  public readonly name = 'azure';
+  public readonly model: string;
+  private client: OpenAI;
+
+  constructor(apiKey: string, endpoint: string, apiVersion: string, model?: string) {
+    this.model = model || DEFAULT_MODELS.azure;
+    this.client = new OpenAI({
+      apiKey,
+      baseURL: `${endpoint.replace(/\/$/, '')}/openai/deployments/${this.model}`,
+      defaultQuery: { 'api-version': apiVersion },
+      defaultHeaders: {
+        'api-key': apiKey,
+      },
+    });
+  }
+
+  private supportsJsonMode(): boolean {
+    // Models that support response_format: { type: 'json_object' }
+    const supportedModels = [
+      // 2025 Models (all support JSON mode)
+      'gpt-5',
+      'gpt-5-mini',
+      'gpt-5-nano',
+      'gpt-5-chat',
+      'o3',
+      'o4-mini',
+      'gpt-4.1',
+      'gpt-4.1-mini',
+      'gpt-4.1-nano',
+      'grok-3',
+      'grok-3-mini',
+      'deepseek-r1',
+      'codex-mini',
+      // Legacy Models
+      'gpt-4-turbo',
+      'gpt-4o',
+      'gpt-4o-mini',
+      'gpt-35-turbo',
+    ];
+
+    return supportedModels.some(supportedModel => this.model.startsWith(supportedModel));
+  }
+
+  async reviewCode(prompt: string, code: string, rules: CursorRule[]): Promise<CodeIssue[]> {
+    try {
+      const systemPrompt = PromptTemplates.buildCodeReviewSystemPrompt(rules, {
+        supportsJsonMode: this.supportsJsonMode(),
+        provider: this.name,
+      });
+      const userPrompt = PromptTemplates.buildUserPrompt(prompt, code);
+
+      // Build the request configuration
+      const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
+        model: this.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 4000,
+      };
+
+      // Only add response_format if the model supports it
+      if (this.supportsJsonMode()) {
+        requestConfig.response_format = { type: 'json_object' };
+      }
+
+      const response = await this.client.chat.completions.create(requestConfig);
+
+      const result = response.choices[0]?.message?.content;
+      if (!result) {
+        throw new Error('No response from Azure OpenAI');
+      }
+
+      return this.parseAIResponse(result);
+    } catch (error) {
+      logger.error('Azure OpenAI API error:', error);
+
+      // Extract specific error message from Azure OpenAI error
+      let errorMessage = 'Unknown error';
+      if (error && typeof error === 'object') {
+        if ('message' in error) {
+          errorMessage = String(error.message);
+        } else if (
+          'error' in error &&
+          error.error &&
+          typeof error.error === 'object' &&
+          'message' in error.error
+        ) {
+          errorMessage = String(error.error.message);
+        }
+      }
+
+      throw new Error(`Azure OpenAI review failed: ${errorMessage}`);
+    }
+  }
+
+  async generateSummary(issues: CodeIssue[], context: ReviewContext): Promise<string> {
+    try {
+      const prompt = PromptTemplates.buildSummaryPrompt(issues, context);
+
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a helpful code review assistant that creates concise, actionable PR review summaries.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.2,
+        max_tokens: 1500,
+      });
+
+      return response.choices[0]?.message?.content || 'Summary generation failed';
+    } catch (error) {
+      logger.error('Azure OpenAI summary generation error:', error);
+
+      // Extract specific error message from Azure OpenAI error
+      let errorMessage = 'Unknown error';
+      if (error && typeof error === 'object') {
+        if ('message' in error) {
+          errorMessage = String(error.message);
+        } else if (
+          'error' in error &&
+          error.error &&
+          typeof error.error === 'object' &&
+          'message' in error.error
+        ) {
+          errorMessage = String(error.error.message);
+        }
+      }
+
+      throw new Error(`Azure OpenAI summary generation error: ${errorMessage}`);
+    }
+  }
+
+  private parseAIResponse(response: string): CodeIssue[] {
+    try {
+      // Clean up the response for better JSON parsing
+      let cleanedResponse = response.trim();
+
+      // If response doesn't start with {, try to find JSON content
+      if (!cleanedResponse.startsWith('{')) {
+        const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          cleanedResponse = jsonMatch[0];
+        }
+      }
+
+      const parsed: AIResponse = JSON.parse(cleanedResponse);
+      return parsed.issues || [];
+    } catch (error) {
+      logger.warn('Failed to parse AI response as JSON:', error);
+      logger.warn('Response content:', response.substring(0, 500) + '...');
+      // Try to extract issues from malformed JSON
+      return this.extractIssuesFromText(response);
+    }
+  }
+
+  private extractIssuesFromText(text: string): CodeIssue[] {
+    // Fallback: try to extract issues from non-JSON response
+    const issues: CodeIssue[] = [];
+
+    // Look for common patterns in text responses
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (line.toLowerCase().includes('violation') || line.toLowerCase().includes('issue')) {
+        issues.push({
+          type: 'warning',
+          category: 'best_practice',
+          message: line.trim(),
+          description: line.trim(),
+          ruleId: 'unknown',
+          ruleName: 'Extracted from text response',
+          file: 'unknown',
+          severity: 'medium',
+        });
+      }
+    }
+
+    return issues;
+  }
+}
+
 export class AIProviderFactory {
   static create(inputs: ActionInputs): AIProvider {
     const { provider, model } = this.resolveProviderAndModel(inputs);
@@ -345,6 +536,18 @@ export class AIProviderFactory {
         throw new Error('Anthropic API key is required');
       }
       return new AnthropicProvider(inputs.anthropicApiKey, model);
+    }
+
+    if (provider === 'azure') {
+      if (!inputs.azureOpenaiApiKey || !inputs.azureOpenaiEndpoint) {
+        throw new Error('Azure OpenAI API key and endpoint are required');
+      }
+      return new AzureOpenAIProvider(
+        inputs.azureOpenaiApiKey,
+        inputs.azureOpenaiEndpoint,
+        inputs.azureOpenaiApiVersion || '2024-02-15-preview',
+        model
+      );
     }
 
     throw new Error(`Unsupported AI provider: ${provider}`);
@@ -398,6 +601,10 @@ export class AIProviderFactory {
       providers.push('anthropic');
     }
 
+    if (inputs.azureOpenaiApiKey && inputs.azureOpenaiEndpoint) {
+      providers.push('azure');
+    }
+
     return providers;
   }
 
@@ -405,6 +612,7 @@ export class AIProviderFactory {
     return {
       openai: getRecommendedModel('openai', reviewLevel),
       anthropic: getRecommendedModel('anthropic', reviewLevel),
+      azure: getRecommendedModel('azure', reviewLevel),
     };
   }
 }
