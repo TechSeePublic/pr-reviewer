@@ -5,26 +5,38 @@ An AI-powered GitHub Action that automatically reviews pull requests according t
 ## ✨ Features
 
 - 🎯 **Respects Cursor Rules** - Supports all Cursor rule formats (`.cursor/rules/*.mdc`, `AGENTS.md`, `.cursorrules`)
-- 🔍 **Smart Code Analysis** - AI-powered review using OpenAI or Anthropic
+- 🔍 **Smart Code Analysis** - AI-powered review using OpenAI, Anthropic, or Azure
+- 📋 **PR-Level Planning** - Creates comprehensive review plans understanding overall PR context
+- 📦 **Intelligent Batching** - Processes files in batches with full PR context for better analysis
 - 💬 **Dual Comment System** - Both inline file comments and PR summary comments
 - ⚙️ **Highly Configurable** - Customize review behavior, severity levels, and comment styles
 - 🚀 **Zero Infrastructure** - Runs entirely on GitHub Actions, no servers needed
 - 🛡️ **Secure** - Code never leaves GitHub's infrastructure
 - 📊 **Comprehensive Reporting** - Detailed review statistics and rule application tracking
-- 🚨 **Fail-Fast Error Handling** - Action fails immediately on AI provider errors for better debugging
-- ⏱️ **Smart Rate Limiting** - Sequential file processing with configurable delays to avoid AI provider rate limits
+- ⏱️ **Smart Rate Limiting** - Configurable delays for both AI providers and GitHub API calls
+- 🔄 **Robust Fallback** - Falls back to single-file review if batch processing fails
 
 ## 🚀 Quick Start
 
-### Rate Limiting & Error Handling
+### New 2-Step Review Process
 
-The action now processes files **one by one** (instead of in batches) with configurable delays between AI provider requests to avoid rate limits. If any AI provider request fails, the action will **fail immediately** instead of continuing with fallback behavior.
+The action now uses an intelligent 2-step approach for better PR understanding and faster processing:
 
-**Key Changes:**
-- ⚡ **Sequential Processing**: Files are reviewed one at a time to prevent overwhelming AI providers
-- ⏱️ **Configurable Delays**: Use `request_delay` to set milliseconds between requests (default: 2000ms)
-- 🚨 **Fail-Fast**: Action stops immediately on AI provider errors for better debugging
-- 📊 **Progress Tracking**: Clear logging shows which file is being reviewed and when delays occur
+**Step 1: PR Planning**
+- 📋 **Analyzes all changes** to understand the overall PR intent and scope
+- 🎯 **Identifies key changes**, risk areas, and review focus points
+- 📝 **Creates a comprehensive plan** that guides the detailed review
+
+**Step 2: Batch Review with Context**
+- 📦 **Processes files in batches** (default: 5 files) with full PR context
+- ⚡ **Faster processing** compared to file-by-file review
+- 🔄 **Automatic fallback** to single-file review if batch processing fails
+- ⏱️ **Smart rate limiting** for both AI providers and GitHub API calls
+
+**Benefits:**
+- 🚀 **Improved Performance**: Batch processing reduces total AI requests
+- 🎯 **Better Context**: AI understands how files work together
+- 📊 **Comprehensive Analysis**: Reviews consider overall PR goals and impact
 
 ### 1. Add to Your Workflow
 
@@ -54,7 +66,9 @@ jobs:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           review_level: 'standard'
           comment_style: 'both'
-          request_delay: '3000'  # 3 seconds between requests to avoid rate limits
+          batch_size: '5'          # Process 5 files per batch
+          request_delay: '2000'    # 2 seconds between AI requests
+          github_rate_limit: '1000' # 1 second between GitHub API calls
 ```
 
 ### 2. Set Up API Keys
@@ -441,15 +455,9 @@ Enable debug logging by setting the `ACTIONS_STEP_DEBUG` secret to `true` in you
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
-
-- [Cursor](https://cursor.sh/) for the amazing AI-powered development environment
-- [GitHub Actions](https://github.com/features/actions) for the CI/CD platform
-- [OpenAI](https://openai.com/) and [Anthropic](https://anthropic.com/) for AI capabilities
 
 ## 📞 Support
 
-- 📖 [Documentation](https://github.com/amit.wagner/pr-reviewer#readme)
 - 🐛 [Issue Tracker](https://github.com/amit.wagner/pr-reviewer/issues)
 - 💬 [Discussions](https://github.com/amit.wagner/pr-reviewer/discussions)
 
@@ -457,7 +465,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Made with ❤️ by the Cursor AI community**
+**Made with ❤️ by the Techsee**
 
 [⭐ Star this repo](https://github.com/amit.wagner/pr-reviewer) • [🐛 Report bug](https://github.com/amit.wagner/pr-reviewer/issues) • [✨ Request feature](https://github.com/amit.wagner/pr-reviewer/issues)
 

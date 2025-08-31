@@ -10,6 +10,8 @@ import {
   AIResponse,
   CodeIssue,
   CursorRule,
+  FileChange,
+  PRPlan,
   ReviewContext,
 } from './types';
 import { DEFAULT_MODELS, getRecommendedModel } from './config';
@@ -103,6 +105,78 @@ export class OpenAIProvider implements AIProvider {
     }
   }
 
+  async generatePRPlan(fileChanges: FileChange[], rules: CursorRule[]): Promise<PRPlan> {
+    try {
+      const prompt = PromptTemplates.buildPRPlanPrompt(fileChanges, rules);
+
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are an expert code reviewer who analyzes pull requests to create comprehensive review plans. Focus on understanding the overall changes and their implications.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 2000,
+        ...(this.supportsJsonMode() && { response_format: { type: 'json_object' } }),
+      });
+
+      const result = response.choices[0]?.message?.content;
+      if (!result) {
+        throw new Error('No response from OpenAI for PR plan');
+      }
+
+      return this.parsePRPlanResponse(result);
+    } catch (error) {
+      logger.error('OpenAI PR plan generation error:', error);
+      throw new Error(`OpenAI PR plan generation failed: ${error}`);
+    }
+  }
+
+  async reviewBatch(
+    files: FileChange[],
+    rules: CursorRule[],
+    prPlan: PRPlan
+  ): Promise<CodeIssue[]> {
+    try {
+      const prompt = PromptTemplates.buildBatchReviewPrompt(files, rules, prPlan);
+
+      const systemPrompt = PromptTemplates.buildCodeReviewSystemPrompt(rules, {
+        supportsJsonMode: this.supportsJsonMode(),
+        provider: this.name,
+      });
+
+      const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
+        model: this.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 6000,
+      };
+
+      if (this.supportsJsonMode()) {
+        requestConfig.response_format = { type: 'json_object' };
+      }
+
+      const response = await this.client.chat.completions.create(requestConfig);
+
+      const result = response.choices[0]?.message?.content;
+      if (!result) {
+        throw new Error('No response from OpenAI for batch review');
+      }
+
+      return this.parseAIResponse(result);
+    } catch (error) {
+      logger.error('OpenAI batch review error:', error);
+      throw new Error(`OpenAI batch review failed: ${error}`);
+    }
+  }
+
   async generateSummary(issues: CodeIssue[], context: ReviewContext): Promise<string> {
     try {
       const prompt = PromptTemplates.buildSummaryPrompt(issues, context);
@@ -190,6 +264,41 @@ export class OpenAIProvider implements AIProvider {
 
     return issues;
   }
+
+  private parsePRPlanResponse(response: string): PRPlan {
+    try {
+      // Clean up the response for better JSON parsing
+      let cleanedResponse = response.trim();
+
+      // If response doesn't start with {, try to find JSON content
+      if (!cleanedResponse.startsWith('{')) {
+        const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          cleanedResponse = jsonMatch[0];
+        }
+      }
+
+      const parsed = JSON.parse(cleanedResponse);
+
+      return {
+        overview: parsed.overview || 'No overview provided',
+        keyChanges: parsed.keyChanges || parsed.key_changes || [],
+        riskAreas: parsed.riskAreas || parsed.risk_areas || [],
+        reviewFocus: parsed.reviewFocus || parsed.review_focus || [],
+        context: parsed.context || 'No additional context provided',
+      };
+    } catch (error) {
+      logger.warn('Failed to parse PR plan response as JSON:', error);
+      // Return a fallback plan
+      return {
+        overview: 'Failed to generate PR plan overview',
+        keyChanges: ['Unable to analyze changes'],
+        riskAreas: ['Unknown risk areas'],
+        reviewFocus: ['General code review'],
+        context: 'PR plan generation failed',
+      };
+    }
+  }
 }
 
 export class AnthropicProvider implements AIProvider {
@@ -243,6 +352,63 @@ export class AnthropicProvider implements AIProvider {
       }
 
       throw new Error(`Anthropic review failed: ${errorMessage}`);
+    }
+  }
+
+  async generatePRPlan(fileChanges: FileChange[], rules: CursorRule[]): Promise<PRPlan> {
+    try {
+      const prompt = PromptTemplates.buildPRPlanPrompt(fileChanges, rules);
+
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 2000,
+        temperature: 0.1,
+        system:
+          'You are an expert code reviewer who analyzes pull requests to create comprehensive review plans. Focus on understanding the overall changes and their implications.',
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      const result = response.content[0];
+      if (!result || result.type !== 'text') {
+        throw new Error('No response from Anthropic for PR plan');
+      }
+
+      return this.parsePRPlanResponse(result.text);
+    } catch (error) {
+      logger.error('Anthropic PR plan generation error:', error);
+      throw new Error(`Anthropic PR plan generation failed: ${error}`);
+    }
+  }
+
+  async reviewBatch(
+    files: FileChange[],
+    rules: CursorRule[],
+    prPlan: PRPlan
+  ): Promise<CodeIssue[]> {
+    try {
+      const prompt = PromptTemplates.buildBatchReviewPrompt(files, rules, prPlan);
+      const systemPrompt = PromptTemplates.buildCodeReviewSystemPrompt(rules, {
+        supportsJsonMode: false,
+        provider: this.name,
+      });
+
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 6000,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      const result = response.content[0];
+      if (!result || result.type !== 'text') {
+        throw new Error('No response from Anthropic for batch review');
+      }
+
+      return this.parseAIResponse(result.text);
+    } catch (error) {
+      logger.error('Anthropic batch review error:', error);
+      throw new Error(`Anthropic batch review failed: ${error}`);
     }
   }
 
@@ -328,6 +494,41 @@ export class AnthropicProvider implements AIProvider {
     }
 
     return issues;
+  }
+
+  private parsePRPlanResponse(response: string): PRPlan {
+    try {
+      // Clean up the response for better JSON parsing
+      let cleanedResponse = response.trim();
+
+      // If response doesn't start with {, try to find JSON content
+      if (!cleanedResponse.startsWith('{')) {
+        const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          cleanedResponse = jsonMatch[0];
+        }
+      }
+
+      const parsed = JSON.parse(cleanedResponse);
+
+      return {
+        overview: parsed.overview || 'No overview provided',
+        keyChanges: parsed.keyChanges || parsed.key_changes || [],
+        riskAreas: parsed.riskAreas || parsed.risk_areas || [],
+        reviewFocus: parsed.reviewFocus || parsed.review_focus || [],
+        context: parsed.context || 'No additional context provided',
+      };
+    } catch (error) {
+      logger.warn('Failed to parse PR plan response as JSON:', error);
+      // Return a fallback plan
+      return {
+        overview: 'Failed to generate PR plan overview',
+        keyChanges: ['Unable to analyze changes'],
+        riskAreas: ['Unknown risk areas'],
+        reviewFocus: ['General code review'],
+        context: 'PR plan generation failed',
+      };
+    }
   }
 }
 
@@ -429,6 +630,78 @@ export class AzureOpenAIProvider implements AIProvider {
     }
   }
 
+  async generatePRPlan(fileChanges: FileChange[], rules: CursorRule[]): Promise<PRPlan> {
+    try {
+      const prompt = PromptTemplates.buildPRPlanPrompt(fileChanges, rules);
+
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are an expert code reviewer who analyzes pull requests to create comprehensive review plans. Focus on understanding the overall changes and their implications.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 2000,
+        ...(this.supportsJsonMode() && { response_format: { type: 'json_object' } }),
+      });
+
+      const result = response.choices[0]?.message?.content;
+      if (!result) {
+        throw new Error('No response from Azure OpenAI for PR plan');
+      }
+
+      return this.parsePRPlanResponse(result);
+    } catch (error) {
+      logger.error('Azure OpenAI PR plan generation error:', error);
+      throw new Error(`Azure OpenAI PR plan generation failed: ${error}`);
+    }
+  }
+
+  async reviewBatch(
+    files: FileChange[],
+    rules: CursorRule[],
+    prPlan: PRPlan
+  ): Promise<CodeIssue[]> {
+    try {
+      const prompt = PromptTemplates.buildBatchReviewPrompt(files, rules, prPlan);
+
+      const systemPrompt = PromptTemplates.buildCodeReviewSystemPrompt(rules, {
+        supportsJsonMode: this.supportsJsonMode(),
+        provider: this.name,
+      });
+
+      const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
+        model: this.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 6000,
+      };
+
+      if (this.supportsJsonMode()) {
+        requestConfig.response_format = { type: 'json_object' };
+      }
+
+      const response = await this.client.chat.completions.create(requestConfig);
+
+      const result = response.choices[0]?.message?.content;
+      if (!result) {
+        throw new Error('No response from Azure OpenAI for batch review');
+      }
+
+      return this.parseAIResponse(result);
+    } catch (error) {
+      logger.error('Azure OpenAI batch review error:', error);
+      throw new Error(`Azure OpenAI batch review failed: ${error}`);
+    }
+  }
+
   async generateSummary(issues: CodeIssue[], context: ReviewContext): Promise<string> {
     try {
       const prompt = PromptTemplates.buildSummaryPrompt(issues, context);
@@ -515,6 +788,41 @@ export class AzureOpenAIProvider implements AIProvider {
     }
 
     return issues;
+  }
+
+  private parsePRPlanResponse(response: string): PRPlan {
+    try {
+      // Clean up the response for better JSON parsing
+      let cleanedResponse = response.trim();
+
+      // If response doesn't start with {, try to find JSON content
+      if (!cleanedResponse.startsWith('{')) {
+        const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          cleanedResponse = jsonMatch[0];
+        }
+      }
+
+      const parsed = JSON.parse(cleanedResponse);
+
+      return {
+        overview: parsed.overview || 'No overview provided',
+        keyChanges: parsed.keyChanges || parsed.key_changes || [],
+        riskAreas: parsed.riskAreas || parsed.risk_areas || [],
+        reviewFocus: parsed.reviewFocus || parsed.review_focus || [],
+        context: parsed.context || 'No additional context provided',
+      };
+    } catch (error) {
+      logger.warn('Failed to parse PR plan response as JSON:', error);
+      // Return a fallback plan
+      return {
+        overview: 'Failed to generate PR plan overview',
+        keyChanges: ['Unable to analyze changes'],
+        riskAreas: ['Unknown risk areas'],
+        reviewFocus: ['General code review'],
+        context: 'PR plan generation failed',
+      };
+    }
   }
 }
 

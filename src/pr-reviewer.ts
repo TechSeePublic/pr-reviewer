@@ -12,8 +12,10 @@ import {
   CodeIssue,
   CursorRule,
   CursorRulesConfig,
+  FileBatch,
   FileChange,
   PRContext,
+  PRPlan,
   ReviewContext,
   ReviewResult,
 } from './types';
@@ -41,7 +43,11 @@ export class PRReviewer {
     this.prContext = this.extractPRContext();
 
     // Initialize clients
-    this.githubClient = new GitHubClient(inputs.githubToken, this.prContext);
+    this.githubClient = new GitHubClient(
+      inputs.githubToken,
+      this.prContext,
+      inputs.githubRateLimit
+    );
     this.aiProvider = AIProviderFactory.create(inputs);
     this.commentManager = new CommentManager(this.githubClient, inputs);
     this.autoFixManager = new AutoFixManager(
@@ -85,11 +91,16 @@ export class PRReviewer {
         return this.createSkippedResult('No applicable rules found');
       }
 
-      // Step 4: Review each file
-      core.info('🔍 Reviewing files with AI...');
-      const allIssues = await this.reviewFiles(fileChanges, applicableRules);
+      // Step 4: Generate PR plan (new planner step)
+      core.info('📋 Generating PR review plan...');
+      const prPlan = await this.generatePRPlan(fileChanges, applicableRules);
+      core.info(`Plan created: ${prPlan.overview}`);
 
-      // Step 5: Generate review result
+      // Step 5: Review files in batches with PR context
+      core.info('🔍 Reviewing files in batches with AI...');
+      const allIssues = await this.reviewFilesInBatches(fileChanges, applicableRules, prPlan);
+
+      // Step 6: Generate review result
       const reviewResult = await this.generateReviewResult(
         allIssues,
         fileChanges,
@@ -97,7 +108,7 @@ export class PRReviewer {
         cursorRules
       );
 
-      // Step 6: Apply auto-fixes if enabled
+      // Step 7: Apply auto-fixes if enabled
       if (this.inputs.enableAutoFix) {
         core.info('🔧 Applying auto-fixes...');
         const autoFixResults = await this.autoFixManager.applyAutoFixes(allIssues, fileChanges);
@@ -113,11 +124,11 @@ export class PRReviewer {
         }
       }
 
-      // Step 7: Post comments
+      // Step 8: Post comments
       core.info('💬 Posting review comments...');
       await this.commentManager.postReviewComments(reviewResult, fileChanges);
 
-      // Step 8: Set outputs
+      // Step 9: Set outputs
       this.setActionOutputs(reviewResult);
 
       core.info(`✅ Review completed: ${reviewResult.status} (${allIssues.length} issues found)`);
@@ -183,37 +194,145 @@ export class PRReviewer {
   }
 
   /**
-   * Review all changed files
+   * Generate PR plan by analyzing all changes
    */
-  private async reviewFiles(fileChanges: FileChange[], rules: CursorRule[]): Promise<CodeIssue[]> {
+  private async generatePRPlan(fileChanges: FileChange[], rules: CursorRule[]): Promise<PRPlan> {
+    try {
+      return await this.aiProvider.generatePRPlan(fileChanges, rules);
+    } catch (error) {
+      core.warning(`Failed to generate PR plan: ${error}`);
+      // Return a fallback plan
+      return {
+        overview: 'Unable to generate PR plan - proceeding with standard review',
+        keyChanges: fileChanges.map(f => `${f.status}: ${f.filename}`),
+        riskAreas: ['Review all changes carefully'],
+        reviewFocus: ['Code quality', 'Best practices', 'Rule compliance'],
+        context: 'Fallback plan due to AI provider error',
+      };
+    }
+  }
+
+  /**
+   * Review files in batches with PR context
+   */
+  private async reviewFilesInBatches(
+    fileChanges: FileChange[],
+    rules: CursorRule[],
+    prPlan: PRPlan
+  ): Promise<CodeIssue[]> {
     const allIssues: CodeIssue[] = [];
+    const batches = this.createFileBatches(fileChanges);
 
-    // Process files one by one to avoid rate limits
-    for (let i = 0; i < fileChanges.length; i++) {
-      const fileChange = fileChanges[i];
+    core.info(
+      `Processing ${fileChanges.length} files in ${batches.length} batches (batch size: ${this.inputs.batchSize})`
+    );
 
-      if (!fileChange) {
-        core.warning(`Skipping undefined file at index ${i}`);
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      if (!batch) {
+        core.warning(`Skipping undefined batch at index ${i}`);
         continue;
       }
 
       try {
-        core.info(`Reviewing file ${i + 1}/${fileChanges.length}: ${fileChange.filename}`);
-        const issues = await this.reviewSingleFile(fileChange, rules);
-        allIssues.push(...issues);
+        core.info(`Reviewing batch ${i + 1}/${batches.length} (${batch.files.length} files)`);
 
-        // Add delay between each file to respect rate limits
-        if (i < fileChanges.length - 1) {
+        // Get file contents for the batch
+        const filesWithContent = await this.getFilesWithContent(batch.files);
+
+        // Review the batch
+        const batchIssues = await this.aiProvider.reviewBatch(filesWithContent, rules, prPlan);
+        allIssues.push(...batchIssues);
+
+        // Add delay between batches to respect rate limits
+        if (i < batches.length - 1) {
           const delayMs = this.inputs.requestDelay;
-          core.info(`Waiting ${delayMs}ms before next request to avoid rate limits...`);
+          core.info(`Waiting ${delayMs}ms before next batch to avoid rate limits...`);
           await this.delay(delayMs);
         }
       } catch (error) {
-        // Fail the action when AI provider errors occur
-        const errorMessage = `AI provider error reviewing file ${fileChange.filename}: ${error}`;
-        core.error(errorMessage);
-        core.setFailed(errorMessage);
-        throw new Error(errorMessage);
+        // Log error but continue with other batches
+        core.error(`Error reviewing batch ${i + 1}: ${error}`);
+
+        // Fallback to single file review for this batch
+        core.info(`Falling back to single-file review for batch ${i + 1}`);
+        const fallbackIssues = await this.reviewBatchFallback(batch.files, rules);
+        allIssues.push(...fallbackIssues);
+      }
+    }
+
+    return allIssues;
+  }
+
+  /**
+   * Create batches of files for processing
+   */
+  private createFileBatches(fileChanges: FileChange[]): FileBatch[] {
+    const batches: FileBatch[] = [];
+    const batchSize = this.inputs.batchSize;
+
+    for (let i = 0; i < fileChanges.length; i += batchSize) {
+      const files = fileChanges.slice(i, i + batchSize);
+      batches.push({
+        files,
+        batchIndex: Math.floor(i / batchSize),
+        totalBatches: Math.ceil(fileChanges.length / batchSize),
+      });
+    }
+
+    return batches;
+  }
+
+  /**
+   * Get file contents for a batch of files
+   */
+  private async getFilesWithContent(files: FileChange[]): Promise<FileChange[]> {
+    const filesWithContent: FileChange[] = [];
+
+    for (const file of files) {
+      try {
+        const content = await this.getFileContent(file);
+        if (content) {
+          // Add content to the file change object for batch processing
+          filesWithContent.push({
+            ...file,
+            // Store content in patch field for batch processing
+            patch:
+              file.patch ||
+              `Content: ${content.substring(0, 2000)}${content.length > 2000 ? '...' : ''}`,
+          });
+        } else {
+          // Include file even without content
+          filesWithContent.push(file);
+        }
+      } catch (error) {
+        core.warning(`Could not get content for ${file.filename}: ${error}`);
+        // Include file without content
+        filesWithContent.push(file);
+      }
+    }
+
+    return filesWithContent;
+  }
+
+  /**
+   * Fallback to single file review when batch review fails
+   */
+  private async reviewBatchFallback(
+    files: FileChange[],
+    rules: CursorRule[]
+  ): Promise<CodeIssue[]> {
+    const allIssues: CodeIssue[] = [];
+
+    for (const file of files) {
+      try {
+        const issues = await this.reviewSingleFile(file, rules);
+        allIssues.push(...issues);
+
+        // Small delay between single file reviews
+        await this.delay(500);
+      } catch (error) {
+        core.warning(`Failed to review ${file.filename} in fallback mode: ${error}`);
       }
     }
 

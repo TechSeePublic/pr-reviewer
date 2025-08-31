@@ -3,7 +3,7 @@
  * This module provides consistent, high-quality prompts that work across all AI providers
  */
 
-import { CodeIssue, CursorRule, FileChange, ReviewContext } from './types';
+import { CodeIssue, CursorRule, FileChange, PRPlan, ReviewContext } from './types';
 
 export interface PromptConfig {
   supportsJsonMode: boolean;
@@ -310,5 +310,151 @@ Look for:
     }
 
     return changedLines;
+  }
+
+  /**
+   * Build PR plan prompt for analyzing overall changes
+   */
+  static buildPRPlanPrompt(fileChanges: FileChange[], rules: CursorRule[]): string {
+    let prompt = `# PR Analysis Request
+
+You are analyzing a pull request to create a comprehensive review plan. Please analyze the overall changes and provide strategic insights.
+
+## Files Changed (${fileChanges.length} files):
+
+`;
+
+    fileChanges.forEach((file, index) => {
+      prompt += `### ${index + 1}. ${file.filename} (${file.status})
+- **Changes**: +${file.additions} -${file.deletions} (${file.changes} total)
+`;
+
+      if (file.patch) {
+        // Show a summary of the patch, not the full content to save tokens
+        const lines = file.patch.split('\n');
+        const significantLines = lines
+          .filter(
+            line =>
+              line.startsWith('@@') ||
+              (line.startsWith('+') && !line.startsWith('+++')) ||
+              (line.startsWith('-') && !line.startsWith('---'))
+          )
+          .slice(0, 10); // Limit to first 10 significant lines
+
+        prompt += `- **Key Changes Preview**:\n`;
+        significantLines.forEach(line => {
+          prompt += `  ${line}\n`;
+        });
+        if (lines.length > significantLines.length) {
+          prompt += `  ... (${lines.length - significantLines.length} more lines)\n`;
+        }
+      }
+      prompt += '\n';
+    });
+
+    if (rules.length > 0) {
+      prompt += `## Project Rules to Consider (${rules.length} rules):
+
+`;
+      rules.forEach((rule, index) => {
+        prompt += `### Rule ${index + 1}: ${rule.id}
+- **Type**: ${rule.type}
+- **Description**: ${rule.description || 'No description'}
+- **Applies to**: ${rule.globs?.join(', ') || 'All files'}
+
+`;
+      });
+    }
+
+    prompt += `## Required Analysis
+
+Please provide a JSON response with the following structure:
+
+\`\`\`json
+{
+  "overview": "High-level summary of what this PR accomplishes",
+  "keyChanges": [
+    "List of the most important changes",
+    "Focus on functional changes, new features, bug fixes",
+    "Architectural or design pattern changes"
+  ],
+  "riskAreas": [
+    "Areas that need careful review",
+    "Potential breaking changes",
+    "Security-sensitive modifications",
+    "Performance-critical changes"
+  ],
+  "reviewFocus": [
+    "Specific aspects reviewers should focus on",
+    "Code quality concerns to check",
+    "Integration points to verify"
+  ],
+  "context": "Additional context about the PR's purpose and scope"
+}
+\`\`\`
+
+Focus on understanding the **intent** and **impact** of these changes rather than line-by-line details.`;
+
+    return prompt;
+  }
+
+  /**
+   * Build batch review prompt for multiple files with PR context
+   */
+  static buildBatchReviewPrompt(files: FileChange[], rules: CursorRule[], prPlan: PRPlan): string {
+    let prompt = `# Batch Code Review Request
+
+## PR Context
+**Overview**: ${prPlan.overview}
+
+**Key Changes**: ${prPlan.keyChanges.join(', ')}
+
+**Risk Areas**: ${prPlan.riskAreas.join(', ')}
+
+**Review Focus**: ${prPlan.reviewFocus.join(', ')}
+
+**Additional Context**: ${prPlan.context}
+
+## Files to Review (${files.length} files):
+
+`;
+
+    files.forEach((file, index) => {
+      prompt += `### File ${index + 1}: ${file.filename}
+**Status**: ${file.status} | **Changes**: +${file.additions} -${file.deletions}
+
+`;
+
+      if (file.patch) {
+        prompt += `**Code Changes**:
+\`\`\`diff
+${file.patch}
+\`\`\`
+
+`;
+      }
+    });
+
+    prompt += `## Review Instructions
+
+Given the PR context above, please review these ${files.length} files as a cohesive unit. Focus on:
+
+1. **Consistency** - Do the changes work together logically?
+2. **Completeness** - Are there missing pieces or incomplete implementations?
+3. **Integration** - How do these files interact with each other?
+4. **PR Goals** - Do the changes achieve the stated objectives?
+
+Apply the same JSON response format as single-file reviews, but consider the **collective impact** of all files together.
+
+Look for:
+- Cross-file dependencies and interactions
+- Inconsistent patterns across files
+- Missing error handling or edge cases
+- Security implications of the combined changes
+- Performance impact of the overall feature/fix
+
+Remember: You're reviewing the changes as they relate to the overall PR goals, not just individual file quality.`;
+
+    return prompt;
   }
 }

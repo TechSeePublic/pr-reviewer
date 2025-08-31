@@ -111,6 +111,16 @@ inputs:
     description: 'Delay in milliseconds between AI provider requests to avoid rate limits (default: 2000)'
     required: false
     default: '2000'
+    
+  batch_size:
+    description: 'Number of files to process in each batch (default: 5)'
+    required: false
+    default: '5'
+    
+  github_rate_limit:
+    description: 'Delay in milliseconds between GitHub API calls to avoid rate limits (default: 1000)'
+    required: false
+    default: '1000'
 
 outputs:
   review_summary:

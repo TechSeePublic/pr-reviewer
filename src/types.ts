@@ -26,6 +26,8 @@ export interface ActionInputs {
   enableAutoFix: boolean;
   autoFixSeverity: 'error' | 'warning' | 'info' | 'all';
   requestDelay: number; // Delay in milliseconds between AI provider requests
+  batchSize: number; // Number of files to process in each batch (default: 5)
+  githubRateLimit: number; // Delay in milliseconds between GitHub API calls (default: 1000ms)
 }
 
 export interface PRContext {
@@ -94,6 +96,8 @@ export interface AIProvider {
   name: string;
   model: string;
   reviewCode(prompt: string, code: string, rules: CursorRule[]): Promise<CodeIssue[]>;
+  reviewBatch(files: FileChange[], rules: CursorRule[], prPlan: PRPlan): Promise<CodeIssue[]>;
+  generatePRPlan(fileChanges: FileChange[], rules: CursorRule[]): Promise<PRPlan>;
   generateSummary(issues: CodeIssue[], context: ReviewContext): Promise<string>;
 }
 
@@ -169,4 +173,18 @@ export interface CommitResult {
   sha: string;
   message: string;
   filesChanged: number;
+}
+
+export interface PRPlan {
+  overview: string;
+  keyChanges: string[];
+  riskAreas: string[];
+  reviewFocus: string[];
+  context: string;
+}
+
+export interface FileBatch {
+  files: FileChange[];
+  batchIndex: number;
+  totalBatches: number;
 }

@@ -22,10 +22,29 @@ import { logger } from './logger';
 export class GitHubClient {
   private octokit: ReturnType<typeof github.getOctokit>;
   private context: PRContext;
+  private rateLimitDelay: number;
+  private lastApiCall: number = 0;
 
-  constructor(token: string, context: PRContext) {
+  constructor(token: string, context: PRContext, rateLimitDelay: number = 1000) {
     this.octokit = github.getOctokit(token);
     this.context = context;
+    this.rateLimitDelay = rateLimitDelay;
+  }
+
+  /**
+   * Apply rate limiting before making API calls
+   */
+  private async applyRateLimit(): Promise<void> {
+    const now = Date.now();
+    const timeSinceLastCall = now - this.lastApiCall;
+
+    if (timeSinceLastCall < this.rateLimitDelay) {
+      const waitTime = this.rateLimitDelay - timeSinceLastCall;
+      logger.info(`Rate limiting: waiting ${waitTime}ms before GitHub API call`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+
+    this.lastApiCall = Date.now();
   }
 
   /**
@@ -34,12 +53,14 @@ export class GitHubClient {
   async getPRChanges(inputs: ActionInputs): Promise<FileChange[]> {
     try {
       // Get PR metadata (not currently used but available for future features)
+      await this.applyRateLimit();
       await this.octokit.rest.pulls.get({
         owner: this.context.owner,
         repo: this.context.repo,
         pull_number: this.context.pullNumber,
       });
 
+      await this.applyRateLimit();
       const { data: files } = await this.octokit.rest.pulls.listFiles({
         owner: this.context.owner,
         repo: this.context.repo,
@@ -103,6 +124,7 @@ export class GitHubClient {
    */
   async getFileContent(filename: string, ref?: string): Promise<GitHubFile | null> {
     try {
+      await this.applyRateLimit();
       const { data } = await this.octokit.rest.repos.getContent({
         owner: this.context.owner,
         repo: this.context.repo,
@@ -144,6 +166,7 @@ export class GitHubClient {
   }> {
     try {
       // Get issue comments (for summary)
+      await this.applyRateLimit();
       const { data: issueComments } = await this.octokit.rest.issues.listComments({
         owner: this.context.owner,
         repo: this.context.repo,
@@ -151,6 +174,7 @@ export class GitHubClient {
       });
 
       // Get review comments (for inline comments)
+      await this.applyRateLimit();
       const { data: reviewComments } = await this.octokit.rest.pulls.listReviewComments({
         owner: this.context.owner,
         repo: this.context.repo,
@@ -201,6 +225,7 @@ export class GitHubClient {
       const body = this.formatSummaryComment(comment);
 
       if (existingCommentId) {
+        await this.applyRateLimit();
         await this.octokit.rest.issues.updateComment({
           owner: this.context.owner,
           repo: this.context.repo,
@@ -208,6 +233,7 @@ export class GitHubClient {
           body,
         });
       } else {
+        await this.applyRateLimit();
         await this.octokit.rest.issues.createComment({
           owner: this.context.owner,
           repo: this.context.repo,
@@ -228,6 +254,7 @@ export class GitHubClient {
       const body = this.formatInlineComment(comment);
 
       if (existingCommentId) {
+        await this.applyRateLimit();
         await this.octokit.rest.pulls.updateReviewComment({
           owner: this.context.owner,
           repo: this.context.repo,
@@ -235,6 +262,7 @@ export class GitHubClient {
           body,
         });
       } else {
+        await this.applyRateLimit();
         await this.octokit.rest.pulls.createReviewComment({
           owner: this.context.owner,
           repo: this.context.repo,
@@ -278,12 +306,14 @@ ${comment.body}`;
   async deleteComment(commentId: number, type: 'issue' | 'review'): Promise<void> {
     try {
       if (type === 'issue') {
+        await this.applyRateLimit();
         await this.octokit.rest.issues.deleteComment({
           owner: this.context.owner,
           repo: this.context.repo,
           comment_id: commentId,
         });
       } else {
+        await this.applyRateLimit();
         await this.octokit.rest.pulls.deleteReviewComment({
           owner: this.context.owner,
           repo: this.context.repo,
@@ -300,6 +330,7 @@ ${comment.body}`;
    */
   async getRateLimit(): Promise<RateLimitInfo> {
     try {
+      await this.applyRateLimit();
       const { data } = await this.octokit.rest.rateLimit.get();
 
       return {
@@ -337,6 +368,7 @@ ${comment.body}`;
    */
   async getRepositoryInfo() {
     try {
+      await this.applyRateLimit();
       const { data } = await this.octokit.rest.repos.get({
         owner: this.context.owner,
         repo: this.context.repo,
@@ -360,6 +392,7 @@ ${comment.body}`;
    */
   async downloadRepository(ref?: string): Promise<Buffer> {
     try {
+      await this.applyRateLimit();
       const { data } = await this.octokit.rest.repos.downloadZipballArchive({
         owner: this.context.owner,
         repo: this.context.repo,
