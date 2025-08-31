@@ -4,7 +4,6 @@
 
 import * as core from '@actions/core';
 import { ActionInputs } from './types';
-import { logger } from './logger';
 
 export function getActionInputs(): ActionInputs {
   const includePatterns = core
@@ -150,8 +149,10 @@ export function validateModelChoice(model: string, provider: string, inputs: Act
 
     const modelInfo = MODEL_CAPABILITIES[model as keyof typeof MODEL_CAPABILITIES];
     if (modelInfo) {
-      if (modelInfo.provider === 'openai' && !hasOpenAI) {
-        throw new Error(`Model "${model}" requires OpenAI API key, but none provided`);
+      if (modelInfo.provider === 'openai' && !hasOpenAI && !hasAzure) {
+        throw new Error(
+          `Model "${model}" requires OpenAI API key or Azure OpenAI credentials, but none provided`
+        );
       }
       if (modelInfo.provider === 'anthropic' && !hasAnthropic) {
         throw new Error(`Model "${model}" requires Anthropic API key, but none provided`);
@@ -165,16 +166,8 @@ export function validateModelChoice(model: string, provider: string, inputs: Act
     return;
   }
 
-  // Check if model is supported by the specified provider
-  const supportedModels = SUPPORTED_MODELS[provider as keyof typeof SUPPORTED_MODELS];
-  if (!supportedModels || !supportedModels.includes(model)) {
-    const suggestions = supportedModels ? supportedModels.slice(0, 3).join(', ') : 'none available';
-    logger.warn(
-      `Model "${model}" is not in the known supported models list for provider "${provider}". ` +
-        `This might be a new model or a typo. Known models: ${suggestions}. ` +
-        `Proceeding anyway - if this fails, check the model name or see documentation for the full list.`
-    );
-  }
+  // No model validation - allow any model with any provider
+  // This supports new models and custom deployments
 }
 
 export function getRecommendedModel(provider: string, reviewLevel: string): string {

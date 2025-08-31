@@ -211,32 +211,35 @@ describe('AI Providers', () => {
       expect(providers).toEqual(['openai', 'anthropic']);
     });
 
-    it('should warn but proceed with unknown model names', () => {
-      const { logger } = require('../src/logger');
-      const warnSpy = jest.spyOn(logger, 'warn');
-      
+    it('should accept any model name without validation', () => {
       const inputs: ActionInputs = {
         aiProvider: 'openai',
         model: 'gpt-future-model-2025',
         openaiApiKey: 'test-key',
       } as ActionInputs;
 
-      // Should not throw an error
+      // Should not throw an error and should accept any model
       expect(() => {
         const result = AIProviderFactory.resolveProviderAndModel(inputs);
         expect(result.provider).toBe('openai');
         expect(result.model).toBe('gpt-future-model-2025');
       }).not.toThrow();
+    });
 
-      // Should have logged a warning
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('gpt-future-model-2025')
-      );
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('not in the known models list')
-      );
+    it('should accept cross-provider models without validation', () => {
+      const inputs: ActionInputs = {
+        aiProvider: 'azure',
+        model: 'claude-3-5-sonnet', // Anthropic model with Azure provider
+        azureOpenaiApiKey: 'test-key',
+        azureOpenaiEndpoint: 'https://test.openai.azure.com',
+      } as ActionInputs;
 
-      warnSpy.mockRestore();
+      // Should not throw an error - no validation means any combination works
+      expect(() => {
+        const result = AIProviderFactory.resolveProviderAndModel(inputs);
+        expect(result.provider).toBe('azure');
+        expect(result.model).toBe('claude-3-5-sonnet');
+      }).not.toThrow();
     });
   });
 });

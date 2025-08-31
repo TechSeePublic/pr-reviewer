@@ -12,7 +12,7 @@ import {
   CursorRule,
   ReviewContext,
 } from './types';
-import { DEFAULT_MODELS, getModelInfo, getRecommendedModel } from './config';
+import { DEFAULT_MODELS, getRecommendedModel } from './config';
 import { logger } from './logger';
 import { PromptTemplates } from './prompt-templates';
 
@@ -574,24 +574,8 @@ export class AIProviderFactory {
       model = getRecommendedModel(provider, inputs.reviewLevel);
       logger.info(`Auto-selected model: ${model} for review level: ${inputs.reviewLevel}`);
     } else if (model) {
-      // If specific model is provided, validate it matches the provider
-      const modelInfo = getModelInfo(model);
-      if (modelInfo) {
-        // Model is known, check if it matches the provider
-        if (modelInfo.provider !== provider) {
-          throw new Error(
-            `Model "${model}" is not compatible with provider "${provider}". ` +
-              `This model requires provider "${modelInfo.provider}".`
-          );
-        }
-      } else {
-        // Model is unknown, issue a warning but proceed
-        logger.warn(
-          `Model "${model}" is not in the known models list. ` +
-            `This might be a new model or a typo. Proceeding anyway - if this fails, ` +
-            `check the model name or see documentation for supported models.`
-        );
-      }
+      // Use the specified model without validation
+      // This allows for new models or custom deployments
     } else {
       // Fallback to default
       model = DEFAULT_MODELS[provider as keyof typeof DEFAULT_MODELS];
