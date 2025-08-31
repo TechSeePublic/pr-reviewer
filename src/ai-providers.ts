@@ -49,7 +49,7 @@ export class OpenAIProvider implements AIProvider {
     try {
       const systemPrompt = PromptTemplates.buildCodeReviewSystemPrompt(rules, {
         supportsJsonMode: this.supportsJsonMode(),
-        provider: this.name
+        provider: this.name,
       });
       const userPrompt = PromptTemplates.buildUserPrompt(prompt, code);
 
@@ -202,7 +202,7 @@ export class AnthropicProvider implements AIProvider {
     try {
       const systemPrompt = PromptTemplates.buildCodeReviewSystemPrompt(rules, {
         supportsJsonMode: false,
-        provider: this.name
+        provider: this.name,
       });
       const userPrompt = PromptTemplates.buildUserPrompt(prompt, code);
 

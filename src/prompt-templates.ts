@@ -192,11 +192,15 @@ Focus your analysis specifically on the changes shown in the diff above, and pro
 - **Issues Found**: ${issues.length} (${errorCount} errors, ${warningCount} warnings, ${suggestionCount} suggestions)
 
 ## Issues Summary
-${issues.length === 0
-  ? '✅ No issues found - all changes follow project rules and best practices.'
-  : issues.map(issue =>
-    `- **${issue.type.toUpperCase()}** in \`${issue.file}\`: ${issue.message}${issue.suggestion ? ` → ${issue.suggestion}` : ''}`
-  ).join('\n')
+${
+  issues.length === 0
+    ? '✅ No issues found - all changes follow project rules and best practices.'
+    : issues
+        .map(
+          issue =>
+            `- **${issue.type.toUpperCase()}** in \`${issue.file}\`: ${issue.message}${issue.suggestion ? ` → ${issue.suggestion}` : ''}`
+        )
+        .join('\n')
 }
 
 ## Instructions
