@@ -36,6 +36,8 @@ describe('PR Reviewer Integration', () => {
     enableAutoFix: false,
     autoFixSeverity: 'error',
     requestDelay: 1000,
+    batchSize: 5,
+    githubRateLimit: 1000,
   };
 
   beforeEach(() => {
@@ -186,6 +188,6 @@ Always use explicit types for variables.`;
     const reviewer = new PRReviewer(mockInputs, '/mock/workspace');
 
     // Should throw immediately on AI provider error
-    await expect(reviewer.reviewPR()).rejects.toThrow('AI provider error reviewing file src/test.ts: Error: OpenAI review failed: API Error');
+    await expect(reviewer.reviewPR()).rejects.toThrow('AI provider error generating summary: Error: OpenAI summary generation error: API Error');
   });
 });
