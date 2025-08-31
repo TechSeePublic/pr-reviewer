@@ -84,7 +84,7 @@ export interface ReviewResult {
   totalFiles: number;
   rulesApplied: CursorRule[];
   summary: string;
-  status: 'passed' | 'needs_attention' | 'failed';
+  status: 'passed' | 'needs_attention';
 }
 
 export interface AIProvider {

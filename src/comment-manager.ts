@@ -426,8 +426,6 @@ export class CommentManager {
         return '✅';
       case 'needs_attention':
         return '⚠️';
-      case 'failed':
-        return '❌';
       default:
         return '🔍';
     }

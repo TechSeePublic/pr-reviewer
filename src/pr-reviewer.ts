@@ -320,14 +320,16 @@ export class PRReviewer {
 
   /**
    * Determine review status based on issues found
+   * Note: Never returns 'failed' - the PR reviewer should report issues but not fail the PR
    */
   private determineReviewStatus(issues: CodeIssue[]): ReviewResult['status'] {
     const errorCount = issues.filter(i => i.type === 'error').length;
     const warningCount = issues.filter(i => i.type === 'warning').length;
+    const infoCount = issues.filter(i => i.type === 'info' || i.type === 'suggestion').length;
 
-    if (errorCount > 0) {
-      return 'failed';
-    } else if (warningCount > 0) {
+    // If there are any issues (errors, warnings, or info), mark as needs_attention
+    // This allows the reviewer to report bugs without failing the PR
+    if (errorCount > 0 || warningCount > 0 || infoCount > 0) {
       return 'needs_attention';
     } else {
       return 'passed';
