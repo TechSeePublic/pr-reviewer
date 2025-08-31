@@ -27,7 +27,7 @@ export class CommentManager {
   constructor(githubClient: GitHubClient, inputs: ActionInputs, aiProvider?: AIProvider) {
     this.githubClient = githubClient;
     this.inputs = inputs;
-    this.flowDiagramGenerator = new FlowDiagramGenerator({}, aiProvider);
+    this.flowDiagramGenerator = new FlowDiagramGenerator({}, aiProvider, githubClient);
   }
 
   /**

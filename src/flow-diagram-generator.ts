@@ -55,8 +55,9 @@ export interface FlowDiagram {
 export class FlowDiagramGenerator {
   private config: FlowDiagramConfig;
   private aiProvider: AIProvider | undefined;
+  private githubClient?: any; // Optional GitHub client for getting complete file contents
 
-  constructor(config: Partial<FlowDiagramConfig> = {}, aiProvider?: AIProvider) {
+  constructor(config: Partial<FlowDiagramConfig> = {}, aiProvider?: AIProvider, githubClient?: any) {
     this.config = {
       maxNodes: 15,
       includeFileTypes: [
@@ -93,6 +94,7 @@ export class FlowDiagramGenerator {
       ...config,
     };
     this.aiProvider = aiProvider;
+    this.githubClient = githubClient;
   }
 
   /**
@@ -253,7 +255,8 @@ export class FlowDiagramGenerator {
 
     try {
       // Use the AI provider's reviewCode method to analyze the flow
-      const response = await this.aiProvider.reviewCode(prompt, this.getCodeContext(files), []);
+      const codeContext = await this.getCodeContext(files);
+      const response = await this.aiProvider.reviewCode(prompt, codeContext, []);
 
       // Parse the AI response to extract flow analysis
       return this.parseFlowAnalysisResponse(response);
@@ -267,64 +270,199 @@ export class FlowDiagramGenerator {
    * Build prompt for AI flow analysis
    */
   private buildFlowAnalysisPrompt(files: FileChange[], prPlan: PRPlan): string {
-    return `# High-Level Flow Analysis Request
+    const fileCount = files.length;
+    const fileTypes = files.map(f => f.filename.split('/').pop()).join(', ');
 
-Create a simple, high-level flow diagram that shows the main business process or user journey for this PR.
+    return `# User Journey Flow Analysis
 
-## PR Context
+You are analyzing a PR to create a HIGH-LEVEL USER JOURNEY diagram. 
+
+## What this PR does
 **Overview**: ${prPlan.overview}
 **Key Changes**: ${prPlan.keyChanges.join(', ')}
+**Files Changed**: ${fileCount} files (${fileTypes})
 
-## Instructions
+## Your Task
+Create a 4-6 step user journey that shows:
+1. **What the user wants to do** (their goal)
+2. **How they start** (initial action)
+3. **What happens in the system** (processing steps)
+4. **What they see as result** (outcome)
 
-Focus on the HIGH-LEVEL user experience and business flow. Create a simple flow with 3-6 main steps.
+Focus on the COMPLETE USER EXPERIENCE - from when they want something to when they get it.
 
-Provide a JSON response with this structure:
+## Required JSON Response
 
 \`\`\`json
 {
-  "overview": "What this feature/change does from a user perspective",
+  "overview": "Clear description of what user experience this PR enables",
   "mainFlow": [
-    "User starts process",
-    "System validates input",
-    "Data is processed", 
-    "User sees result"
+    "User wants to [goal]",
+    "User [action] to start",
+    "System [processing step]",
+    "System [another step if needed]",
+    "User sees [final result]"
   ]
 }
 \`\`\`
 
-Rules:
-- Keep it simple (3-6 steps maximum)
-- Focus on USER ACTIONS and OUTCOMES, not technical implementation
-- Use business language, not technical terms
-- Show the end-to-end journey
-- Avoid technical details like "API calls" or "component rendering"
+## Examples of GOOD user journeys:
+- "User wants to view profile" → "User clicks profile link" → "System loads user data" → "System displays profile page" → "User sees their information"
+- "User wants to save document" → "User clicks save button" → "System validates content" → "System stores to database" → "User sees success message"
+- "User wants to login" → "User enters credentials" → "System validates login" → "System creates session" → "User accesses dashboard"
 
-Example good flows:
-- "User logs in" → "System validates credentials" → "User access granted"
-- "User submits form" → "Data is saved" → "Confirmation shown"
-- "User clicks button" → "Process starts" → "Results displayed"`;
+Remember: Think like a USER, not a developer. What is their journey and experience?`;
+  }
+
+    /**
+   * Get complete file context with change markers for AI analysis
+   */
+  private async getCodeContext(files: FileChange[]): Promise<string> {
+    const fileContexts = await Promise.all(
+      files.map(async file => {
+        // Try to get complete file content
+        const completeContent = await this.getCompleteFileContent(file);
+        const changes = this.extractChanges(file);
+        const functionality = this.extractFileFunctionality(file);
+
+        return `## ${file.filename} (${file.status})
+
+**Purpose:** ${this.getFileTypeDescription(file.filename)}
+**What this does:** ${functionality}
+**Changes:** ${file.additions} additions, ${file.deletions} deletions
+
+${completeContent ?
+  `**COMPLETE FILE CONTENT:**
+\`\`\`${this.getFileExtension(file.filename)}
+${completeContent}
+\`\`\`
+
+**WHAT CHANGED IN THIS FILE:**
+${changes}` :
+  `**CHANGES ONLY (complete file not available):**
+${changes}`
+}
+
+---`;
+      })
+    );
+
+    return fileContexts.join('\n\n');
   }
 
   /**
-   * Get code context from file changes
+   * Get meaningful description of what file type does
    */
-  private getCodeContext(files: FileChange[]): string {
-    return files
-      .map(file => {
-        const patch = file.patch || '';
-        const addedLines = patch
-          .split('\n')
-          .filter(line => line.startsWith('+') && !line.startsWith('+++'))
-          .map(line => line.substring(1))
-          .join('\n');
+  private getFileTypeDescription(filename: string): string {
+    if (filename.includes('component') || filename.includes('Component')) {
+      return 'handles user interface and user interactions';
+    }
+    if (filename.includes('service') || filename.includes('Service')) {
+      return 'manages business logic and data operations';
+    }
+    if (filename.includes('api') || filename.includes('API')) {
+      return 'handles API requests and responses';
+    }
+    if (filename.includes('model') || filename.includes('schema')) {
+      return 'defines data structure and database operations';
+    }
+    if (filename.includes('util') || filename.includes('helper')) {
+      return 'provides utility functions and helpers';
+    }
+    if (filename.includes('type') || filename.includes('interface')) {
+      return 'defines data types and interfaces';
+    }
+    if (filename.includes('test') || filename.includes('spec')) {
+      return 'contains tests and validations';
+    }
+    if (filename.endsWith('.tsx') || filename.endsWith('.jsx')) {
+      return 'renders user interface components';
+    }
+    if (filename.endsWith('.ts') || filename.endsWith('.js')) {
+      return 'contains application logic';
+    }
+    return 'contains code functionality';
+  }
 
-        return `## ${file.filename} (${file.status})
-\`\`\`
-${addedLines}
-\`\`\``;
-      })
-      .join('\n\n');
+  /**
+   * Get complete file content if possible
+   */
+  private async getCompleteFileContent(file: FileChange): Promise<string | null> {
+    if (!this.githubClient) {
+      return null; // No GitHub client available
+    }
+
+    try {
+      // For new files, the content might be in the patch
+      if (file.status === 'added') {
+        return this.extractNewFileContent(file);
+      }
+
+      // For modified files, get the current content
+      const githubFile = await this.githubClient.getFileContent(file.filename);
+      if (githubFile) {
+        return this.githubClient.decodeFileContent(githubFile);
+      }
+    } catch (error) {
+      // Fall back to patch-only
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract new file content from patch
+   */
+  private extractNewFileContent(file: FileChange): string {
+    if (!file.patch) return '';
+
+    return file.patch
+      .split('\n')
+      .filter(line => line.startsWith('+') && !line.startsWith('+++'))
+      .map(line => line.substring(1))
+      .join('\n');
+  }
+
+  /**
+   * Extract changes in a readable format
+   */
+  private extractChanges(file: FileChange): string {
+    if (!file.patch) return 'No patch information available';
+
+    const lines = file.patch.split('\n');
+    const changes: string[] = [];
+
+    for (const line of lines) {
+      if (line.startsWith('@@')) {
+        changes.push(`\n📍 ${line}`);
+      } else if (line.startsWith('+') && !line.startsWith('+++')) {
+        changes.push(`✅ ADDED: ${line.substring(1)}`);
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        changes.push(`❌ REMOVED: ${line.substring(1)}`);
+      }
+    }
+
+    return changes.join('\n');
+  }
+
+  /**
+   * Get file extension for syntax highlighting
+   */
+  private getFileExtension(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'ts': return 'typescript';
+      case 'tsx': return 'tsx';
+      case 'js': return 'javascript';
+      case 'jsx': return 'jsx';
+      case 'py': return 'python';
+      case 'java': return 'java';
+      case 'go': return 'go';
+      case 'rs': return 'rust';
+      case 'cpp': case 'c': return 'cpp';
+      case 'cs': return 'csharp';
+      default: return ext || 'text';
+    }
   }
 
   /**
@@ -629,11 +767,7 @@ ${addedLines}
    * Generate simple styling for clean diagrams
    */
   private generateSimpleStyling(): string {
-    return `
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px
-    classDef process fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef data fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-`;
+    return '';
   }
 
   /**
@@ -701,15 +835,7 @@ ${addedLines}
    * Generate enhanced styling
    */
   private generateEnhancedStyling(): string {
-    return `
-    classDef added fill:#d4edda,stroke:#28a745,stroke-width:2px
-    classDef modified fill:#fff3cd,stroke:#ffc107,stroke-width:2px
-    classDef removed fill:#f8d7da,stroke:#dc3545,stroke-width:2px
-    classDef renamed fill:#e2e3e5,stroke:#6c757d,stroke-width:2px
-    classDef high-importance stroke:#dc3545,stroke-width:3px
-    classDef process fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
-    classDef data fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-`;
+    return '';
   }
 
   /**
@@ -976,31 +1102,9 @@ ${addedLines}
   /**
    * Get node styling based on status and importance
    */
-  private getNodeStyle(node: FlowNode): string | null {
-    const classNames: string[] = [];
-
-    // Status styling
-    switch (node.status) {
-      case 'added':
-        classNames.push('added');
-        break;
-      case 'modified':
-        classNames.push('modified');
-        break;
-      case 'removed':
-        classNames.push('removed');
-        break;
-      case 'renamed':
-        classNames.push('renamed');
-        break;
-    }
-
-    // Importance styling
-    if (node.importance === 'high') {
-      classNames.push('high-importance');
-    }
-
-    return classNames.length > 0 ? `    class ${node.id} ${classNames.join(',')}` : null;
+  private getNodeStyle(_node: FlowNode): string | null {
+    // Return null to use default Mermaid styling
+    return null;
   }
 
   /**
@@ -1025,13 +1129,7 @@ ${addedLines}
    * Generate CSS styling for the diagram
    */
   private generateStyling(): string {
-    return `
-    classDef added fill:#d4edda,stroke:#28a745,stroke-width:2px
-    classDef modified fill:#fff3cd,stroke:#ffc107,stroke-width:2px
-    classDef removed fill:#f8d7da,stroke:#dc3545,stroke-width:2px
-    classDef renamed fill:#e2e3e5,stroke:#6c757d,stroke-width:2px
-    classDef high-importance stroke:#dc3545,stroke-width:3px
-`;
+    return '';
   }
 
   /**

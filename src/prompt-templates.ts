@@ -156,19 +156,25 @@ Remember: Your goal is to help developers write better, safer, more maintainable
    * Builds the user prompt with code context
    */
   static buildUserPrompt(context: string, code: string): string {
-    return `## CODE REVIEW REQUEST
+    return `${context}
 
-${context}
-
-## CODE TO ANALYZE
+## COMPLETE FILE CONTENT (For Context)
 
 \`\`\`
 ${code}
 \`\`\`
 
-Please analyze this code against the Cursor rules and identify critical issues only. Return your findings in the specified JSON format.
+## ANALYSIS REQUEST
 
-Focus your analysis specifically on the changes shown in the diff above, and only report bugs, security issues, performance problems, or rule violations.`;
+Please analyze this file, focusing ONLY on the changes shown in the diff above. 
+
+**Remember**: 
+- The complete file content above is for CONTEXT to understand the changes
+- Only review the specific lines that were ADDED/MODIFIED in the diff
+- Report critical issues: bugs, security problems, performance issues, or rule violations
+- Return findings in the specified JSON format
+
+**Focus your analysis on the changed areas, use the complete file for understanding context.**`;
   }
 
   /**
@@ -216,22 +222,21 @@ Keep it professional and concise. Only report actual problems.`;
    * Builds enhanced review context with better formatting
    */
   static buildReviewContext(fileChange: FileChange, _fileContent: string): string {
-    let context = `## COMPLETE PR ANALYSIS REQUEST
+    let context = `## CODE REVIEW REQUEST
 
 ### File Information
 - **Filename**: ${fileChange.filename}
-- **Change Type**: ${fileChange.status}
-- **Lines Modified**: +${fileChange.additions} -${fileChange.deletions}
-- **Total Changes**: ${fileChange.changes}
+- **Status**: ${fileChange.status}
+- **Changes**: +${fileChange.additions} -${fileChange.deletions} (${fileChange.changes} total)
 
-**NOTE**: This analysis covers ALL changes in the complete Pull Request (from base branch to current HEAD), not just the latest commit.
+**IMPORTANT**: You will receive the COMPLETE FILE CONTENT below for context, but only review the specific changes shown in the diff.
 
 `;
 
     // Include patch information for context
     if (fileChange.patch) {
-      context += `### Complete PR Changes (Focus Area)
-The following diff shows ALL changes made in this entire Pull Request. Focus your analysis ONLY on these modifications:
+      context += `### What Changed (Review These Areas Only)
+The following diff shows EXACTLY what was modified. Focus your analysis ONLY on these changes:
 
 \`\`\`diff
 ${fileChange.patch}
@@ -242,31 +247,30 @@ ${fileChange.patch}
       // Extract and highlight changed line numbers
       const changedLines = this.extractChangedLines(fileChange.patch);
       if (changedLines.length > 0) {
-        context += `### Modified Line Numbers (Full PR)
-Focus analysis on lines: ${changedLines.join(', ')}
+        context += `### Changed Lines to Review
+**Focus analysis on lines**: ${changedLines.join(', ')}
 
 `;
       }
     }
 
-    context += `### Analysis Instructions
+    context += `### Review Guidelines
 
-**CRITICAL**: Analyze ALL changes in this complete Pull Request:
-- ✅ **All lines added** across the entire PR (marked with +)
-- ✅ **All lines modified** throughout the PR (context around changes)  
-- ✅ **All logic directly affected** by any changes in the PR
-- ❌ **Pre-existing unchanged code** (unless directly impacted by PR changes)
+**WHAT TO ANALYZE**:
+- ✅ **Added lines** (marked with + in diff)
+- ✅ **Modified lines** and their immediate context
+- ✅ **Logic affected** by the changes
+- ❌ **Unchanged pre-existing code** (unless directly impacted)
 
-**Review Scope**: Complete Pull Request from base to HEAD (not just latest commit)
+**WHAT TO LOOK FOR**:
+1. **Logic Errors** - Bugs that could cause runtime failures  
+2. **Security Issues** - Vulnerabilities in new/changed code
+3. **Missing Error Handling** - New code paths without proper error handling
+4. **Performance Problems** - Inefficient code introduced by changes
+5. **Integration Issues** - How changes affect other parts of the system
+6. **Rule Violations** - Violations of provided Cursor rules
 
-Look for:
-1. **Logic errors** that could cause runtime issues (highest priority)
-2. **Security vulnerabilities** in any new/changed code (high priority)
-3. **Missing error handling** for any new code paths
-4. **Performance issues** introduced by any changes
-5. **Best practice violations** in any modifications
-6. **Integration issues** between changes across different files
-7. **Rule violations** from the provided Cursor rules (when available)
+**CONTEXT**: The complete file content below provides context to understand the changes, but focus your review only on the modified areas shown in the diff above.
 
 `;
 
