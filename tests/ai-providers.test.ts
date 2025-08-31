@@ -210,5 +210,33 @@ describe('AI Providers', () => {
 
       expect(providers).toEqual(['openai', 'anthropic']);
     });
+
+    it('should warn but proceed with unknown model names', () => {
+      const { logger } = require('../src/logger');
+      const warnSpy = jest.spyOn(logger, 'warn');
+      
+      const inputs: ActionInputs = {
+        aiProvider: 'openai',
+        model: 'gpt-future-model-2025',
+        openaiApiKey: 'test-key',
+      } as ActionInputs;
+
+      // Should not throw an error
+      expect(() => {
+        const result = AIProviderFactory.resolveProviderAndModel(inputs);
+        expect(result.provider).toBe('openai');
+        expect(result.model).toBe('gpt-future-model-2025');
+      }).not.toThrow();
+
+      // Should have logged a warning
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('gpt-future-model-2025')
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('not in the known models list')
+      );
+
+      warnSpy.mockRestore();
+    });
   });
 });

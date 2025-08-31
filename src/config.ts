@@ -4,6 +4,7 @@
 
 import * as core from '@actions/core';
 import { ActionInputs } from './types';
+import { logger } from './logger';
 
 export function getActionInputs(): ActionInputs {
   const includePatterns = core
@@ -168,10 +169,10 @@ export function validateModelChoice(model: string, provider: string, inputs: Act
   const supportedModels = SUPPORTED_MODELS[provider as keyof typeof SUPPORTED_MODELS];
   if (!supportedModels || !supportedModels.includes(model)) {
     const suggestions = supportedModels ? supportedModels.slice(0, 3).join(', ') : 'none available';
-    throw new Error(
-      `Model "${model}" is not supported by provider "${provider}". ` +
-        `Supported models: ${suggestions}. ` +
-        `See documentation for full list.`
+    logger.warn(
+      `Model "${model}" is not in the known supported models list for provider "${provider}". ` +
+        `This might be a new model or a typo. Known models: ${suggestions}. ` +
+        `Proceeding anyway - if this fails, check the model name or see documentation for the full list.`
     );
   }
 }
