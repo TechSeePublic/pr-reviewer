@@ -290,7 +290,14 @@ export class CommentManager {
 
     // Suggestion if available
     if (primaryIssue.suggestion && this.inputs.enableSuggestions) {
-      body += `**💡 Suggested Fix:**\n\`\`\`suggestion\n${primaryIssue.suggestion}\n\`\`\`\n\n`;
+      // Check if fixedCode is available for better display
+      if (primaryIssue.fixedCode) {
+        body += `**💡 Suggested Fix:**\n\`\`\`${this.getLanguageFromFile(primaryIssue.file)}\n${primaryIssue.fixedCode}\n\`\`\`\n\n`;
+      } else {
+        // Use suggestion as code if it looks like code, otherwise as text
+        const codeLanguage = this.getLanguageFromFile(primaryIssue.file);
+        body += `**💡 Suggested Fix:**\n\`\`\`${codeLanguage}\n${primaryIssue.suggestion}\n\`\`\`\n\n`;
+      }
     }
 
     // Auto-fix available indicator
@@ -464,9 +471,28 @@ export class CommentManager {
     }
 
     // AI-generated summary
-    if (summary) {
+    if (summary && summary.trim().length > 0) {
       body += `### 🎯 **AI Assessment**\n`;
       body += `> ${summary}\n\n`;
+    } else {
+      // Provide a fallback summary based on the issues found
+      body += `### 🎯 **AI Assessment**\n`;
+      if (issues.length === 0) {
+        body += `> ✅ **Excellent work!** No issues detected in this PR. The code follows best practices and appears ready for deployment.\n\n`;
+      } else {
+        const criticalCount = issues.filter(
+          i => i.type === 'error' || i.severity === 'high'
+        ).length;
+        const warningCount = issues.filter(i => i.type === 'warning').length;
+
+        if (criticalCount > 0) {
+          body += `> ⚠️ **Review Required** - Found ${criticalCount} critical issue${criticalCount > 1 ? 's' : ''} that need${criticalCount === 1 ? 's' : ''} attention before merging.\n\n`;
+        } else if (warningCount > 0) {
+          body += `> 💡 **Minor Issues Found** - ${warningCount} warning${warningCount > 1 ? 's' : ''} detected. Consider addressing these for improved code quality.\n\n`;
+        } else {
+          body += `> ℹ️ **Info Available** - Found ${issues.length} informational suggestion${issues.length > 1 ? 's' : ''} for code improvement.\n\n`;
+        }
+      }
     }
 
     // Next steps
@@ -625,6 +651,72 @@ export class CommentManager {
         return 'Maintainability';
       default:
         return 'Other';
+    }
+  }
+
+  /**
+   * Get language identifier from file extension for syntax highlighting
+   */
+  private getLanguageFromFile(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'ts':
+        return 'typescript';
+      case 'tsx':
+        return 'typescript';
+      case 'js':
+        return 'javascript';
+      case 'jsx':
+        return 'javascript';
+      case 'py':
+        return 'python';
+      case 'java':
+        return 'java';
+      case 'go':
+        return 'go';
+      case 'rs':
+        return 'rust';
+      case 'cpp':
+      case 'cc':
+      case 'cxx':
+        return 'cpp';
+      case 'c':
+        return 'c';
+      case 'cs':
+        return 'csharp';
+      case 'php':
+        return 'php';
+      case 'rb':
+        return 'ruby';
+      case 'swift':
+        return 'swift';
+      case 'kt':
+        return 'kotlin';
+      case 'vue':
+        return 'vue';
+      case 'svelte':
+        return 'svelte';
+      case 'html':
+        return 'html';
+      case 'css':
+        return 'css';
+      case 'scss':
+      case 'sass':
+        return 'scss';
+      case 'json':
+        return 'json';
+      case 'yaml':
+      case 'yml':
+        return 'yaml';
+      case 'xml':
+        return 'xml';
+      case 'sql':
+        return 'sql';
+      case 'sh':
+      case 'bash':
+        return 'bash';
+      default:
+        return 'text';
     }
   }
 }

@@ -419,12 +419,15 @@ export class PRReviewer {
     let summary = '';
     try {
       summary = await this.aiProvider.generateSummary(issues, reviewContext);
+      // Validate summary content
+      if (!summary || summary.trim().length === 0) {
+        core.warning('AI summary generation returned empty content, will use fallback');
+        summary = this.generateFallbackSummary(issues, fileChanges.length);
+      }
     } catch (error) {
-      // Fail the action when AI summary generation fails
-      const errorMessage = `AI provider error generating summary: ${error}`;
-      core.error(errorMessage);
-      core.setFailed(errorMessage);
-      throw new Error(errorMessage);
+      // Log the error but don't fail the action - use fallback summary instead
+      core.warning(`AI provider error generating summary: ${error}`);
+      summary = this.generateFallbackSummary(issues, fileChanges.length);
     }
 
     return {
@@ -461,23 +464,34 @@ export class PRReviewer {
    */
   private generateFallbackSummary(issues: CodeIssue[], filesReviewed: number): string {
     if (issues.length === 0) {
-      return `Great work! All ${filesReviewed} files follow the Cursor rules with no violations found.`;
+      return `✅ **Excellent work!** All ${filesReviewed} file${filesReviewed > 1 ? 's are' : ' is'} clean with no issues detected. The code follows best practices and appears ready for deployment.`;
     }
 
     const errorCount = issues.filter(i => i.type === 'error').length;
     const warningCount = issues.filter(i => i.type === 'warning').length;
+    const infoCount = issues.filter(i => i.type === 'info' || i.type === 'suggestion').length;
+    const criticalCount = issues.filter(i => i.severity === 'high').length;
 
-    let summary = `Found ${issues.length} issue${issues.length === 1 ? '' : 's'} across ${filesReviewed} files. `;
+    let summary = `📋 **Review Summary:** Found ${issues.length} issue${issues.length > 1 ? 's' : ''} across ${filesReviewed} file${filesReviewed > 1 ? 's' : ''}`;
 
-    if (errorCount > 0) {
-      summary += `${errorCount} error${errorCount === 1 ? '' : 's'} need immediate attention. `;
+    const parts = [];
+    if (errorCount > 0) parts.push(`${errorCount} error${errorCount > 1 ? 's' : ''}`);
+    if (warningCount > 0) parts.push(`${warningCount} warning${warningCount > 1 ? 's' : ''}`);
+    if (infoCount > 0) parts.push(`${infoCount} suggestion${infoCount > 1 ? 's' : ''}`);
+
+    if (parts.length > 0) {
+      summary += ` (${parts.join(', ')})`;
     }
 
-    if (warningCount > 0) {
-      summary += `${warningCount} warning${warningCount === 1 ? '' : 's'} should be addressed. `;
+    // Add priority assessment
+    if (criticalCount > 0 || errorCount > 0) {
+      summary += '. 🚨 **Action Required** - Critical issues need to be addressed before merging.';
+    } else if (warningCount > 0) {
+      summary +=
+        '. ⚠️ **Review Recommended** - Consider addressing warnings for improved code quality.';
+    } else {
+      summary += '. 💡 **Optional Improvements** - All issues are informational suggestions.';
     }
-
-    summary += 'Please review the specific comments and apply the suggested fixes.';
 
     return summary;
   }
