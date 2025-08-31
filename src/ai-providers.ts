@@ -545,7 +545,7 @@ export class AIProviderFactory {
       return new AzureOpenAIProvider(
         inputs.azureOpenaiApiKey,
         inputs.azureOpenaiEndpoint,
-        inputs.azureOpenaiApiVersion || '2024-02-15-preview',
+        inputs.azureOpenaiApiVersion || '2024-10-21',
         model
       );
     }

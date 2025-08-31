@@ -79,7 +79,7 @@ The bot automatically detects and applies Cursor rules from:
 | `anthropic_api_key` | Anthropic API key | - | ⚠️ |
 | `azure_openai_api_key` | Azure OpenAI API key | - | ⚠️ |
 | `azure_openai_endpoint` | Azure OpenAI endpoint URL | - | ⚠️ |
-| `azure_openai_api_version` | Azure OpenAI API version | `2024-02-15-preview` | ❌ |
+| `azure_openai_api_version` | Azure OpenAI API version | `2024-10-21` | ❌ |
 | `ai_provider` | AI provider (`openai`, `anthropic`, `azure`, `auto`) | `auto` | ❌ |
 | `model` | AI model to use | `auto` | ❌ |
 | `review_level` | Review intensity (`light`, `standard`, `thorough`) | `standard` | ❌ |
@@ -102,7 +102,9 @@ For Azure OpenAI, you'll need:
 
 1. **API Key**: Your Azure OpenAI service API key
 2. **Endpoint**: Your Azure OpenAI resource endpoint (e.g., `https://your-resource.openai.azure.com/`)
-3. **API Version**: The API version to use (default: `2024-02-15-preview`)
+3. **API Version**: The API version to use:
+   - `2024-10-21` (default, stable) - Supports Whisper, DALL-E 3, fine-tuning
+   - `2025-04-01-preview` (latest) - Includes o3, o4-mini, GPT-image-1 support
 4. **Model Deployment**: Ensure your chosen model is deployed in your Azure OpenAI resource
 
 **Note**: Azure OpenAI uses deployment names that may differ from OpenAI model names. For example, `gpt-3.5-turbo` becomes `gpt-35-turbo` in Azure.
@@ -281,7 +283,7 @@ Great work on the new feature! Just a few TypeScript type annotations needed to 
     model: 'gpt-5'
     azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
     azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-    azure_openai_api_version: '2024-02-15-preview'
+    azure_openai_api_version: '2024-10-21'
 ```
 
 ### Smart Model Selection
