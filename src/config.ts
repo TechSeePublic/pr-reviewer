@@ -49,6 +49,7 @@ export function getActionInputs(): ActionInputs {
       (core.getInput('inline_severity') as 'error' | 'warning' | 'info' | 'all') || 'warning',
     summaryFormat:
       (core.getInput('summary_format') as 'brief' | 'detailed' | 'minimal') || 'detailed',
+    logLevel: (core.getInput('log_level') as 'error' | 'warning' | 'info' | 'all') || 'warning',
     enableSuggestions: core.getBooleanInput('enable_suggestions') ?? true,
     skipIfNoRules: core.getBooleanInput('skip_if_no_rules') ?? false,
     updateExistingComments: core.getBooleanInput('update_existing_comments') ?? true,
@@ -440,7 +441,7 @@ export const SEVERITY_LEVELS = {
 } as const;
 
 export const COMMENT_MARKERS = {
-  BOT_IDENTIFIER: '<!-- cursor-ai-pr-reviewer -->',
+  BOT_IDENTIFIER: '<!-- techsee-ai-pr-reviewer -->',
   SUMMARY_MARKER: '<!-- cursor-ai-summary -->',
   INLINE_MARKER: '<!-- cursor-ai-inline -->',
 } as const;

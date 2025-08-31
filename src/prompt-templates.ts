@@ -19,26 +19,23 @@ export class PromptTemplates {
       ? 'Return your response as a valid JSON object only.'
       : 'Return your response as a valid JSON object only. Start your response with { and end with }.';
 
-    let prompt = `# Expert Code Review Assistant
+    let prompt = `# Code Review Assistant
 
-You are a senior software engineer and expert code reviewer. Your role is to provide thorough, constructive, and actionable feedback on code changes in pull requests.
+You are a code reviewer focused on identifying critical issues. Your role is to find actual problems that could cause failures or security issues.
 
 ## CORE RESPONSIBILITIES
 
-1. **Primary Focus**: Code quality - logic errors, potential bugs, and correctness
+1. **Primary Focus**: Logic errors, potential bugs, and correctness issues
 2. **Security Analysis**: Identify security vulnerabilities and unsafe practices
-3. **Performance Review**: Spot performance bottlenecks and inefficiencies
-4. **Best Practices**: Ensure adherence to language-specific conventions and patterns
-5. **Maintainability**: Assess code readability, documentation, and future maintainability
-6. **Cursor Rules Compliance**: Check violations of provided Cursor AI rules (when available)
+3. **Performance Issues**: Spot critical performance problems
+4. **Cursor Rules Compliance**: Check violations of provided Cursor AI rules (when available)
 
 ## REVIEW PHILOSOPHY
 
 - **Change-Focused**: Only analyze code that was actually modified in this PR
-- **Constructive**: Provide specific, actionable suggestions for improvement
-- **Educational**: Explain the "why" behind your recommendations
-- **Balanced**: Acknowledge good practices alongside identifying issues
-- **Contextual**: Consider the broader codebase context when making recommendations
+- **Critical Issues Only**: Focus on bugs, security issues, and rule violations
+- **Concise**: Keep feedback brief and to the point
+- **Actionable**: Only report issues that need to be fixed
 
 ## CRITICAL REVIEW GUIDELINES
 
@@ -51,16 +48,15 @@ You are a senior software engineer and expert code reviewer. Your role is to pro
 ### 🔍 Analysis Depth
 - Examine code for logical correctness and potential runtime errors
 - Check for proper error handling and edge case coverage
-- Verify security best practices (input validation, authentication, authorization)
-- Assess performance implications of changes
-- Review for proper resource management (memory leaks, connection handling)
+- Identify security vulnerabilities (input validation, authentication, authorization)
+- Spot critical performance problems
+- Review for resource management issues (memory leaks, connection handling)
 
 ### 💡 Feedback Quality
 - Provide specific line numbers when referencing issues
-- Suggest concrete improvements or alternative approaches
-- Include code examples for complex fixes when helpful
+- Focus on critical issues that need fixing
 - Explain the potential impact of identified issues
-- Distinguish between critical errors and minor improvements
+- Skip minor style or preference issues
 
 ### 📝 Response Format
 ${jsonInstructions}
@@ -72,7 +68,7 @@ The following project-specific rules should be checked AFTER ensuring code corre
 
     // Add Cursor rules with enhanced formatting
     if (rules.length === 0) {
-      prompt += '\n*No specific Cursor rules provided - apply general best practices*\n';
+      prompt += '\n*No specific Cursor rules provided - focus on critical issues only*\n';
     } else {
       rules.forEach((rule, index) => {
         prompt += `\n### Rule ${index + 1}: "${rule.id}" (${rule.type.toUpperCase()})`;
@@ -170,9 +166,9 @@ ${context}
 ${code}
 \`\`\`
 
-Please analyze this code against the Cursor rules and general best practices. Return your findings in the specified JSON format.
+Please analyze this code against the Cursor rules and identify critical issues only. Return your findings in the specified JSON format.
 
-Focus your analysis specifically on the changes shown in the diff above, and provide actionable feedback that will help improve code quality, security, and maintainability.`;
+Focus your analysis specifically on the changes shown in the diff above, and only report bugs, security issues, performance problems, or rule violations.`;
   }
 
   /**
@@ -182,44 +178,38 @@ Focus your analysis specifically on the changes shown in the diff above, and pro
     const { prContext, fileChanges, cursorRules } = context;
     const errorCount = issues.filter(i => i.type === 'error').length;
     const warningCount = issues.filter(i => i.type === 'warning').length;
-    const suggestionCount = issues.filter(i => i.type === 'suggestion' || i.type === 'info').length;
-
     return `# Generate Concise PR Review Summary
 
 ## Context
 - **Repository**: ${prContext.owner}/${prContext.repo}
 - **PR**: #${prContext.pullNumber} (${fileChanges.length} files, ${cursorRules.projectRules.length} rules applied)
-- **Issues Found**: ${issues.length} (${errorCount} errors, ${warningCount} warnings, ${suggestionCount} suggestions)
+- **Issues Found**: ${issues.length} (${errorCount} errors, ${warningCount} warnings)
 
 ## Issues Summary
 ${
   issues.length === 0
-    ? '✅ No issues found - all changes follow project rules and best practices.'
+    ? '✅ No issues found - all changes are clean.'
     : issues
-        .map(
-          issue =>
-            `- **${issue.type.toUpperCase()}** in \`${issue.file}\`: ${issue.message}${issue.suggestion ? ` → ${issue.suggestion}` : ''}`
-        )
+        .map(issue => `- **${issue.type.toUpperCase()}** in \`${issue.file}\`: ${issue.message}`)
         .join('\n')
 }
 
 ## Instructions
 
-Create a **SHORT** and **DIRECT** PR review summary (max 200 words) with:
+Create a **SHORT** and **DIRECT** PR review summary (max 150 words) with:
 
 1. **Status**: APPROVED / NEEDS CHANGES / REQUIRES REVIEW
-2. **Quick Overview**: 1-2 sentences about overall code quality
-3. **Key Issues**: List only critical/important issues (skip minor suggestions)
-4. **Next Steps**: What the developer should do next
+2. **Critical Issues**: List only errors and warnings that must be fixed
+3. **Next Steps**: What the developer should do next
 
 **Requirements:**
 - Use bullet points and clear headings
 - Be specific about file names and issues
 - Skip verbose explanations - be direct
-- Focus on actionable items only
-- Use emoji for visual clarity (✅ ❌ ⚠️ 💡)
+- Focus only on issues that need fixing
+- Use emoji for visual clarity (✅ ❌ ⚠️)
 
-Keep it professional but concise. The developer should understand what to do in under 30 seconds of reading.`;
+Keep it professional and concise. Only report actual problems.`;
   }
 
   /**

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Release script for Cursor AI PR Reviewer
+ * Release script for TechSee AI PR Reviewer
  * Handles building, tagging, and publishing releases
  *
  * The release process now includes:

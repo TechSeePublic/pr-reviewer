@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Build script for Cursor AI PR Reviewer
+# Build script for TechSee AI PR Reviewer
 set -e
 
-echo "🔨 Building Cursor AI PR Reviewer..."
+echo "🔨 Building TechSee AI PR Reviewer..."
 
 # Clean previous build
 echo "🧹 Cleaning previous build..."

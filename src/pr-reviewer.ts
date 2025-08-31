@@ -126,7 +126,7 @@ export class PRReviewer {
 
       // Step 8: Post comments
       core.info('💬 Posting review comments...');
-      await this.commentManager.postReviewComments(reviewResult, fileChanges);
+      await this.commentManager.postReviewComments(reviewResult, fileChanges, prPlan);
 
       // Step 9: Set outputs
       this.setActionOutputs(reviewResult);
@@ -206,7 +206,7 @@ export class PRReviewer {
         overview: 'Unable to generate PR plan - proceeding with standard review',
         keyChanges: fileChanges.map(f => `${f.status}: ${f.filename}`),
         riskAreas: ['Review all changes carefully'],
-        reviewFocus: ['Code quality', 'Best practices', 'Rule compliance'],
+        reviewFocus: ['Critical issues', 'Rule compliance'],
         context: 'Fallback plan due to AI provider error',
       };
     }
@@ -444,11 +444,12 @@ export class PRReviewer {
   private determineReviewStatus(issues: CodeIssue[]): ReviewResult['status'] {
     const errorCount = issues.filter(i => i.type === 'error').length;
     const warningCount = issues.filter(i => i.type === 'warning').length;
-    const infoCount = issues.filter(i => i.type === 'info' || i.type === 'suggestion').length;
+    const infoCount = issues.filter(i => i.type === 'info').length;
+    const suggestionCount = issues.filter(i => i.type === 'suggestion').length;
 
-    // If there are any issues (errors, warnings, or info), mark as needs_attention
-    // This allows the reviewer to report bugs without failing the PR
-    if (errorCount > 0 || warningCount > 0 || infoCount > 0) {
+    // If there are any issues (errors, warnings, info, suggestions), mark as needs_attention
+    // This allows the reviewer to report all types of findings without failing the PR
+    if (errorCount > 0 || warningCount > 0 || infoCount > 0 || suggestionCount > 0) {
       return 'needs_attention';
     } else {
       return 'passed';

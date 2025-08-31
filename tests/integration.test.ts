@@ -30,7 +30,7 @@ describe('PR Reviewer Integration', () => {
     commentStyle: 'both',
     inlineSeverity: 'warning',
     summaryFormat: 'detailed',
-    enableSuggestions: true,
+
     skipIfNoRules: false,
     updateExistingComments: true,
     enableAutoFix: false,

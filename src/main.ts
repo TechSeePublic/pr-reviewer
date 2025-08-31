@@ -1,5 +1,5 @@
 /**
- * Main entry point for the Cursor AI PR Reviewer GitHub Action
+ * Main entry point for the TechSee AI PR Reviewer GitHub Action
  */
 
 import * as core from '@actions/core';
@@ -13,7 +13,7 @@ async function run(): Promise<void> {
     const inputs = getActionInputs();
     validateInputs(inputs);
 
-    core.info('🤖 Cursor AI PR Reviewer starting...');
+    core.info('🤖 TechSee AI PR Reviewer starting...');
     core.info(`AI Provider: ${inputs.aiProvider}`);
     core.info(`Review Level: ${inputs.reviewLevel}`);
     core.info(`Comment Style: ${inputs.commentStyle}`);
@@ -33,12 +33,8 @@ async function run(): Promise<void> {
     if (result.status === 'needs_attention') {
       const errorCount = result.issues.filter(i => i.type === 'error').length;
       const warningCount = result.issues.filter(i => i.type === 'warning').length;
-      const infoCount = result.issues.filter(
-        i => i.type === 'info' || i.type === 'suggestion'
-      ).length;
-
       core.warning(
-        `Review completed with ${result.issues.length} issue(s) found: ${errorCount} errors, ${warningCount} warnings, ${infoCount} suggestions`
+        `Review completed with ${result.issues.length} issue(s) found: ${errorCount} errors, ${warningCount} warnings`
       );
       core.info('📝 Issues have been reported in PR comments - please review and address them');
     } else {

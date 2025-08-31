@@ -1,4 +1,4 @@
-name: 'Cursor AI PR Reviewer'
+name: 'TechSee AI PR Reviewer'
 description: 'AI-powered PR reviewer that respects Cursor AI rules'
 author: 'Amit Wagner'
 
@@ -82,11 +82,16 @@ inputs:
     required: false
     default: 'detailed'
     
+  log_level:
+    description: 'Minimum severity level for posting comments (error, warning, info, all)'
+    required: false
+    default: 'warning'
+
   enable_suggestions:
-    description: 'Enable code suggestions in reviews'
+    description: 'Enable suggestion code blocks in inline comments'
     required: false
     default: 'true'
-    
+
   skip_if_no_rules:
     description: 'Skip review if no cursor rules are found'
     required: false

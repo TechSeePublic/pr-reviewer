@@ -1,5 +1,5 @@
 /**
- * Core types for the Cursor AI PR Reviewer
+ * Core types for the TechSee AI PR Reviewer
  */
 
 export interface ActionInputs {
@@ -20,6 +20,7 @@ export interface ActionInputs {
   commentStyle: 'inline' | 'summary' | 'both';
   inlineSeverity: 'error' | 'warning' | 'info' | 'all';
   summaryFormat: 'brief' | 'detailed' | 'minimal';
+  logLevel: 'error' | 'warning' | 'info' | 'all';
   enableSuggestions: boolean;
   skipIfNoRules: boolean;
   updateExistingComments: boolean;
@@ -68,7 +69,13 @@ export interface FileChange {
 
 export interface CodeIssue {
   type: 'error' | 'warning' | 'info' | 'suggestion';
-  category: 'rule_violation' | 'bug' | 'security' | 'performance' | 'best_practice';
+  category:
+    | 'rule_violation'
+    | 'bug'
+    | 'security'
+    | 'performance'
+    | 'best_practice'
+    | 'maintainability';
   message: string;
   description: string;
   suggestion?: string;
