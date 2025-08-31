@@ -52,24 +52,33 @@ export class CommentManager {
       existingComments = await this.githubClient.getExistingBotComments();
     }
 
-    // Filter issues based on log level
-    const filteredIssues = this.filterIssuesByLogLevel(reviewResult.issues);
+    // Filter issues based on log level for inline comments
+    const filteredIssuesForInline = this.filterIssuesByLogLevel(reviewResult.issues);
 
-    // Post inline comments
+    // Post inline comments (only critical issues based on log level)
     if (shouldPostInline) {
-      await this.postInlineComments(filteredIssues, fileChanges, existingComments.inlineComments);
+      await this.postInlineComments(
+        filteredIssuesForInline,
+        fileChanges,
+        existingComments.inlineComments
+      );
     }
 
-    // Post summary comment (show all issues in summary, but respect log level for overall posting decision)
+    // Post summary comment (always show all issues, but only post if there are critical issues or all issues are low-severity)
     if (shouldPostSummary) {
-      // For summary, show all issues but only post if there are issues above log level
-      const summaryResult = {
-        ...reviewResult,
-        issues: filteredIssues.length > 0 ? reviewResult.issues : [],
-      };
-      if (filteredIssues.length > 0 || reviewResult.issues.length === 0) {
+      const criticalIssues = this.filterIssuesByLogLevel(reviewResult.issues);
+
+      // Always show all issues in summary, but only post if:
+      // 1. There are critical issues (above log level threshold), OR
+      // 2. There are any issues and no critical ones (to show non-critical issues in summary only)
+      const shouldPost =
+        criticalIssues.length > 0 ||
+        (reviewResult.issues.length > 0 && criticalIssues.length === 0) ||
+        reviewResult.issues.length === 0;
+
+      if (shouldPost) {
         await this.postSummaryComment(
-          summaryResult,
+          reviewResult, // Always pass full result with all issues
           fileChanges,
           existingComments.summaryComment,
           prPlan

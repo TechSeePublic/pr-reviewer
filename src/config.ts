@@ -46,10 +46,10 @@ export function getActionInputs(): ActionInputs {
     maxFiles: parseInt(core.getInput('max_files') || '50', 10),
     commentStyle: (core.getInput('comment_style') as 'inline' | 'summary' | 'both') || 'both',
     inlineSeverity:
-      (core.getInput('inline_severity') as 'error' | 'warning' | 'info' | 'all') || 'warning',
+      (core.getInput('inline_severity') as 'error' | 'warning' | 'info' | 'all') || 'error',
     summaryFormat:
       (core.getInput('summary_format') as 'brief' | 'detailed' | 'minimal') || 'detailed',
-    logLevel: (core.getInput('log_level') as 'error' | 'warning' | 'info' | 'all') || 'warning',
+    logLevel: (core.getInput('log_level') as 'error' | 'warning' | 'info' | 'all') || 'error',
     enableSuggestions: core.getBooleanInput('enable_suggestions') ?? true,
     skipIfNoRules: core.getBooleanInput('skip_if_no_rules') ?? false,
     updateExistingComments: core.getBooleanInput('update_existing_comments') ?? true,
@@ -57,7 +57,7 @@ export function getActionInputs(): ActionInputs {
     autoFixSeverity:
       (core.getInput('auto_fix_severity') as 'error' | 'warning' | 'info' | 'all') || 'error',
     requestDelay: parseInt(core.getInput('request_delay') || '2000', 10),
-    batchSize: parseInt(core.getInput('batch_size') || '100', 10),
+    batchSize: parseInt(core.getInput('batch_size') || '5', 10),
     githubRateLimit: parseInt(core.getInput('github_rate_limit') || '1000', 10),
   };
 

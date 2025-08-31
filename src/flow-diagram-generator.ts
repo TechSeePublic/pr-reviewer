@@ -355,10 +355,10 @@ ${addedLines}
       }
     }
 
-    // Fallback to basic analysis
+    // Fallback to basic analysis (will be enhanced by generateDefaultFlow)
     return {
       overview: 'Feature implementation',
-      mainFlow: ['User action', 'System processing', 'Result displayed'],
+      mainFlow: [], // Empty array will trigger generateDefaultFlow
     };
   }
 
@@ -438,22 +438,82 @@ ${addedLines}
   ): FlowNode[] {
     const nodes: FlowNode[] = [];
 
+    // Ensure we have at least 3 steps in the flow
+    let steps = flowAnalysis.mainFlow;
+    if (steps.length < 3) {
+      // Generate default flow based on file changes
+      steps = this.generateDefaultFlow(files);
+    }
+
     // Create simple flow step nodes from main flow
-    flowAnalysis.mainFlow.forEach((step, index) => {
-      const stepType = this.determineStepType(step, index, flowAnalysis.mainFlow.length);
+    steps.forEach((step, index) => {
+      const stepType = this.determineStepType(step, index, steps.length);
 
       nodes.push({
         id: this.sanitizeId(`step_${index + 1}_${step}`),
         label: step,
         type: stepType,
         status: 'unchanged',
-        importance: index === 0 || index === flowAnalysis.mainFlow.length - 1 ? 'high' : 'medium',
+        importance: index === 0 || index === steps.length - 1 ? 'high' : 'medium',
         description: `Step ${index + 1}: ${step}`,
         functionality: step,
       });
     });
 
     return nodes;
+  }
+
+  /**
+   * Generate default flow when AI doesn't provide enough steps
+   */
+  private generateDefaultFlow(files: FileChange[]): string[] {
+    const hasComponents = files.some(
+      f => f.filename.includes('component') || f.filename.includes('Component')
+    );
+    const hasServices = files.some(
+      f => f.filename.includes('service') || f.filename.includes('Service')
+    );
+    const hasAPI = files.some(f => f.filename.includes('api') || f.filename.includes('API'));
+    const hasDatabase = files.some(
+      f =>
+        f.filename.includes('db') || f.filename.includes('model') || f.filename.includes('schema')
+    );
+
+    if (hasComponents && hasServices) {
+      return [
+        'User interacts with interface',
+        'Component processes request',
+        'Service handles business logic',
+        'Data is updated',
+        'User sees result',
+      ];
+    }
+
+    if (hasAPI) {
+      return [
+        'Client sends request',
+        'API validates input',
+        'Server processes data',
+        'Response sent back',
+      ];
+    }
+
+    if (hasDatabase) {
+      return [
+        'User submits data',
+        'System validates input',
+        'Database is updated',
+        'Confirmation displayed',
+      ];
+    }
+
+    // Generic flow
+    return [
+      'User initiates action',
+      'System processes request',
+      'Data is handled',
+      'Result is displayed',
+    ];
   }
 
   /**

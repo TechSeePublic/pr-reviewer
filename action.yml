@@ -75,7 +75,7 @@ inputs:
   inline_severity:
     description: 'Minimum severity for inline comments (error, warning, info, all)'
     required: false
-    default: 'warning'
+    default: 'error'
     
   summary_format:
     description: 'Format of summary comment (brief, detailed, minimal)'
@@ -85,7 +85,7 @@ inputs:
   log_level:
     description: 'Minimum severity level for posting comments (error, warning, info, all)'
     required: false
-    default: 'warning'
+    default: 'error'
 
   enable_suggestions:
     description: 'Enable suggestion code blocks in inline comments'
@@ -118,9 +118,9 @@ inputs:
     default: '2000'
     
   batch_size:
-    description: 'Number of files to process in each batch (default: 100)'
+    description: 'Number of files to process in each batch (default: 5)'
     required: false
-    default: '100'
+    default: '5'
     
   github_rate_limit:
     description: 'Delay in milliseconds between GitHub API calls to avoid rate limits (default: 1000)'
