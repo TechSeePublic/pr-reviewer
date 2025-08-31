@@ -49,7 +49,7 @@ export class PRReviewer {
       inputs.githubRateLimit
     );
     this.aiProvider = AIProviderFactory.create(inputs);
-    this.commentManager = new CommentManager(this.githubClient, inputs);
+    this.commentManager = new CommentManager(this.githubClient, inputs, this.aiProvider);
     this.autoFixManager = new AutoFixManager(
       this.githubClient,
       inputs,

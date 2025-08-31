@@ -57,7 +57,7 @@ export function getActionInputs(): ActionInputs {
     autoFixSeverity:
       (core.getInput('auto_fix_severity') as 'error' | 'warning' | 'info' | 'all') || 'error',
     requestDelay: parseInt(core.getInput('request_delay') || '2000', 10),
-    batchSize: parseInt(core.getInput('batch_size') || '5', 10),
+    batchSize: parseInt(core.getInput('batch_size') || '100', 10),
     githubRateLimit: parseInt(core.getInput('github_rate_limit') || '1000', 10),
   };
 
@@ -138,8 +138,8 @@ export function validateInputs(inputs: ActionInputs): void {
   }
 
   // Validate batch size
-  if (inputs.batchSize < 1 || inputs.batchSize > 20) {
-    throw new Error('batch_size must be between 1 and 20');
+  if (inputs.batchSize < 1 || inputs.batchSize > 200) {
+    throw new Error('batch_size must be between 1 and 200');
   }
 
   // Validate GitHub rate limit

@@ -4,6 +4,7 @@
 
 import {
   ActionInputs,
+  AIProvider,
   CodeIssue,
   FileChange,
   InlineComment,
@@ -23,10 +24,10 @@ export class CommentManager {
   private inputs: ActionInputs;
   private flowDiagramGenerator: FlowDiagramGenerator;
 
-  constructor(githubClient: GitHubClient, inputs: ActionInputs) {
+  constructor(githubClient: GitHubClient, inputs: ActionInputs, aiProvider?: AIProvider) {
     this.githubClient = githubClient;
     this.inputs = inputs;
-    this.flowDiagramGenerator = new FlowDiagramGenerator();
+    this.flowDiagramGenerator = new FlowDiagramGenerator({}, aiProvider);
   }
 
   /**

@@ -37,7 +37,7 @@ describe('PR Reviewer Integration', () => {
     enableAutoFix: false,
     autoFixSeverity: 'error',
     requestDelay: 1000,
-    batchSize: 5,
+    batchSize: 100,
     githubRateLimit: 1000,
   };
 
