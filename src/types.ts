@@ -6,7 +6,8 @@ export interface ActionInputs {
   githubToken: string;
   openaiApiKey?: string;
   anthropicApiKey?: string;
-  aiProvider: 'openai' | 'anthropic' | 'auto';
+  geminiApiKey?: string;
+  aiProvider: 'openai' | 'anthropic' | 'gemini' | 'auto';
   model: string;
   reviewLevel: 'light' | 'standard' | 'thorough';
   rulesPath?: string;

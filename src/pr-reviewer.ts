@@ -22,6 +22,7 @@ import { GitHubClient } from './github-client';
 import { AIProviderFactory } from './ai-providers';
 import { CommentManager } from './comment-manager';
 import { AutoFixManager } from './auto-fix-manager';
+import { PromptTemplates } from './prompt-templates';
 
 export class PRReviewer {
   private inputs: ActionInputs;
@@ -239,7 +240,7 @@ export class PRReviewer {
     }
 
     // Build context for AI review
-    const context = this.buildReviewContext(fileChange, fileContent);
+    const context = PromptTemplates.buildReviewContext(fileChange, fileContent);
 
     // Get AI review
     const issues = await this.aiProvider.reviewCode(context, fileContent, rules);
@@ -273,35 +274,6 @@ export class PRReviewer {
       core.warning(`Could not get content for ${fileChange.filename}: ${error}`);
       return null;
     }
-  }
-
-  /**
-   * Build review context for AI
-   */
-  private buildReviewContext(fileChange: FileChange, _fileContent: string): string {
-    let context = `Reviewing file: ${fileChange.filename}\n`;
-    context += `Change type: ${fileChange.status}\n`;
-    context += `Changes: +${fileChange.additions} -${fileChange.deletions}\n\n`;
-
-    // Include patch information for context
-    if (fileChange.patch) {
-      context += `Diff patch (focus your analysis ONLY on these changes):\n${fileChange.patch}\n\n`;
-
-      // Extract changed line numbers for more precise analysis
-      const changedLines = this.extractChangedLines(fileChange.patch);
-      if (changedLines.length > 0) {
-        context += `Changed line numbers: ${changedLines.join(', ')}\n\n`;
-      }
-    }
-
-    context += `IMPORTANT: Only flag issues that are directly related to the code changes shown in the diff above.\n`;
-    context += `Do NOT comment on pre-existing code unless it's directly impacted by the current changes.\n`;
-    context += `Focus your analysis specifically on:\n`;
-    context += `1. Lines that were added (marked with +)\n`;
-    context += `2. Lines that were modified (context around changes)\n`;
-    context += `3. Logic that is directly affected by the changes\n\n`;
-
-    return context;
   }
 
   /**

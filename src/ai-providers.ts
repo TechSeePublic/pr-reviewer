@@ -14,6 +14,7 @@ import {
 } from './types';
 import { DEFAULT_MODELS, getModelInfo, getRecommendedModel } from './config';
 import { logger } from './logger';
+import { PromptTemplates } from './prompt-templates';
 
 export class OpenAIProvider implements AIProvider {
   public readonly name = 'openai';
@@ -46,8 +47,11 @@ export class OpenAIProvider implements AIProvider {
 
   async reviewCode(prompt: string, code: string, rules: CursorRule[]): Promise<CodeIssue[]> {
     try {
-      const systemPrompt = this.buildSystemPrompt(rules);
-      const userPrompt = this.buildUserPrompt(prompt, code);
+      const systemPrompt = PromptTemplates.buildCodeReviewSystemPrompt(rules, {
+        supportsJsonMode: this.supportsJsonMode(),
+        provider: this.name
+      });
+      const userPrompt = PromptTemplates.buildUserPrompt(prompt, code);
 
       // Build the request configuration
       const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
@@ -97,7 +101,7 @@ export class OpenAIProvider implements AIProvider {
 
   async generateSummary(issues: CodeIssue[], context: ReviewContext): Promise<string> {
     try {
-      const prompt = this.buildSummaryPrompt(issues, context);
+      const prompt = PromptTemplates.buildSummaryPrompt(issues, context);
 
       const response = await this.client.chat.completions.create({
         model: this.model,
@@ -134,79 +138,6 @@ export class OpenAIProvider implements AIProvider {
 
       throw new Error(`OpenAI summary generation error: ${errorMessage}`);
     }
-  }
-
-  private buildSystemPrompt(rules: CursorRule[]): string {
-    const jsonInstructions = this.supportsJsonMode()
-      ? '5. Return responses in valid JSON format only'
-      : '5. Return responses in valid JSON format only (start your response with { and end with })';
-
-    let prompt = `You are a comprehensive code review assistant that analyzes code changes for:
-1. Violations of provided Cursor AI rules
-2. General code quality issues and potential bugs
-3. Security vulnerabilities
-4. Performance issues
-5. Best practices violations
-
-IMPORTANT INSTRUCTIONS:
-1. Prioritize violations of the provided Cursor rules when they exist
-2. Also identify potential bugs, security issues, and code quality problems
-3. Focus on the actual code changes, not existing code unless it's directly related to the changes
-4. Provide specific, actionable feedback with line numbers when possible
-${jsonInstructions}
-6. Be concise but helpful in your explanations
-7. Only flag issues that are related to the actual changes in the PR
-
-CURSOR RULES TO FOLLOW:
-`;
-
-    rules.forEach((rule, index) => {
-      prompt += `\n${index + 1}. RULE "${rule.id}" (${rule.type}):`;
-      if (rule.description) {
-        prompt += `\n   Description: ${rule.description}`;
-      }
-      prompt += `\n   Content: ${rule.content}`;
-      if (rule.globs && rule.globs.length > 0) {
-        prompt += `\n   Applies to: ${rule.globs.join(', ')}`;
-      }
-      prompt += '\n';
-    });
-
-    prompt += `
-RESPONSE FORMAT:
-Return a JSON object with this structure:
-{
-  "issues": [
-    {
-      "type": "error|warning|info|suggestion",
-      "category": "rule_violation|bug|security|performance|best_practice",
-      "message": "Brief issue description",
-      "description": "Detailed explanation",
-      "suggestion": "Specific fix suggestion (optional)",
-      "fixedCode": "Complete corrected code for auto-fix (optional)",
-      "ruleId": "cursor_rule_id or general_code_review",
-      "ruleName": "Human readable rule name or issue category",
-      "file": "filename",
-      "line": 0,
-      "severity": "high|medium|low"
-    }
-  ],
-  "confidence": 0.95,
-  "reasoning": "Brief explanation of analysis approach"
-}`;
-
-    return prompt;
-  }
-
-  private buildUserPrompt(context: string, code: string): string {
-    return `${context}
-
-CODE TO REVIEW:
-\`\`\`
-${code}
-\`\`\`
-
-Please analyze this code against the Cursor rules and return any violations or suggestions in the specified JSON format.`;
   }
 
   private parseAIResponse(response: string): CodeIssue[] {
@@ -255,28 +186,6 @@ Please analyze this code against the Cursor rules and return any violations or s
 
     return issues;
   }
-
-  private buildSummaryPrompt(issues: CodeIssue[], context: ReviewContext): string {
-    const { prContext, fileChanges, cursorRules } = context;
-
-    return `Generate a comprehensive PR review summary for:
-Repository: ${prContext.owner}/${prContext.repo}
-PR #${prContext.pullNumber}
-Files changed: ${fileChanges.length}
-Cursor rules applied: ${cursorRules.projectRules.length}
-
-ISSUES FOUND:
-${issues.map(issue => `- ${issue.type.toUpperCase()}: ${issue.message} (${issue.file}:${issue.line || 'unknown'})`).join('\n')}
-
-Please create a summary that includes:
-1. Overall assessment (passed/needs attention/failed)
-2. Key issues by category
-3. Rules that were applied
-4. Actionable next steps
-5. Positive feedback where appropriate
-
-Keep it professional, constructive, and actionable. Use markdown formatting.`;
-  }
 }
 
 export class AnthropicProvider implements AIProvider {
@@ -291,8 +200,11 @@ export class AnthropicProvider implements AIProvider {
 
   async reviewCode(prompt: string, code: string, rules: CursorRule[]): Promise<CodeIssue[]> {
     try {
-      const systemPrompt = this.buildSystemPrompt(rules);
-      const userPrompt = this.buildUserPrompt(prompt, code);
+      const systemPrompt = PromptTemplates.buildCodeReviewSystemPrompt(rules, {
+        supportsJsonMode: false,
+        provider: this.name
+      });
+      const userPrompt = PromptTemplates.buildUserPrompt(prompt, code);
 
       const response = await this.client.messages.create({
         model: this.model,
@@ -332,7 +244,7 @@ export class AnthropicProvider implements AIProvider {
 
   async generateSummary(issues: CodeIssue[], context: ReviewContext): Promise<string> {
     try {
-      const prompt = this.buildSummaryPrompt(issues, context);
+      const prompt = PromptTemplates.buildSummaryPrompt(issues, context);
 
       const response = await this.client.messages.create({
         model: this.model,
@@ -365,76 +277,6 @@ export class AnthropicProvider implements AIProvider {
 
       throw new Error(`Anthropic summary generation error: ${errorMessage}`);
     }
-  }
-
-  // Anthropic doesn't support JSON mode, so we need our own methods
-  private buildSystemPrompt(rules: CursorRule[]): string {
-    let prompt = `You are a comprehensive code review assistant that analyzes code changes for:
-1. Violations of provided Cursor AI rules
-2. General code quality issues and potential bugs
-3. Security vulnerabilities
-4. Performance issues
-5. Best practices violations
-
-IMPORTANT INSTRUCTIONS:
-1. Prioritize violations of the provided Cursor rules when they exist
-2. Also identify potential bugs, security issues, and code quality problems
-3. Focus on the actual code changes, not existing code unless it's directly related to the changes
-4. Provide specific, actionable feedback with line numbers when possible
-5. Return responses in valid JSON format only (start your response with { and end with })
-6. Be concise but helpful in your explanations
-7. Only flag issues that are related to the actual changes in the PR
-
-CURSOR RULES TO FOLLOW:
-`;
-
-    rules.forEach((rule, index) => {
-      prompt += `\n${index + 1}. RULE "${rule.id}" (${rule.type}):`;
-      if (rule.description) {
-        prompt += `\n   Description: ${rule.description}`;
-      }
-      prompt += `\n   Content: ${rule.content}`;
-      if (rule.globs && rule.globs.length > 0) {
-        prompt += `\n   Applies to: ${rule.globs.join(', ')}`;
-      }
-      prompt += '\n';
-    });
-
-    prompt += `
-RESPONSE FORMAT:
-Return a JSON object with this structure:
-{
-  "issues": [
-    {
-      "type": "error|warning|info|suggestion",
-      "category": "rule_violation|bug|security|performance|best_practice",
-      "message": "Brief issue description",
-      "description": "Detailed explanation",
-      "suggestion": "Specific fix suggestion (optional)",
-      "fixedCode": "Complete corrected code for auto-fix (optional)",
-      "ruleId": "cursor_rule_id or general_code_review",
-      "ruleName": "Human readable rule name or issue category",
-      "file": "filename",
-      "line": 0,
-      "severity": "high|medium|low"
-    }
-  ],
-  "confidence": 0.95,
-  "reasoning": "Brief explanation of analysis approach"
-}`;
-
-    return prompt;
-  }
-
-  private buildUserPrompt(context: string, code: string): string {
-    return `${context}
-
-CODE TO REVIEW:
-\`\`\`
-${code}
-\`\`\`
-
-Please analyze this code against the Cursor rules and return any violations or suggestions in the specified JSON format.`;
   }
 
   private parseAIResponse(response: string): CodeIssue[] {
@@ -482,28 +324,6 @@ Please analyze this code against the Cursor rules and return any violations or s
     }
 
     return issues;
-  }
-
-  private buildSummaryPrompt(issues: CodeIssue[], context: ReviewContext): string {
-    const { prContext, fileChanges, cursorRules } = context;
-
-    return `Generate a comprehensive PR review summary for:
-Repository: ${prContext.owner}/${prContext.repo}
-PR #${prContext.pullNumber}
-Files changed: ${fileChanges.length}
-Cursor rules applied: ${cursorRules.projectRules.length}
-
-ISSUES FOUND:
-${issues.map(issue => `- ${issue.type.toUpperCase()}: ${issue.message} (${issue.file}:${issue.line || 'unknown'})`).join('\n')}
-
-Please create a summary that includes:
-1. Overall assessment (passed/needs attention/failed)
-2. Key issues by category
-3. Rules that were applied
-4. Actionable next steps
-5. Positive feedback where appropriate
-
-Keep it professional, constructive, and actionable. Use markdown formatting.`;
   }
 }
 
