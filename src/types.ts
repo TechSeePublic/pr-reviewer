@@ -4,6 +4,7 @@
 
 export interface ActionInputs {
   githubToken: string;
+  prNumber?: string;
   openaiApiKey?: string;
   anthropicApiKey?: string;
   geminiApiKey?: string;

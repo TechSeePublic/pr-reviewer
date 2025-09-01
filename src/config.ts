@@ -20,6 +20,7 @@ export function getActionInputs(): ActionInputs {
 
   const inputs: ActionInputs = {
     githubToken: core.getInput('gh_token', { required: true }),
+    prNumber: core.getInput('pr_number'),
     aiProvider:
       (core.getInput('ai_provider') as 'openai' | 'anthropic' | 'gemini' | 'azure' | 'auto') ||
       'auto',

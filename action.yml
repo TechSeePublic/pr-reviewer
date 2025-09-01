@@ -7,6 +7,10 @@ branding:
   color: 'blue'
 
 inputs:
+  pr_number:
+    description: 'PR number to review (required for manual workflow_dispatch)'
+    required: false
+    
   gh_token:
     description: 'GitHub token for API access'
     required: true

@@ -1,0 +1,39 @@
+name: Manual PR Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review'
+        required: true
+        type: string
+      review_level:
+        description: 'Review intensity level'
+        required: false
+        default: 'standard'
+        type: choice
+        options:
+          - light
+          - standard
+          - thorough
+
+jobs:
+  manual-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: AI Code Review (Manual)
+        uses: ./
+        with:
+          pr_number: ${{ github.event.inputs.pr_number }}
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          review_level: ${{ github.event.inputs.review_level }}
+          comment_style: 'both'
+          log_level: 'info'  # More verbose logging for manual runs

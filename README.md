@@ -71,6 +71,40 @@ jobs:
           github_rate_limit: '1000' # 1 second between GitHub API calls
 ```
 
+### Manual Trigger (Optional)
+
+You can also create a workflow for manual PR reviews:
+
+```yaml
+name: Manual PR Review
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review'
+        required: true
+        type: string
+
+jobs:
+  manual-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: AI Code Review (Manual)
+        uses: amit.wagner/pr-reviewer@v1
+        with:
+          pr_number: ${{ github.event.inputs.pr_number }}
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          review_level: 'standard'
+```
+
 ### 2. Set Up API Keys
 
 Add your AI provider API key to GitHub Secrets:
@@ -88,6 +122,7 @@ The bot automatically detects and applies Cursor rules from:
 
 | Input | Description | Default | Required |
 |-------|-------------|---------|----------|
+| `pr_number` | PR number to review (for manual workflow_dispatch) | - | ❌ |
 | `gh_token` | GitHub token for API access | `${{ github.token }}` | ✅ |
 | `openai_api_key` | OpenAI API key | - | ⚠️ |
 | `anthropic_api_key` | Anthropic API key | - | ⚠️ |

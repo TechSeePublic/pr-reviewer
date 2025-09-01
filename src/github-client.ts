@@ -52,13 +52,19 @@ export class GitHubClient {
    */
   async getPRChanges(inputs: ActionInputs): Promise<FileChange[]> {
     try {
-      // Get PR metadata (not currently used but available for future features)
+      // Get PR metadata and update context if running manually
       await this.applyRateLimit();
-      await this.octokit.rest.pulls.get({
+      const { data: prData } = await this.octokit.rest.pulls.get({
         owner: this.context.owner,
         repo: this.context.repo,
         pull_number: this.context.pullNumber,
       });
+
+      // Update context with correct SHA values if running manually
+      if (inputs.prNumber) {
+        this.context.sha = prData.head.sha;
+        this.context.baseSha = prData.base.sha;
+      }
 
       await this.applyRateLimit();
       const { data: files } = await this.octokit.rest.pulls.listFiles({

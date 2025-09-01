@@ -145,8 +145,29 @@ export class PRReviewer {
   private extractPRContext(): PRContext {
     const context = github.context;
 
+    // Handle manual workflow dispatch
+    if (context.eventName === 'workflow_dispatch' || this.inputs.prNumber) {
+      const prNumber = this.inputs.prNumber;
+      if (!prNumber) {
+        throw new Error(
+          'PR number is required when running manually. Use workflow_dispatch with pr_number input.'
+        );
+      }
+
+      return {
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pullNumber: parseInt(prNumber, 10),
+        sha: context.sha, // Use current commit SHA (will be updated when we fetch PR data)
+        baseSha: context.sha, // Will be updated when we fetch PR data
+      };
+    }
+
+    // Handle pull request events
     if (!context.payload.pull_request) {
-      throw new Error('This action can only be run on pull request events');
+      throw new Error(
+        'This action can only be run on pull request events or manual workflow dispatch with pr_number'
+      );
     }
 
     return {
