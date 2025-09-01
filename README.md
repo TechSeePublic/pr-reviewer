@@ -244,7 +244,7 @@ const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
 
 ### Summary Comments
 ```markdown
-## 🤖 Cursor AI PR Review Summary
+## 🤖 TechSee AI PR Review Summary
 
 ### ⚠️ **Overall Status: NEEDS ATTENTION**
 

@@ -349,7 +349,7 @@ export class CommentManager {
   ): Promise<string> {
     const { issues, filesReviewed, totalFiles, rulesApplied, summary, status } = reviewResult;
 
-    let body = `## 🤖 Cursor AI PR Review Summary\n\n`;
+    let body = `## 🤖 TechSee AI PR Review Summary\n\n`;
 
     // Status indicator
     const statusIcon = this.getStatusIcon(status);
