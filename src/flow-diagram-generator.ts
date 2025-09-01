@@ -140,7 +140,9 @@ export class FlowDiagramGenerator {
   private buildMermaidPrompt(files: FileChange[], prPlan: PRPlan): string {
     const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
 
-    return `# Analyze this PR and create a flow diagram
+    return `# FLOW DIAGRAM GENERATION REQUEST (NOT A CODE REVIEW)
+
+This is NOT a code review request. Do NOT return code review issues or suggestions.
 
 ## What this PR does:
 ${prPlan.overview}
@@ -151,8 +153,9 @@ ${prPlan.keyChanges.join('\n')}
 ## Files modified:
 ${fileList}
 
-Create a Mermaid flowchart that shows the logical flow of what this PR accomplishes. Focus on:
+YOUR TASK: Create a Mermaid flowchart that shows the logical flow of what this PR accomplishes.
 
+Focus on:
 - The user's journey or business process
 - What triggers the flow
 - What decisions are made
@@ -161,11 +164,20 @@ Create a Mermaid flowchart that shows the logical flow of what this PR accomplis
 
 Think about the user experience, not the code structure. Show the logical flow from start to finish.
 
-CRITICAL: You must return ONLY valid Mermaid flowchart code that:
-- Starts with "flowchart TD" 
-- Uses proper Mermaid syntax
-- Has connected nodes with arrows (--> )
-- Contains no markdown formatting or explanations
+CRITICAL REQUIREMENTS:
+- This is NOT a code review - do not analyze code quality
+- Do not return any code review issues or suggestions
+- Return ONLY a valid Mermaid flowchart starting with "flowchart TD"
+- Use proper Mermaid syntax with connected nodes and arrows (-->)
+- No markdown formatting, no explanations, just raw Mermaid code
+
+EXAMPLE OUTPUT FORMAT:
+flowchart TD
+    A[User action] --> B{Decision point}
+    B -->|Yes| C[Process step]
+    B -->|No| D[Alternative step]
+    C --> E[Final result]
+    D --> E
 
 Return only the raw Mermaid code, nothing else.`;
   }
@@ -203,10 +215,24 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
     // Handle array response (from reviewCode)
     if (Array.isArray(response)) {
       logger.info(`Processing array response with ${response.length} items`);
+
+      // Check if this looks like a code review response instead of a flow diagram
+      const isCodeReviewResponse =
+        response.length > 0 && response.every(item => item.type && item.category && item.severity);
+
+      if (isCodeReviewResponse) {
+        logger.error('AI returned code review issues instead of Mermaid diagram');
+        logger.error('This indicates the AI misunderstood the flow diagram request');
+        throw new Error(
+          'AI returned code review format instead of flow diagram - prompt may need adjustment'
+        );
+      }
+
       for (const item of response) {
         if (item.description || item.message) {
           const text = item.description || item.message;
           logger.info(`AI returned text (${text.length} chars): ${text.substring(0, 150)}...`);
+
           const extracted = this.extractMermaidFromText(text);
           if (extracted) {
             logger.info('✅ Successfully extracted Mermaid code from array item');
