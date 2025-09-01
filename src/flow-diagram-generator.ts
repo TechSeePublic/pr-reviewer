@@ -121,8 +121,8 @@ export class FlowDiagramGenerator {
       }
 
       const diagram: FlowDiagram = {
-        title: `User Flow: ${prPlan.overview.substring(0, 50)}${prPlan.overview.length > 50 ? '...' : ''}`,
-        description: `This diagram shows the user experience and business logic for this feature.`,
+        title: `Technical Flow: ${prPlan.overview.substring(0, 45)}${prPlan.overview.length > 45 ? '...' : ''}`,
+        description: `This diagram shows the technical implementation and code flow for the changes in this PR.`,
         mermaidCode,
       };
 
@@ -195,55 +195,65 @@ export class FlowDiagramGenerator {
   private buildMermaidPrompt(files: FileChange[], prPlan: PRPlan): string {
     const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
 
-    return `# USER FLOW DIAGRAM GENERATION
+    return `# TECHNICAL FLOW DIAGRAM GENERATION
 
-Create a Mermaid flowchart that shows the USER EXPERIENCE and BUSINESS LOGIC of the feature being implemented.
+Create a Mermaid flowchart that shows the TECHNICAL IMPLEMENTATION and CODE FLOW of the changes in this PR.
 
 ## Feature Description:
 ${prPlan.overview}
 
-## What the feature does for users:
+## Technical Changes Made:
 ${prPlan.keyChanges.join('\n')}
 
-## Technical files involved:
+## Files Modified:
 ${fileList}
 
-YOUR TASK: Create a flowchart showing how a USER interacts with this feature.
+YOUR TASK: Create a flowchart showing the TECHNICAL FLOW from a DEVELOPER'S perspective.
 
-FOCUS ON THE USER'S PERSPECTIVE:
-- What does the user want to accomplish?
-- What actions does the user take?
-- What happens in the system when they do this?
-- What does the user see as a result?
-- What are the different paths/outcomes?
+FOCUS ON TECHNICAL IMPLEMENTATION:
+- Function calls and method execution
+- Data flow and transformations
+- API calls and responses
+- Validation and error handling
+- Database operations
+- System components interactions
+- Key algorithms and logic
+
+SHOW TECHNICAL ELEMENTS:
+- Function/method entry points
+- Data validation steps
+- Processing logic and calculations
+- External API calls
+- Database queries/updates
+- Error handling paths
+- Return values and responses
 
 DO NOT SHOW:
-- PR processes or code review steps
-- Development workflows or technical implementation
-- File structures or code organization
-
-SHOW INSTEAD:
-- User actions and interactions
-- Business logic and decision points
-- System responses and outcomes
-- Data flow and processing steps
+- End-user UI interactions
+- Generic user actions like "clicks button"
+- PR review processes
 
 SYNTAX REQUIREMENTS:
 - Keep node labels simple and short (under 30 characters)
 - Do NOT use quotes (") inside node labels
-- Use simple words like "success", "error", "result" instead of quoted messages
+- Use technical terms like "validate", "process", "query", "return"
 - Keep the diagram focused (maximum 8-10 nodes)
-- Use clear, simple language
+- Use clear, technical language
 
-EXAMPLE - For a login feature:
+EXAMPLE - For an authentication API:
 flowchart TD
-    A[User opens application] --> B[User clicks login]
-    B --> C[User enters credentials]
-    C --> D{Valid credentials?}
-    D -->|Yes| E[User logged in successfully]
-    D -->|No| F[Show error message]
-    F --> C
-    E --> G[User sees dashboard]
+    A[Receive login request] --> B[Extract credentials]
+    B --> C[Validate input format]
+    C --> D{Input valid?}
+    D -->|No| E[Return validation error]
+    D -->|Yes| F[Query user database]
+    F --> G{User exists?}
+    G -->|No| H[Return user not found]
+    G -->|Yes| I[Verify password hash]
+    I --> J{Password correct?}
+    J -->|No| K[Return auth failed]
+    J -->|Yes| L[Generate JWT token]
+    L --> M[Return success response]
 
 Return only the Mermaid flowchart code, nothing else.`;
   }
