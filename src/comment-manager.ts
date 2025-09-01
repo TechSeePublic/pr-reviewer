@@ -407,11 +407,11 @@ export class CommentManager {
       const categoryOrder = [
         'bug',
         'security',
+        'documentation',
         'performance',
         'rule_violation',
         'best_practice',
         'maintainability',
-        'documentation',
       ];
       for (const category of categoryOrder) {
         if (issuesByCategory[category]) {
@@ -667,7 +667,7 @@ export class CommentManager {
       case 'maintainability':
         return 'Maintainability';
       case 'documentation':
-        return 'Documentation & Typos';
+        return 'Documentation & Typos (Critical)';
       default:
         return 'Other';
     }

@@ -105,8 +105,8 @@ export class FlowDiagramGenerator {
       const prompt = this.buildMermaidPrompt(files, prPlan);
       const context = this.buildFileContext(files);
 
-      // Ask AI to generate the Mermaid diagram directly
-      const response = await this.aiProvider?.reviewCode(prompt, context, []);
+      // Ask AI to generate the Mermaid diagram directly using a custom method
+      const response = await this.generateMermaidWithAI(prompt, context);
       if (!response) {
         throw new Error('No response from AI provider');
       }
@@ -131,6 +131,61 @@ export class FlowDiagramGenerator {
     } catch (error) {
       logger.error('AI diagram generation failed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Generate Mermaid diagram using direct AI call (not code review format)
+   */
+  private async generateMermaidWithAI(prompt: string, context: string): Promise<string | unknown> {
+    if (!this.aiProvider) {
+      throw new Error('AI provider not available');
+    }
+
+    // Access the underlying AI provider to make a direct call
+    // This bypasses the code review format and gets raw text response
+    if ('client' in this.aiProvider) {
+      // Handle OpenAI provider
+      const openaiProvider = this.aiProvider as any;
+
+      try {
+        const response = await openaiProvider.client.chat.completions.create({
+          model: openaiProvider.model,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are a flow diagram generator. Generate only valid Mermaid flowchart code. Do not provide code reviews or suggestions.',
+            },
+            {
+              role: 'user',
+              content: `${prompt}\n\n## Context:\n${context}`,
+            },
+          ],
+          temperature: 0.1,
+          max_tokens: 1000,
+        });
+
+        const result = response.choices[0]?.message?.content;
+        if (!result) {
+          throw new Error('No response from OpenAI for Mermaid generation');
+        }
+
+        logger.info('✅ Got direct AI response for Mermaid generation');
+        return result;
+      } catch (error) {
+        logger.error('Direct OpenAI call failed:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to reviewCode method but warn about it
+      logger.warn('Unable to make direct AI call, falling back to reviewCode method');
+      const response = await this.aiProvider.reviewCode(prompt, context, []);
+
+      // For non-OpenAI providers, we still need to use the array response
+      // Mark this as an array response so the parser knows how to handle it
+      (response as any).__isArrayResponse = true;
+      return response as any;
     }
   }
 
