@@ -28,7 +28,7 @@ export interface ActionInputs {
   enableAutoFix: boolean;
   autoFixSeverity: 'error' | 'warning' | 'info' | 'all';
   requestDelay: number; // Delay in milliseconds between AI provider requests
-  batchSize: number; // Number of files to process in each batch (default: 100)
+  batchSize: number; // Number of files to process in each batch (default: 50)
   githubRateLimit: number; // Delay in milliseconds between GitHub API calls (default: 1000ms)
 }
 

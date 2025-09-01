@@ -58,7 +58,7 @@ export function getActionInputs(): ActionInputs {
     autoFixSeverity:
       (core.getInput('auto_fix_severity') as 'error' | 'warning' | 'info' | 'all') || 'error',
     requestDelay: parseInt(core.getInput('request_delay') || '2000', 10),
-    batchSize: parseInt(core.getInput('batch_size') || '5', 10),
+    batchSize: parseInt(core.getInput('batch_size') || '50', 10),
     githubRateLimit: parseInt(core.getInput('github_rate_limit') || '1000', 10),
   };
 

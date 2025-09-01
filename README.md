@@ -28,7 +28,7 @@ The action now uses an intelligent 2-step approach for better PR understanding a
 - 📝 **Creates a comprehensive plan** that guides the detailed review
 
 **Step 2: Batch Review with Context**
-- 📦 **Processes files in batches** (default: 5 files) with full PR context for comprehensive analysis
+- 📦 **Processes files in batches** (default: 50 files) with full PR context for comprehensive analysis
 - ⚡ **Faster processing** compared to file-by-file review
 - 🔄 **Automatic fallback** to single-file review if batch processing fails
 - ⏱️ **Smart rate limiting** for both AI providers and GitHub API calls
@@ -66,7 +66,7 @@ jobs:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           review_level: 'standard'
           comment_style: 'both'
-          batch_size: '5'          # Process up to 5 files per batch (default: 5 files per batch)
+          batch_size: '50'         # Process up to 50 files per batch (default: 50 files per batch)
           request_delay: '2000'    # 2 seconds between AI requests
           github_rate_limit: '1000' # 1 second between GitHub API calls
 ```
@@ -472,7 +472,7 @@ npm run release 1.2.3
 - The action automatically handles GitHub API rate limits
 - For AI provider rate limits, consider using `review_level: 'light'`
 - Adjust `request_delay` to increase delays between AI requests (default: 2000ms)
-- The action processes files in batches (default: 5 files per batch) for better context and efficiency
+- The action processes files in batches (default: 50 files per batch) for better context and efficiency
 
 **Model compatibility issues**
 - Ensure the model name matches exactly (case-sensitive)
