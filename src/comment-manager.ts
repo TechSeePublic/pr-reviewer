@@ -374,13 +374,13 @@ export class CommentManager {
         );
 
         if (flowDiagram) {
-          body += `### 🔄 **PR Flow Diagram**\n\n`;
+          body += `### 🔄 **User Flow Diagram**\n\n`;
           body += `${flowDiagram.description}\n\n`;
           // Ensure mermaid code ends with newline
           const cleanMermaidCode = flowDiagram.mermaidCode.trim();
           body += `\`\`\`mermaid\n${cleanMermaidCode}\n\`\`\`\n\n`;
           body += `<details>\n<summary>📊 About This Diagram</summary>\n\n`;
-          body += `This flow diagram shows the user journey and business logic implemented in this PR.\n\n`;
+          body += `This flow diagram shows the user experience and business logic for the feature being implemented.\n\n`;
           body += `**Diagram Elements:**\n`;
           body += `- **Rectangles** \`[]\`: Process steps or actions\n`;
           body += `- **Diamonds** \`{}\`: Decision points or conditions\n`;

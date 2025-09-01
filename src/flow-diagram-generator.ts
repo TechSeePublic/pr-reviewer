@@ -121,8 +121,8 @@ export class FlowDiagramGenerator {
       }
 
       const diagram: FlowDiagram = {
-        title: `PR Flow: ${prPlan.overview.substring(0, 50)}${prPlan.overview.length > 50 ? '...' : ''}`,
-        description: `This diagram shows the flow of changes across ${files.length} files in this PR.`,
+        title: `User Flow: ${prPlan.overview.substring(0, 50)}${prPlan.overview.length > 50 ? '...' : ''}`,
+        description: `This diagram shows the user experience and business logic for this feature.`,
         mermaidCode,
       };
 
@@ -195,46 +195,50 @@ export class FlowDiagramGenerator {
   private buildMermaidPrompt(files: FileChange[], prPlan: PRPlan): string {
     const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
 
-    return `# FLOW DIAGRAM GENERATION REQUEST (NOT A CODE REVIEW)
+    return `# USER FLOW DIAGRAM GENERATION
 
-This is NOT a code review request. Do NOT return code review issues or suggestions.
+Create a Mermaid flowchart that shows the USER EXPERIENCE and BUSINESS LOGIC of the feature being implemented.
 
-## What this PR does:
+## Feature Description:
 ${prPlan.overview}
 
-## Key changes:
+## What the feature does for users:
 ${prPlan.keyChanges.join('\n')}
 
-## Files modified:
+## Technical files involved:
 ${fileList}
 
-YOUR TASK: Create a Mermaid flowchart that shows the logical flow of what this PR accomplishes.
+YOUR TASK: Create a flowchart showing how a USER interacts with this feature.
 
-Focus on:
-- The user's journey or business process
-- What triggers the flow
-- What decisions are made
-- What actions happen
-- What the outcome is
+FOCUS ON THE USER'S PERSPECTIVE:
+- What does the user want to accomplish?
+- What actions does the user take?
+- What happens in the system when they do this?
+- What does the user see as a result?
+- What are the different paths/outcomes?
 
-Think about the user experience, not the code structure. Show the logical flow from start to finish.
+DO NOT SHOW:
+- PR processes or code review steps
+- Development workflows or technical implementation
+- File structures or code organization
 
-CRITICAL REQUIREMENTS:
-- This is NOT a code review - do not analyze code quality
-- Do not return any code review issues or suggestions
-- Return ONLY a valid Mermaid flowchart starting with "flowchart TD"
-- Use proper Mermaid syntax with connected nodes and arrows (-->)
-- No markdown formatting, no explanations, just raw Mermaid code
+SHOW INSTEAD:
+- User actions and interactions
+- Business logic and decision points
+- System responses and outcomes
+- Data flow and processing steps
 
-EXAMPLE OUTPUT FORMAT:
+EXAMPLE - For a login feature:
 flowchart TD
-    A[User action] --> B{Decision point}
-    B -->|Yes| C[Process step]
-    B -->|No| D[Alternative step]
-    C --> E[Final result]
-    D --> E
+    A[User opens application] --> B[User clicks login]
+    B --> C[User enters credentials]
+    C --> D{Valid credentials?}
+    D -->|Yes| E[User logged in successfully]
+    D -->|No| F[Show error message]
+    F --> C
+    E --> G[User sees dashboard]
 
-Return only the raw Mermaid code, nothing else.`;
+Return only the Mermaid flowchart code, nothing else.`;
   }
 
   /**
