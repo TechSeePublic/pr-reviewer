@@ -72,38 +72,27 @@ export class CommentManager {
       );
     }
 
-    // Post summary comment (always show all issues, but only post if there are critical issues or all issues are low-severity)
+    // Post summary comment - only skip if there are no file changes to review
     if (shouldPostSummary) {
-      const criticalIssues = this.filterIssuesByLogLevel(reviewResult.issues);
+      if (fileChanges.length === 0) {
+        logger.info('❌ Summary comment skipped - no file changes to review');
+        return;
+      }
 
       logger.info(
-        `Summary comment decision: criticalIssues=${criticalIssues.length}, totalIssues=${reviewResult.issues.length}`
+        `📝 Posting summary comment for ${fileChanges.length} file changes and ${reviewResult.issues.length} issues...`
       );
-
-      // Always post summary comment - it should show all issues regardless of log level filtering
-      // The summary provides an overview and should always be posted for transparency
-      const shouldPost = true;
-
-      logger.info(
-        `Summary shouldPost decision: ${shouldPost} (criticalIssues=${criticalIssues.length}, totalIssues=${reviewResult.issues.length})`
-      );
-
-      if (shouldPost) {
-        logger.info('Attempting to post summary comment...');
-        try {
-          await this.postSummaryComment(
-            reviewResult, // Always pass full result with all issues
-            fileChanges,
-            existingComments.summaryComment,
-            prPlan
-          );
-          logger.info('✅ Summary comment posted successfully');
-        } catch (error) {
-          logger.error('❌ Failed to post summary comment:', error);
-          throw error;
-        }
-      } else {
-        logger.info('❌ Summary comment skipped due to shouldPost=false');
+      try {
+        await this.postSummaryComment(
+          reviewResult,
+          fileChanges,
+          existingComments.summaryComment,
+          prPlan
+        );
+        logger.info('✅ Summary comment posted successfully');
+      } catch (error) {
+        logger.error('❌ Failed to post summary comment:', error);
+        throw error;
       }
     } else {
       logger.info('❌ Summary comment skipped due to commentStyle configuration');
