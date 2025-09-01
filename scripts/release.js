@@ -195,7 +195,7 @@ class ReleaseManager {
       // If something goes wrong, try to get back to the original branch
       try {
         this.runCommand(`git checkout ${currentBranch}`, { silent: true });
-      } catch {}
+      } catch {error}
       throw error;
     }
   }

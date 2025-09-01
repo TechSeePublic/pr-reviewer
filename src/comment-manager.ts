@@ -43,6 +43,13 @@ export class CommentManager {
     const shouldPostSummary =
       this.inputs.commentStyle === 'summary' || this.inputs.commentStyle === 'both';
 
+    logger.info(
+      `Comment posting config: commentStyle=${this.inputs.commentStyle}, shouldPostSummary=${shouldPostSummary}, shouldPostInline=${shouldPostInline}`
+    );
+    logger.info(
+      `Review result: ${reviewResult.issues.length} total issues, logLevel=${this.inputs.logLevel}`
+    );
+
     // Get existing comments if we should update them
     let existingComments: { inlineComments: InlineComment[]; summaryComment?: SummaryComment } = {
       inlineComments: [],
@@ -57,6 +64,7 @@ export class CommentManager {
 
     // Post inline comments (only critical issues based on log level)
     if (shouldPostInline) {
+      logger.info(`Posting ${filteredIssuesForInline.length} inline comments...`);
       await this.postInlineComments(
         filteredIssuesForInline,
         fileChanges,
@@ -68,22 +76,37 @@ export class CommentManager {
     if (shouldPostSummary) {
       const criticalIssues = this.filterIssuesByLogLevel(reviewResult.issues);
 
-      // Always show all issues in summary, but only post if:
-      // 1. There are critical issues (above log level threshold), OR
-      // 2. There are any issues and no critical ones (to show non-critical issues in summary only)
-      const shouldPost =
-        criticalIssues.length > 0 ||
-        (reviewResult.issues.length > 0 && criticalIssues.length === 0) ||
-        reviewResult.issues.length === 0;
+      logger.info(
+        `Summary comment decision: criticalIssues=${criticalIssues.length}, totalIssues=${reviewResult.issues.length}`
+      );
+
+      // Always post summary comment - it should show all issues regardless of log level filtering
+      // The summary provides an overview and should always be posted for transparency
+      const shouldPost = true;
+
+      logger.info(
+        `Summary shouldPost decision: ${shouldPost} (criticalIssues=${criticalIssues.length}, totalIssues=${reviewResult.issues.length})`
+      );
 
       if (shouldPost) {
-        await this.postSummaryComment(
-          reviewResult, // Always pass full result with all issues
-          fileChanges,
-          existingComments.summaryComment,
-          prPlan
-        );
+        logger.info('Attempting to post summary comment...');
+        try {
+          await this.postSummaryComment(
+            reviewResult, // Always pass full result with all issues
+            fileChanges,
+            existingComments.summaryComment,
+            prPlan
+          );
+          logger.info('✅ Summary comment posted successfully');
+        } catch (error) {
+          logger.error('❌ Failed to post summary comment:', error);
+          throw error;
+        }
+      } else {
+        logger.info('❌ Summary comment skipped due to shouldPost=false');
       }
+    } else {
+      logger.info('❌ Summary comment skipped due to commentStyle configuration');
     }
   }
 
