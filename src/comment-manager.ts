@@ -376,15 +376,17 @@ export class CommentManager {
         if (flowDiagram) {
           body += `### 🔄 **PR Flow Diagram**\n\n`;
           body += `${flowDiagram.description}\n\n`;
-          body += `\`\`\`mermaid\n${flowDiagram.mermaidCode}\`\`\`\n\n`;
-          body += `<details>\n<summary>📊 Diagram Legend</summary>\n\n`;
-          body += `- 🟢 **Green**: Added files\n`;
-          body += `- 🟡 **Yellow**: Modified files\n`;
-          body += `- 🔴 **Red**: Removed files\n`;
-          body += `- 🔘 **Gray**: Renamed files\n`;
-          body += `- **Bold border**: High importance (large changes or critical issues)\n`;
-          body += `- **Solid arrows**: Direct imports/dependencies\n`;
-          body += `- **Dashed arrows**: Function calls or usage\n\n`;
+          // Ensure mermaid code ends with newline
+          const cleanMermaidCode = flowDiagram.mermaidCode.trim();
+          body += `\`\`\`mermaid\n${cleanMermaidCode}\n\`\`\`\n\n`;
+          body += `<details>\n<summary>📊 About This Diagram</summary>\n\n`;
+          body += `This flow diagram shows the user journey and business logic implemented in this PR.\n\n`;
+          body += `**Diagram Elements:**\n`;
+          body += `- **Rectangles** \`[]\`: Process steps or actions\n`;
+          body += `- **Diamonds** \`{}\`: Decision points or conditions\n`;
+          body += `- **Rounded rectangles** \`()\`: Start/end points\n`;
+          body += `- **Solid arrows** \`-->\`: Flow direction\n`;
+          body += `- **Labeled arrows** \`-->|label|\`: Conditional flows\n\n`;
           body += `</details>\n\n`;
         }
       } catch (error) {

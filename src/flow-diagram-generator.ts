@@ -114,6 +114,12 @@ export class FlowDiagramGenerator {
       // Parse the AI response to extract the Mermaid code
       const mermaidCode = this.parseMermaidResponse(response);
 
+      // Validate the Mermaid code
+      if (!this.isValidMermaidCode(mermaidCode)) {
+        logger.warn('Generated Mermaid code failed validation');
+        throw new Error('Invalid Mermaid code generated');
+      }
+
       const diagram: FlowDiagram = {
         title: `PR Flow: ${prPlan.overview.substring(0, 50)}${prPlan.overview.length > 50 ? '...' : ''}`,
         description: `This diagram shows the flow of changes across ${files.length} files in this PR.`,
@@ -155,7 +161,13 @@ Create a Mermaid flowchart that shows the logical flow of what this PR accomplis
 
 Think about the user experience, not the code structure. Show the logical flow from start to finish.
 
-Return only the Mermaid flowchart code, nothing else.`;
+CRITICAL: You must return ONLY valid Mermaid flowchart code that:
+- Starts with "flowchart TD" 
+- Uses proper Mermaid syntax
+- Has connected nodes with arrows (--> )
+- Contains no markdown formatting or explanations
+
+Return only the raw Mermaid code, nothing else.`;
   }
 
   /**
@@ -215,10 +227,10 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
       }
     }
 
-    // If no Mermaid code found, return a simple default
+    // If no Mermaid code found, fail
     if (!mermaidCode || !mermaidCode.includes('flowchart')) {
-      logger.warn('Could not extract valid Mermaid code from AI response');
-      return 'flowchart TD\n    A[Start] --> B[Process] --> C[End]';
+      logger.error('Could not extract valid Mermaid code from AI response');
+      throw new Error('AI did not return valid Mermaid code');
     }
 
     return mermaidCode;
@@ -247,6 +259,64 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
     }
 
     return null;
+  }
+
+  /**
+   * Validate Mermaid code for basic syntax
+   */
+  private isValidMermaidCode(code: string): boolean {
+    if (!code || typeof code !== 'string') {
+      logger.warn('Mermaid validation failed: code is not a string');
+      return false;
+    }
+
+    const trimmed = code.trim();
+
+    // Must start with flowchart
+    if (!trimmed.startsWith('flowchart')) {
+      logger.warn('Mermaid validation failed: does not start with flowchart');
+      return false;
+    }
+
+    // Must have at least one arrow (flow connection)
+    if (!trimmed.includes('-->')) {
+      logger.warn('Mermaid validation failed: no flow arrows found');
+      return false;
+    }
+
+    // Should not contain markdown blocks
+    if (trimmed.includes('```')) {
+      logger.warn('Mermaid validation failed: contains markdown code blocks');
+      return false;
+    }
+
+    // Should not contain explanatory text (multiple paragraphs)
+    const lines = trimmed.split('\n');
+    const nonEmptyLines = lines.filter(line => line.trim().length > 0);
+    if (nonEmptyLines.length < 2) {
+      logger.warn('Mermaid validation failed: too few lines');
+      return false;
+    }
+
+    // Basic check for balanced brackets
+    const openBrackets = (trimmed.match(/\[/g) || []).length;
+    const closeBrackets = (trimmed.match(/\]/g) || []).length;
+    if (openBrackets !== closeBrackets) {
+      logger.warn('Mermaid validation failed: unbalanced brackets');
+      return false;
+    }
+
+    // Should not contain obvious explanation text
+    if (
+      trimmed.toLowerCase().includes('this diagram') ||
+      trimmed.toLowerCase().includes('explanation') ||
+      trimmed.toLowerCase().includes('represents')
+    ) {
+      logger.warn('Mermaid validation failed: contains explanatory text');
+      return false;
+    }
+
+    return true;
   }
 
   /**
