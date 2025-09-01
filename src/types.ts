@@ -76,7 +76,8 @@ export interface CodeIssue {
     | 'security'
     | 'performance'
     | 'best_practice'
-    | 'maintainability';
+    | 'maintainability'
+    | 'documentation';
   message: string;
   description: string;
   suggestion?: string;

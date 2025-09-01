@@ -394,7 +394,11 @@ export class AutoFixManager {
       case 'rule_violation':
         return 'Rule Violations';
       case 'best_practice':
-        return 'Performance';
+        return 'Best Practices';
+      case 'maintainability':
+        return 'Maintainability Improvements';
+      case 'documentation':
+        return 'Documentation & Typo Fixes';
       default:
         return 'Other';
     }

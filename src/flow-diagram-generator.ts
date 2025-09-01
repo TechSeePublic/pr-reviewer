@@ -197,13 +197,19 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
   private parseMermaidResponse(response: unknown): string {
     let mermaidCode = '';
 
+    // Log the AI response for debugging
+    logger.info(`AI Response type: ${typeof response}`);
+
     // Handle array response (from reviewCode)
     if (Array.isArray(response)) {
+      logger.info(`Processing array response with ${response.length} items`);
       for (const item of response) {
         if (item.description || item.message) {
           const text = item.description || item.message;
+          logger.info(`AI returned text (${text.length} chars): ${text.substring(0, 150)}...`);
           const extracted = this.extractMermaidFromText(text);
           if (extracted) {
+            logger.info('✅ Successfully extracted Mermaid code from array item');
             mermaidCode = extracted;
             break;
           }
@@ -212,24 +218,40 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
     }
     // Handle string response
     else if (typeof response === 'string') {
+      logger.info(
+        `AI returned string (${response.length} chars): ${response.substring(0, 150)}...`
+      );
       const extracted = this.extractMermaidFromText(response);
       if (extracted) {
+        logger.info('✅ Successfully extracted Mermaid code from string');
         mermaidCode = extracted;
       }
     }
     // Handle object response
     else if (response && typeof response === 'object') {
+      logger.info('AI returned object response');
       const responseObj = response as Record<string, unknown>;
       if (typeof responseObj.mermaidCode === 'string') {
+        logger.info('✅ Found mermaidCode property in object');
         mermaidCode = responseObj.mermaidCode;
       } else if (typeof responseObj.diagram === 'string') {
+        logger.info('✅ Found diagram property in object');
         mermaidCode = responseObj.diagram;
+      } else {
+        logger.info(`Object keys: ${Object.keys(responseObj).join(', ')}`);
       }
     }
 
-    // If no Mermaid code found, fail
+    // If no Mermaid code found, fail with detailed logging
     if (!mermaidCode || !mermaidCode.includes('flowchart')) {
       logger.error('Could not extract valid Mermaid code from AI response');
+      logger.error(`Final mermaidCode variable: ${mermaidCode}`);
+      logger.error(`Response type was: ${typeof response}`);
+      if (Array.isArray(response)) {
+        logger.error(
+          `Array items structure: ${JSON.stringify(response.map(item => Object.keys(item || {})))}`
+        );
+      }
       throw new Error('AI did not return valid Mermaid code');
     }
 
@@ -243,21 +265,32 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
     // Look for flowchart in the text
     const flowchartMatch = text.match(/flowchart\s+TD\s*\n([\s\S]*?)(?=\n\n|\n```|$)/);
     if (flowchartMatch && flowchartMatch[1]) {
+      logger.info('✅ Extracted flowchart TD pattern');
       return `flowchart TD\n${flowchartMatch[1]}`;
     }
 
     // Look for any flowchart statement
     const anyFlowchartMatch = text.match(/(flowchart\s+[\s\S]*?)(?=\n\n|\n```|$)/);
     if (anyFlowchartMatch && anyFlowchartMatch[1]) {
+      logger.info('✅ Extracted general flowchart pattern');
       return anyFlowchartMatch[1];
     }
 
     // Look for Mermaid code blocks
     const codeBlockMatch = text.match(/```(?:mermaid)?\s*\n(flowchart[\s\S]*?)\n```/);
     if (codeBlockMatch && codeBlockMatch[1]) {
+      logger.info('✅ Extracted from Mermaid code block');
       return codeBlockMatch[1];
     }
 
+    // Try a simpler pattern - just look for flowchart anywhere
+    const simpleFlowchartMatch = text.match(/flowchart[\s\S]*/);
+    if (simpleFlowchartMatch) {
+      logger.info('✅ Extracted using simple flowchart pattern');
+      return simpleFlowchartMatch[0];
+    }
+
+    logger.warn(`❌ No Mermaid patterns found in text: ${text.substring(0, 100)}...`);
     return null;
   }
 

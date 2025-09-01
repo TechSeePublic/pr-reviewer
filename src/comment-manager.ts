@@ -411,6 +411,7 @@ export class CommentManager {
         'rule_violation',
         'best_practice',
         'maintainability',
+        'documentation',
       ];
       for (const category of categoryOrder) {
         if (issuesByCategory[category]) {
@@ -641,6 +642,8 @@ export class CommentManager {
         return '💡';
       case 'maintainability':
         return '🔧';
+      case 'documentation':
+        return '📝';
       default:
         return '🔍';
     }
@@ -663,6 +666,8 @@ export class CommentManager {
         return 'Best Practices';
       case 'maintainability':
         return 'Maintainability';
+      case 'documentation':
+        return 'Documentation & Typos';
       default:
         return 'Other';
     }
