@@ -228,6 +228,13 @@ SHOW INSTEAD:
 - System responses and outcomes
 - Data flow and processing steps
 
+SYNTAX REQUIREMENTS:
+- Keep node labels simple and short (under 30 characters)
+- Do NOT use quotes (") inside node labels
+- Use simple words like "success", "error", "result" instead of quoted messages
+- Keep the diagram focused (maximum 8-10 nodes)
+- Use clear, simple language
+
 EXAMPLE - For a login feature:
 flowchart TD
     A[User opens application] --> B[User clicks login]
@@ -431,6 +438,23 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
       trimmed.toLowerCase().includes('represents')
     ) {
       logger.warn('Mermaid validation failed: contains explanatory text');
+      return false;
+    }
+
+    // Check for problematic quotes in node labels
+    const nodeWithQuotes = trimmed.match(/\[[^\]]*"[^\]]*\]/);
+    if (nodeWithQuotes) {
+      logger.warn('Mermaid validation failed: node labels contain quotes which break syntax');
+      return false;
+    }
+
+    // Check for very long lines that might cause rendering issues
+    const codeLines = trimmed.split('\n');
+    const longLines = codeLines.filter(line => line.trim().length > 100);
+    if (longLines.length > 0) {
+      logger.warn(
+        'Mermaid validation failed: contains very long lines that may cause rendering issues'
+      );
       return false;
     }
 
