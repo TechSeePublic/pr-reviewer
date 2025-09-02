@@ -347,7 +347,7 @@ export class CommentManager {
     fileChanges: FileChange[],
     prPlan?: PRPlan
   ): Promise<string> {
-    const { issues, filesReviewed, totalFiles, rulesApplied, summary, status } = reviewResult;
+    const { issues, filesReviewed, totalFiles, rulesApplied, status } = reviewResult;
 
     let body = `## 🤖 TechSee AI PR Review Summary\n\n`;
 
@@ -404,61 +404,13 @@ export class CommentManager {
       }
     }
 
-    // Issues breakdown by category and type
+    // Issues found
     if (issues.length > 0) {
       const issuesByCategory = this.groupIssuesByCategory(issues);
-      const issuesByType = this.groupIssuesByType(issues);
 
-      body += `### 🎯 **Issues Breakdown**\n\n`;
-
-      // By category
-      body += `**By Category:**\n`;
-      const categoryOrder = [
-        'bug',
-        'security',
-        'documentation',
-        'performance',
-        'rule_violation',
-        'best_practice',
-        'maintainability',
-      ];
-      for (const category of categoryOrder) {
-        if (issuesByCategory[category]) {
-          const categoryIcon = this.getCategoryIcon(category);
-          body += `- ${categoryIcon} **${this.formatCategoryName(category)}:** ${issuesByCategory[category].length}\n`;
-        }
-      }
-
-      body += `\n**By Severity:**\n`;
-      const typeOrder = ['error', 'warning', 'info', 'suggestion'];
-      for (const type of typeOrder) {
-        if (issuesByType[type]) {
-          const icon = this.getIssueIcon(type);
-          body += `- ${icon} **${type.toUpperCase()}:** ${issuesByType[type].length}\n`;
-        }
-      }
-      body += '\n';
-
-      // Critical issues first
-      const criticalIssues = issues.filter(
-        issue => issue.type === 'error' || issue.severity === 'high'
-      );
-      if (criticalIssues.length > 0) {
-        body += `### 🚨 **Critical Issues Requiring Immediate Attention**\n`;
-        for (const issue of criticalIssues.slice(0, 5)) {
-          const categoryIcon = this.getCategoryIcon(issue.category);
-          body += `- ${categoryIcon} **${issue.file}:${issue.line || '?'}** - ${issue.message}\n`;
-        }
-        if (criticalIssues.length > 5) {
-          body += `- ... and ${criticalIssues.length - 5} more critical issues\n`;
-        }
-        body += '\n';
-      }
-
-      // Detailed format for detailed summary
+      // Show all issues directly
       if (this.inputs.summaryFormat === 'detailed' && issues.length <= 15) {
-        body += `### 📋 **All Issues**\n`;
-        body += `<details>\n<summary>Click to expand full issue list</summary>\n\n`;
+        body += `### 📋 **All Issues**\n\n`;
 
         for (const [category, categoryIssues] of Object.entries(issuesByCategory)) {
           if (categoryIssues.length > 0) {
@@ -471,7 +423,6 @@ export class CommentManager {
             body += '\n';
           }
         }
-        body += `</details>\n\n`;
       } else if (issues.length > 15) {
         body += `### 📋 **Issue Summary**\n`;
         body += `*Too many issues to display individually. Please check inline comments for details.*\n\n`;
@@ -492,57 +443,6 @@ export class CommentManager {
         body += '\n';
       }
       body += '\n</details>\n\n';
-    }
-
-    // AI-generated summary
-    if (summary && summary.trim().length > 0) {
-      body += `### 🎯 **AI Assessment**\n`;
-      body += `> ${summary}\n\n`;
-    } else {
-      // Provide a fallback summary based on the issues found
-      body += `### 🎯 **AI Assessment**\n`;
-      if (issues.length === 0) {
-        body += `> ✅ **Excellent work!** No issues detected in this PR. The code follows best practices and appears ready for deployment.\n\n`;
-      } else {
-        const criticalCount = issues.filter(
-          i => i.type === 'error' || i.severity === 'high'
-        ).length;
-        const warningCount = issues.filter(i => i.type === 'warning').length;
-
-        if (criticalCount > 0) {
-          body += `> ⚠️ **Review Required** - Found ${criticalCount} critical issue${criticalCount > 1 ? 's' : ''} that need${criticalCount === 1 ? 's' : ''} attention before merging.\n\n`;
-        } else if (warningCount > 0) {
-          body += `> 💡 **Minor Issues Found** - ${warningCount} warning${warningCount > 1 ? 's' : ''} detected. Consider addressing these for improved code quality.\n\n`;
-        } else {
-          body += `> ℹ️ **Info Available** - Found ${issues.length} informational suggestion${issues.length > 1 ? 's' : ''} for code improvement.\n\n`;
-        }
-      }
-    }
-
-    // Next steps
-    if (issues.length > 0) {
-      body += `### 🛠️ **Recommended Actions**\n`;
-
-      const hasCritical = issues.some(i => i.type === 'error' || i.severity === 'high');
-      const hasSecurityIssues = issues.some(i => i.category === 'security');
-      const hasBugs = issues.some(i => i.category === 'bug');
-
-      if (hasCritical) {
-        body += `1. **🚨 Address critical issues immediately** - These may prevent successful deployment\n`;
-      }
-      if (hasSecurityIssues) {
-        body += `2. **🔒 Fix security vulnerabilities** - These pose risks to your application\n`;
-      }
-      if (hasBugs) {
-        body += `3. **🐛 Resolve bugs** - These may cause unexpected behavior\n`;
-      }
-
-      body += `${hasCritical || hasSecurityIssues || hasBugs ? '' : '1. '}Review inline comments for detailed suggestions\n`;
-      body += `${hasCritical || hasSecurityIssues || hasBugs ? '' : '2. '}Apply recommended fixes where appropriate\n`;
-      body += `${hasCritical || hasSecurityIssues || hasBugs ? '' : '3. '}Push changes to trigger a new review\n\n`;
-    } else {
-      body += `### ✅ **Excellent Work!**\n`;
-      body += `🎉 No issues found! Your code follows all established patterns and best practices.\n\n`;
     }
 
     body += `---\n*Generated by [TechSee AI PR Reviewer](https://github.com/amit.wagner/pr-reviewer) • [Report Issues](https://github.com/amit.wagner/pr-reviewer/issues)*`;

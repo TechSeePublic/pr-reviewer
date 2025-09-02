@@ -471,7 +471,64 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
       return false;
     }
 
+    // Check for minimum number of steps (nodes) - must have at least 3 steps
+    const nodeCount = this.countMermaidNodes(trimmed);
+    if (nodeCount < 3) {
+      logger.warn(
+        `Mermaid validation failed: diagram has only ${nodeCount} steps, minimum 3 required`
+      );
+      return false;
+    }
+
     return true;
+  }
+
+  /**
+   * Count the number of nodes/steps in a Mermaid flowchart
+   */
+  private countMermaidNodes(mermaidCode: string): number {
+    const lines = mermaidCode.split('\n');
+    const uniqueNodes = new Set<string>();
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+
+      // Skip flowchart declaration line and empty lines
+      if (!trimmedLine || trimmedLine.startsWith('flowchart')) {
+        continue;
+      }
+
+      // Extract all node IDs from the line using comprehensive regex patterns
+      // This will match node IDs in various contexts:
+      // - Standalone node definitions: A[Label], B{Label}, C(Label)
+      // - Arrow connections: A --> B, A -->|label| B, A --> B[Label]
+      // - Multiple connections on same line
+
+      // Pattern to match node IDs (typically single letters A-Z, but could be multi-char)
+      const nodeMatches = trimmedLine.match(/\b([A-Z]+)(?=\s*(?:-->|\[|\{|\(|$)|\s*-->)/g);
+
+      if (nodeMatches) {
+        for (const nodeId of nodeMatches) {
+          uniqueNodes.add(nodeId.trim());
+        }
+      }
+
+      // Also extract destination nodes from arrows with inline labels
+      const arrowDestMatches = trimmedLine.match(/-->\s*(?:\|[^|]*\|\s*)?([A-Z]+)/g);
+      if (arrowDestMatches) {
+        for (const match of arrowDestMatches) {
+          const destMatch = match.match(/-->\s*(?:\|[^|]*\|\s*)?([A-Z]+)/);
+          if (destMatch && destMatch[1]) {
+            uniqueNodes.add(destMatch[1]);
+          }
+        }
+      }
+    }
+
+    logger.info(
+      `Counted ${uniqueNodes.size} unique nodes in Mermaid diagram: ${Array.from(uniqueNodes).join(', ')}`
+    );
+    return uniqueNodes.size;
   }
 
   /**
