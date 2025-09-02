@@ -87,7 +87,7 @@ export class CommentManager {
       `Comment posting config: commentStyle=${this.inputs.commentStyle}, shouldPostSummary=${shouldPostSummary}, shouldPostInline=${shouldPostInline}`
     );
     logger.info(
-      `Review result: ${reviewResult.issues.length} total issues, logLevel=${this.inputs.logLevel}`
+      `Review result: ${reviewResult.issues.length} total issues found (logLevel=${this.inputs.logLevel}, inlineSeverity=${this.inputs.inlineSeverity})`
     );
 
     // Get existing comments if we should update them
@@ -101,6 +101,24 @@ export class CommentManager {
 
     // Filter issues based on inline severity for inline comments
     const filteredIssuesForInline = this.filterIssuesBySeverity(reviewResult.issues);
+
+    // Log issue types for debugging
+    const issueTypes = reviewResult.issues.reduce(
+      (acc, issue) => {
+        acc[issue.type] = (acc[issue.type] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    logger.info(
+      `Issue types found: ${Object.entries(issueTypes)
+        .map(([type, count]) => `${type}:${count}`)
+        .join(', ')}`
+    );
+    logger.info(
+      `Issue filtering: ${reviewResult.issues.length} total → ${filteredIssuesForInline.length} eligible for inline comments (severity: ${this.inputs.inlineSeverity}+)`
+    );
 
     // Post inline comments (based on inline_severity setting)
     if (shouldPostInline) {
