@@ -513,6 +513,20 @@ ${JSON.stringify(
               const typeIcon = this.getIssueIcon(issue.type);
               const fileURL = this.generateGitHubFileURL(issue.file, issue.line);
               body += `- ${typeIcon} **[${issue.file}:${issue.line || '?'}](${fileURL})** - ${issue.message}\n`;
+
+              // Add description if it's different from message and provides additional context
+              if (
+                issue.description &&
+                issue.description !== issue.message &&
+                issue.description.length > 0
+              ) {
+                body += `  - *${issue.description}*\n`;
+              }
+
+              // Add suggestion if available
+              if (issue.suggestion && issue.suggestion.length > 0) {
+                body += `  - 💡 **Suggestion:** ${issue.suggestion}\n`;
+              }
             }
             body += '\n';
           }
