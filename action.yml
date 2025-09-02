@@ -134,6 +134,11 @@ inputs:
     description: 'Delay in milliseconds between GitHub API calls to avoid rate limits (default: 1000)'
     required: false
     default: '1000'
+    
+  deterministic_mode:
+    description: 'Force deterministic behavior for consistent results (temperature=0, stable parsing)'
+    required: false
+    default: 'true'
 
 outputs:
   review_summary:

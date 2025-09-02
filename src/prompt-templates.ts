@@ -69,11 +69,12 @@ You are a professional code reviewer.
 - Explain the potential impact of identified issues
 - Skip minor style or preference issues
 
-### 📍 Line Number Guidelines
-- Use absolute line numbers from the complete file content provided
-- The "line" field should reference the EXACT line number where the issue occurs in the full file
-- If an issue spans multiple lines, use the primary line where the issue starts
-- For file-level issues (imports, exports, etc.), use line 1
+### 📍 Line Number Guidelines - CRITICAL FOR ACCURACY
+- **MANDATORY**: Use the exact line numbers shown in the numbered file content below
+- The line numbers are displayed as "123| code content" - use the number before the "|"
+- **NEVER estimate or count lines manually** - always reference the provided line numbers
+- If an issue spans multiple lines, use the line number where the issue starts
+- Double-check your line number against the provided numbered content before submitting
 
 ### 📝 Response Format
 ${jsonInstructions}
@@ -125,7 +126,7 @@ Your response MUST be a valid JSON object with this exact structure:
       "ruleId": "cursor_rule_id or 'general_review'",
       "ruleName": "Human-readable rule name or issue category",
       "file": "EXACT filename from context - NEVER use 'unknown' or 'Multiple Files'",
-      "line": "EXACT line number from the complete file content where issue occurs",
+      "line": "EXACT line number from the numbered file content (e.g., if you see '138| const x = 1;', use 138)",
       "severity": "high|medium|low"
     }
   ],
@@ -477,7 +478,7 @@ Keep it professional and concise. Only report actual problems.`;
   /**
    * Builds enhanced review context with better formatting
    */
-  static buildReviewContext(fileChange: FileChange, _fileContent: string): string {
+  static buildReviewContext(fileChange: FileChange, fileContent: string): string {
     let context = `## CODE REVIEW REQUEST
 
 ### File Information
@@ -540,9 +541,95 @@ ${this.getLanguageSpecificGuidelines(fileChange.filename)}
 
 **CONTEXT**: The complete file content below provides context to understand the changes, but focus your review only on the modified areas shown in the diff above.
 
+### Complete File Content (with line numbers)
+**CRITICAL**: When reporting issues, use the EXACT line numbers shown below.
+
+\`\`\`${this.getLanguageFromFilename(fileChange.filename)}
+${this.addLineNumbers(fileContent)}
+\`\`\`
+
 `;
 
     return context;
+  }
+
+  /**
+   * Add line numbers to file content for precise AI line reporting
+   */
+  private static addLineNumbers(content: string): string {
+    const lines = content.split('\n');
+    return lines
+      .map((line, index) => {
+        const lineNumber = (index + 1).toString().padStart(3, ' ');
+        return `${lineNumber}| ${line}`;
+      })
+      .join('\n');
+  }
+
+  /**
+   * Get language identifier from filename for syntax highlighting
+   */
+  private static getLanguageFromFilename(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'ts':
+        return 'typescript';
+      case 'tsx':
+        return 'typescript';
+      case 'js':
+        return 'javascript';
+      case 'jsx':
+        return 'javascript';
+      case 'py':
+        return 'python';
+      case 'java':
+        return 'java';
+      case 'go':
+        return 'go';
+      case 'rs':
+        return 'rust';
+      case 'cpp':
+      case 'cc':
+      case 'cxx':
+        return 'cpp';
+      case 'c':
+        return 'c';
+      case 'cs':
+        return 'csharp';
+      case 'php':
+        return 'php';
+      case 'rb':
+        return 'ruby';
+      case 'swift':
+        return 'swift';
+      case 'kt':
+        return 'kotlin';
+      case 'vue':
+        return 'vue';
+      case 'svelte':
+        return 'svelte';
+      case 'html':
+        return 'html';
+      case 'css':
+        return 'css';
+      case 'scss':
+      case 'sass':
+        return 'scss';
+      case 'json':
+        return 'json';
+      case 'yaml':
+      case 'yml':
+        return 'yaml';
+      case 'xml':
+        return 'xml';
+      case 'sql':
+        return 'sql';
+      case 'sh':
+      case 'bash':
+        return 'bash';
+      default:
+        return 'text';
+    }
   }
 
   /**

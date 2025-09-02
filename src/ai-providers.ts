@@ -22,10 +22,12 @@ export class OpenAIProvider implements AIProvider {
   public readonly name = 'openai';
   public readonly model: string;
   private client: OpenAI;
+  private deterministicMode: boolean;
 
-  constructor(apiKey: string, model?: string) {
+  constructor(apiKey: string, model?: string, deterministicMode: boolean = true) {
     this.client = new OpenAI({ apiKey });
     this.model = model || DEFAULT_MODELS.openai;
+    this.deterministicMode = deterministicMode;
   }
 
   private supportsJsonMode(): boolean {
@@ -66,7 +68,7 @@ export class OpenAIProvider implements AIProvider {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.1,
+        temperature: this.deterministicMode ? 0.0 : 0.1,
         max_tokens: 8000,
       };
 
@@ -119,7 +121,7 @@ export class OpenAIProvider implements AIProvider {
           },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.1,
+        temperature: this.deterministicMode ? 0.0 : 0.1,
         max_tokens: 4000,
         ...(this.supportsJsonMode() && { response_format: { type: 'json_object' } }),
       });
@@ -155,7 +157,7 @@ export class OpenAIProvider implements AIProvider {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.1,
+        temperature: this.deterministicMode ? 0.0 : 0.1,
         max_tokens: 12000,
       };
 
@@ -194,7 +196,7 @@ export class OpenAIProvider implements AIProvider {
           },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.2,
+        temperature: this.deterministicMode ? 0.0 : 0.1,
         max_tokens: 3000,
       });
 
@@ -239,6 +241,13 @@ export class OpenAIProvider implements AIProvider {
     } catch (error) {
       logger.warn('Failed to parse AI response as JSON:', error);
       logger.warn('Response content:', response.substring(0, 500) + '...');
+
+      // In deterministic mode, return empty array instead of fallback parsing
+      if (this.deterministicMode) {
+        logger.warn('Deterministic mode: returning empty array instead of fallback parsing');
+        return [];
+      }
+
       // Try to extract issues from malformed JSON
       return this.extractIssuesFromText(response);
     }
@@ -415,10 +424,12 @@ export class AnthropicProvider implements AIProvider {
   public readonly name = 'anthropic';
   public readonly model: string;
   private client: Anthropic;
+  private deterministicMode: boolean;
 
-  constructor(apiKey: string, model?: string) {
+  constructor(apiKey: string, model?: string, deterministicMode: boolean = true) {
     this.client = new Anthropic({ apiKey });
     this.model = model || DEFAULT_MODELS.anthropic;
+    this.deterministicMode = deterministicMode;
   }
 
   async reviewCode(prompt: string, code: string, rules: CursorRule[]): Promise<CodeIssue[]> {
@@ -432,7 +443,7 @@ export class AnthropicProvider implements AIProvider {
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: 8000,
-        temperature: 0.1,
+        temperature: this.deterministicMode ? 0.0 : 0.1,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       });
@@ -472,7 +483,7 @@ export class AnthropicProvider implements AIProvider {
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: 4000,
-        temperature: 0.1,
+        temperature: this.deterministicMode ? 0.0 : 0.1,
         system:
           'You are an expert code reviewer who analyzes pull requests to create comprehensive review plans. Focus on understanding the overall changes and their implications.',
         messages: [{ role: 'user', content: prompt }],
@@ -505,7 +516,7 @@ export class AnthropicProvider implements AIProvider {
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: 12000,
-        temperature: 0.1,
+        temperature: this.deterministicMode ? 0.0 : 0.1,
         system: systemPrompt,
         messages: [{ role: 'user', content: prompt }],
       });
@@ -532,7 +543,7 @@ export class AnthropicProvider implements AIProvider {
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: 3000,
-        temperature: 0.2,
+        temperature: this.deterministicMode ? 0.0 : 0.1,
         system:
           'You are a helpful code review assistant that creates concise, actionable PR review summaries.',
         messages: [{ role: 'user', content: prompt }],
@@ -580,6 +591,13 @@ export class AnthropicProvider implements AIProvider {
     } catch (error) {
       logger.warn('Failed to parse AI response as JSON:', error);
       logger.warn('Response content:', response.substring(0, 500) + '...');
+
+      // In deterministic mode, return empty array instead of fallback parsing
+      if (this.deterministicMode) {
+        logger.warn('Deterministic mode: returning empty array instead of fallback parsing');
+        return [];
+      }
+
       // Try to extract issues from malformed JSON
       return this.extractIssuesFromText(response);
     }
@@ -746,15 +764,18 @@ export class AzureOpenAIProvider implements AIProvider {
   public readonly model: string;
   private readonly realModel?: string;
   private client: OpenAI;
+  private deterministicMode: boolean;
 
   constructor(
     apiKey: string,
     endpoint: string,
     apiVersion: string,
     model?: string,
-    realModel?: string
+    realModel?: string,
+    deterministicMode: boolean = true
   ) {
     this.model = model || DEFAULT_MODELS.azure;
+    this.deterministicMode = deterministicMode;
     if (realModel) {
       this.realModel = realModel;
     }
@@ -1007,6 +1028,13 @@ export class AzureOpenAIProvider implements AIProvider {
     } catch (error) {
       logger.warn('Failed to parse AI response as JSON:', error);
       logger.warn('Response content:', response.substring(0, 500) + '...');
+
+      // In deterministic mode, return empty array instead of fallback parsing
+      if (this.deterministicMode) {
+        logger.warn('Deterministic mode: returning empty array instead of fallback parsing');
+        return [];
+      }
+
       // Try to extract issues from malformed JSON
       return this.extractIssuesFromText(response);
     }
@@ -1172,20 +1200,22 @@ export class AIProviderFactory {
   static create(inputs: ActionInputs): AIProvider {
     const { provider, model } = this.resolveProviderAndModel(inputs);
 
-    logger.info(`Using AI provider: ${provider}, model: ${model}`);
+    logger.info(
+      `Using AI provider: ${provider}, model: ${model}, deterministic: ${inputs.deterministicMode}`
+    );
 
     if (provider === 'openai') {
       if (!inputs.openaiApiKey) {
         throw new Error('OpenAI API key is required');
       }
-      return new OpenAIProvider(inputs.openaiApiKey, model);
+      return new OpenAIProvider(inputs.openaiApiKey, model, inputs.deterministicMode);
     }
 
     if (provider === 'anthropic') {
       if (!inputs.anthropicApiKey) {
         throw new Error('Anthropic API key is required');
       }
-      return new AnthropicProvider(inputs.anthropicApiKey, model);
+      return new AnthropicProvider(inputs.anthropicApiKey, model, inputs.deterministicMode);
     }
 
     if (provider === 'azure') {
@@ -1197,7 +1227,8 @@ export class AIProviderFactory {
         inputs.azureOpenaiEndpoint,
         inputs.azureOpenaiApiVersion || '2024-10-21',
         model,
-        inputs.azureOpenaiRealModel
+        inputs.azureOpenaiRealModel,
+        inputs.deterministicMode
       );
     }
 

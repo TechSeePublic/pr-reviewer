@@ -31,6 +31,7 @@ export interface ActionInputs {
   requestDelay: number; // Delay in milliseconds between AI provider requests
   batchSize: number; // Number of files to process in each batch (default: 50)
   githubRateLimit: number; // Delay in milliseconds between GitHub API calls (default: 1000ms)
+  deterministicMode: boolean; // Force deterministic behavior (temperature=0, stable parsing)
 }
 
 export interface PRContext {

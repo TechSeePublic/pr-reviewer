@@ -58,6 +58,7 @@ export function getActionInputs(): ActionInputs {
     requestDelay: parseInt(core.getInput('request_delay') || '2000', 10),
     batchSize: parseInt(core.getInput('batch_size') || '50', 10),
     githubRateLimit: parseInt(core.getInput('github_rate_limit') || '1000', 10),
+    deterministicMode: core.getBooleanInput('deterministic_mode') ?? true,
   };
 
   // Add optional properties only if they have values
