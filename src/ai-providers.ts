@@ -299,6 +299,17 @@ export class OpenAIProvider implements AIProvider {
       };
     }
   }
+
+  public requiresMaxCompletionTokens(): boolean {
+    // Models that require max_completion_tokens instead of max_tokens
+    const reasoningModels = ['o1', 'o1-preview', 'o1-mini', 'o3', 'o3-mini', 'o4-mini'];
+    return reasoningModels.some(reasoningModel => this.model.startsWith(reasoningModel));
+  }
+
+  public supportsTemperature(): boolean {
+    // Reasoning models don't support temperature parameter
+    return !this.requiresMaxCompletionTokens();
+  }
 }
 
 export class AnthropicProvider implements AIProvider {
@@ -588,7 +599,7 @@ export class AzureOpenAIProvider implements AIProvider {
     return supportedModels.some(supportedModel => modelToCheck.startsWith(supportedModel));
   }
 
-  private requiresMaxCompletionTokens(): boolean {
+  public requiresMaxCompletionTokens(): boolean {
     // Models that require max_completion_tokens instead of max_tokens
     const reasoningModels = ['o1', 'o1-preview', 'o1-mini', 'o3', 'o3-mini', 'o4-mini'];
 
@@ -597,7 +608,7 @@ export class AzureOpenAIProvider implements AIProvider {
     return reasoningModels.some(reasoningModel => modelToCheck.startsWith(reasoningModel));
   }
 
-  private supportsTemperature(): boolean {
+  public supportsTemperature(): boolean {
     // Reasoning models don't support temperature parameter
     return !this.requiresMaxCompletionTokens();
   }

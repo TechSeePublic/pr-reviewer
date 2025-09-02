@@ -149,9 +149,20 @@ export class FlowDiagramGenerator {
       const openaiProvider = this.aiProvider as any;
 
       try {
-        // Check if this is an Azure OpenAI provider that requires max_completion_tokens
-        const requiresMaxCompletionTokens = openaiProvider.requiresMaxCompletionTokens?.() || false;
-        const supportsTemperature = openaiProvider.supportsTemperature?.() !== false; // Default to true for non-Azure providers
+        // Check if this is an Azure/OpenAI provider that has the new methods
+        const requiresMaxCompletionTokens =
+          typeof openaiProvider.requiresMaxCompletionTokens === 'function'
+            ? openaiProvider.requiresMaxCompletionTokens()
+            : false;
+        const supportsTemperature =
+          typeof openaiProvider.supportsTemperature === 'function'
+            ? openaiProvider.supportsTemperature()
+            : true; // Default to true for backward compatibility
+
+        logger.info(
+          `Flow diagram generation: model=${openaiProvider.model}, requiresMaxCompletionTokens=${requiresMaxCompletionTokens}, supportsTemperature=${supportsTemperature}`
+        );
+
         const response = await openaiProvider.client.chat.completions.create({
           model: openaiProvider.model,
           messages: [
@@ -178,17 +189,37 @@ export class FlowDiagramGenerator {
         return result;
       } catch (error) {
         logger.error('Direct OpenAI call failed:', error);
+
+        // Provide more detailed error information
+        if (error && typeof error === 'object') {
+          const errorObj = error as any;
+          if (errorObj.status) {
+            logger.error(`API Error Status: ${errorObj.status}`);
+          }
+          if (errorObj.message) {
+            logger.error(`API Error Message: ${errorObj.message}`);
+          }
+          if (errorObj.code) {
+            logger.error(`API Error Code: ${errorObj.code}`);
+          }
+        }
+
         throw error;
       }
     } else {
       // Fallback to reviewCode method but warn about it
       logger.warn('Unable to make direct AI call, falling back to reviewCode method');
-      const response = await this.aiProvider.reviewCode(prompt, context, []);
+      try {
+        const response = await this.aiProvider.reviewCode(prompt, context, []);
 
-      // For non-OpenAI providers, we still need to use the array response
-      // Mark this as an array response so the parser knows how to handle it
-      (response as any).__isArrayResponse = true;
-      return response as any;
+        // For non-OpenAI providers, we still need to use the array response
+        // Mark this as an array response so the parser knows how to handle it
+        (response as any).__isArrayResponse = true;
+        return response as any;
+      } catch (error) {
+        logger.error('Fallback reviewCode method also failed:', error);
+        throw error;
+      }
     }
   }
 
