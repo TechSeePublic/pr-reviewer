@@ -88,6 +88,11 @@ export function getActionInputs(): ActionInputs {
     inputs.azureOpenaiApiVersion = azureOpenaiApiVersion;
   }
 
+  const azureOpenaiRealModel = core.getInput('azure_openai_real_model');
+  if (azureOpenaiRealModel) {
+    inputs.azureOpenaiRealModel = azureOpenaiRealModel;
+  }
+
   const rulesPath = core.getInput('rules_path');
   if (rulesPath) {
     inputs.rulesPath = rulesPath;

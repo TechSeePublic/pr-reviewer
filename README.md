@@ -129,6 +129,7 @@ The bot automatically detects and applies Cursor rules from:
 | `azure_openai_api_key` | Azure OpenAI API key | - | ⚠️ |
 | `azure_openai_endpoint` | Azure OpenAI endpoint URL | - | ⚠️ |
 | `azure_openai_api_version` | Azure OpenAI API version | `2024-10-21` | ❌ |
+| `azure_openai_real_model` | Real model name for custom Azure deployments | - | ❌ |
 | `ai_provider` | AI provider (`openai`, `anthropic`, `azure`, `auto`) | `auto` | ❌ |
 | `model` | AI model to use | `auto` | ❌ |
 | `review_level` | Review intensity (`light`, `standard`, `thorough`) | `standard` | ❌ |
@@ -158,7 +159,20 @@ For Azure OpenAI, you'll need:
    - `2025-04-01-preview` (latest) - Includes o3, o4-mini, GPT-image-1 support
 4. **Model Deployment**: Ensure your chosen model is deployed in your Azure OpenAI resource
 
-**Note**: Azure OpenAI uses deployment names that may differ from OpenAI model names. For example, `gpt-3.5-turbo` becomes `gpt-35-turbo` in Azure.
+#### Custom Deployment Names
+
+Azure OpenAI allows custom deployment names that may differ from the actual model names. When using custom deployment names, you should specify the real model name for proper parameter detection:
+
+```yaml
+azure_openai_real_model: 'o1-preview'  # Real model name
+model: 'my-reasoning-model-prod'        # Custom deployment name
+```
+
+**Why this is needed**: Different Azure OpenAI models require different API parameters:
+- **Standard models** (gpt-4, gpt-35-turbo): Use `max_tokens` parameter
+- **Reasoning models** (o1, o3, o4-mini): Use `max_completion_tokens` parameter
+
+**Note**: If you use standard deployment names that match the model (e.g., `gpt-4o`, `o1-preview`), the `azure_openai_real_model` parameter is not needed.
 
 ## 🤖 Supported AI Models
 
@@ -335,6 +349,15 @@ Great work on the new feature! Just a few TypeScript type annotations needed to 
     azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
     azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
     azure_openai_api_version: '2024-10-21'
+
+# Azure OpenAI with custom deployment names
+- uses: amit.wagner/pr-reviewer@v1
+  with:
+    ai_provider: 'azure'
+    model: 'my-reasoning-model-prod'      # Custom deployment name
+    azure_openai_real_model: 'o1-preview' # Actual model for proper parameter detection
+    azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+    azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
 ```
 
 ### Smart Model Selection

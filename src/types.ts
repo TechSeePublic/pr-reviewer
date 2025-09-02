@@ -11,6 +11,7 @@ export interface ActionInputs {
   azureOpenaiApiKey?: string;
   azureOpenaiEndpoint?: string;
   azureOpenaiApiVersion?: string;
+  azureOpenaiRealModel?: string;
   aiProvider: 'openai' | 'anthropic' | 'gemini' | 'azure' | 'auto';
   model: string;
   reviewLevel: 'light' | 'standard' | 'thorough';
