@@ -67,7 +67,7 @@ export class OpenAIProvider implements AIProvider {
           { role: 'user', content: userPrompt },
         ],
         temperature: 0.1,
-        max_tokens: 4000,
+        max_tokens: 8000,
       };
 
       // Only add response_format if the model supports it
@@ -120,7 +120,7 @@ export class OpenAIProvider implements AIProvider {
           { role: 'user', content: prompt },
         ],
         temperature: 0.1,
-        max_tokens: 2000,
+        max_tokens: 4000,
         ...(this.supportsJsonMode() && { response_format: { type: 'json_object' } }),
       });
 
@@ -156,7 +156,7 @@ export class OpenAIProvider implements AIProvider {
           { role: 'user', content: prompt },
         ],
         temperature: 0.1,
-        max_tokens: 6000,
+        max_tokens: 12000,
       };
 
       if (this.supportsJsonMode()) {
@@ -192,7 +192,7 @@ export class OpenAIProvider implements AIProvider {
           { role: 'user', content: prompt },
         ],
         temperature: 0.2,
-        max_tokens: 1500,
+        max_tokens: 3000,
       });
 
       return response.choices[0]?.message?.content || 'Summary generation failed';
@@ -332,7 +332,7 @@ export class AnthropicProvider implements AIProvider {
 
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 4000,
+        max_tokens: 8000,
         temperature: 0.1,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
@@ -372,7 +372,7 @@ export class AnthropicProvider implements AIProvider {
 
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 2000,
+        max_tokens: 4000,
         temperature: 0.1,
         system:
           'You are an expert code reviewer who analyzes pull requests to create comprehensive review plans. Focus on understanding the overall changes and their implications.',
@@ -405,7 +405,7 @@ export class AnthropicProvider implements AIProvider {
 
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 6000,
+        max_tokens: 12000,
         temperature: 0.1,
         system: systemPrompt,
         messages: [{ role: 'user', content: prompt }],
@@ -429,7 +429,7 @@ export class AnthropicProvider implements AIProvider {
 
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 1500,
+        max_tokens: 3000,
         temperature: 0.2,
         system:
           'You are a helpful code review assistant that creates concise, actionable PR review summaries.',
@@ -630,8 +630,8 @@ export class AzureOpenAIProvider implements AIProvider {
         ],
         ...(this.supportsTemperature() && { temperature: 0.1 }),
         ...(this.requiresMaxCompletionTokens()
-          ? { max_completion_tokens: 4000 }
-          : { max_tokens: 4000 }),
+          ? { max_completion_tokens: 8000 }
+          : { max_tokens: 8000 }),
       };
 
       // Only add response_format if the model supports it
@@ -685,8 +685,8 @@ export class AzureOpenAIProvider implements AIProvider {
         ],
         ...(this.supportsTemperature() && { temperature: 0.1 }),
         ...(this.requiresMaxCompletionTokens()
-          ? { max_completion_tokens: 2000 }
-          : { max_tokens: 2000 }),
+          ? { max_completion_tokens: 4000 }
+          : { max_tokens: 4000 }),
         ...(this.supportsJsonMode() && { response_format: { type: 'json_object' } }),
       });
 
@@ -723,8 +723,8 @@ export class AzureOpenAIProvider implements AIProvider {
         ],
         ...(this.supportsTemperature() && { temperature: 0.1 }),
         ...(this.requiresMaxCompletionTokens()
-          ? { max_completion_tokens: 6000 }
-          : { max_tokens: 6000 }),
+          ? { max_completion_tokens: 12000 }
+          : { max_tokens: 12000 }),
       };
 
       if (this.supportsJsonMode()) {
@@ -761,8 +761,8 @@ export class AzureOpenAIProvider implements AIProvider {
         ],
         ...(this.supportsTemperature() && { temperature: 0.2 }),
         ...(this.requiresMaxCompletionTokens()
-          ? { max_completion_tokens: 1500 }
-          : { max_tokens: 1500 }),
+          ? { max_completion_tokens: 3000 }
+          : { max_tokens: 3000 }),
       });
 
       return response.choices[0]?.message?.content || 'Summary generation failed';

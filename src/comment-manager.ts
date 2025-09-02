@@ -553,6 +553,16 @@ export class CommentManager {
         return '🔧';
       case 'documentation':
         return '📝';
+      case 'architecture':
+        return '🏗️';
+      case 'i18n':
+        return '🌍';
+      case 'api_design':
+        return '🔌';
+      case 'data_flow':
+        return '🌊';
+      case 'business_logic':
+        return '💼';
       default:
         return '🔍';
     }
@@ -577,6 +587,16 @@ export class CommentManager {
         return 'Maintainability';
       case 'documentation':
         return 'Documentation & Typos (Critical)';
+      case 'architecture':
+        return 'Architecture & Design';
+      case 'i18n':
+        return 'Internationalization';
+      case 'api_design':
+        return 'API Design';
+      case 'data_flow':
+        return 'Data Flow & State';
+      case 'business_logic':
+        return 'Business Logic';
       default:
         return 'Other';
     }

@@ -78,7 +78,12 @@ export interface CodeIssue {
     | 'performance'
     | 'best_practice'
     | 'maintainability'
-    | 'documentation';
+    | 'documentation'
+    | 'architecture'
+    | 'i18n'
+    | 'api_design'
+    | 'data_flow'
+    | 'business_logic';
   message: string;
   description: string;
   suggestion?: string;
@@ -190,6 +195,23 @@ export interface PRPlan {
   keyChanges: string[];
   riskAreas: string[];
   reviewFocus: string[];
+  dependencies?: {
+    affectedFiles?: string[];
+    externalAPIs?: string[];
+    databaseChanges?: string;
+    configurationChanges?: string;
+  };
+  businessImpact?: {
+    userFacing?: string;
+    dataImpact?: string;
+    performanceImpact?: string;
+    securityImplications?: string;
+  };
+  testing?: {
+    requiredTests?: string[];
+    testCoverage?: string;
+    regressionRisk?: string;
+  };
   context: string;
 }
 
