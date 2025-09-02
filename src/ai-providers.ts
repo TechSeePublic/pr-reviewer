@@ -597,6 +597,11 @@ export class AzureOpenAIProvider implements AIProvider {
     return reasoningModels.some(reasoningModel => modelToCheck.startsWith(reasoningModel));
   }
 
+  private supportsTemperature(): boolean {
+    // Reasoning models don't support temperature parameter
+    return !this.requiresMaxCompletionTokens();
+  }
+
   async reviewCode(prompt: string, code: string, rules: CursorRule[]): Promise<CodeIssue[]> {
     try {
       const systemPrompt = PromptTemplates.buildCodeReviewSystemPrompt(rules, {
@@ -612,7 +617,7 @@ export class AzureOpenAIProvider implements AIProvider {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.1,
+        ...(this.supportsTemperature() && { temperature: 0.1 }),
         ...(this.requiresMaxCompletionTokens()
           ? { max_completion_tokens: 4000 }
           : { max_tokens: 4000 }),
@@ -667,7 +672,7 @@ export class AzureOpenAIProvider implements AIProvider {
           },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.1,
+        ...(this.supportsTemperature() && { temperature: 0.1 }),
         ...(this.requiresMaxCompletionTokens()
           ? { max_completion_tokens: 2000 }
           : { max_tokens: 2000 }),
@@ -705,7 +710,7 @@ export class AzureOpenAIProvider implements AIProvider {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.1,
+        ...(this.supportsTemperature() && { temperature: 0.1 }),
         ...(this.requiresMaxCompletionTokens()
           ? { max_completion_tokens: 6000 }
           : { max_tokens: 6000 }),
@@ -743,7 +748,7 @@ export class AzureOpenAIProvider implements AIProvider {
           },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.2,
+        ...(this.supportsTemperature() && { temperature: 0.2 }),
         ...(this.requiresMaxCompletionTokens()
           ? { max_completion_tokens: 1500 }
           : { max_tokens: 1500 }),

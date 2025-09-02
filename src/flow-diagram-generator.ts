@@ -151,6 +151,7 @@ export class FlowDiagramGenerator {
       try {
         // Check if this is an Azure OpenAI provider that requires max_completion_tokens
         const requiresMaxCompletionTokens = openaiProvider.requiresMaxCompletionTokens?.() || false;
+        const supportsTemperature = openaiProvider.supportsTemperature?.() !== false; // Default to true for non-Azure providers
         const response = await openaiProvider.client.chat.completions.create({
           model: openaiProvider.model,
           messages: [
@@ -164,7 +165,7 @@ export class FlowDiagramGenerator {
               content: `${prompt}\n\n## Context:\n${context}`,
             },
           ],
-          temperature: 0.1,
+          ...(supportsTemperature && { temperature: 0.1 }),
           ...(requiresMaxCompletionTokens ? { max_completion_tokens: 1000 } : { max_tokens: 1000 }),
         });
 
