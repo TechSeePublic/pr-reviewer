@@ -195,13 +195,29 @@ export class CommentManager {
       const originalLine = parseInt(lineStr, 10);
 
       // Find the actual line to comment on
+      logger.info(`\n=== VALIDATING LINE LOCATION ===`);
+      logger.info(`File: ${file}`);
+      logger.info(`AI reported line: ${originalLine}`);
+      logger.info(`Issue: ${locationIssues[0]?.message}`);
+
       const validLocation = this.findValidCommentLocation(file, originalLine, fileChanges);
       if (!validLocation) {
         logger.warn(
-          `Skipping inline comment for ${file}:${originalLine} - no valid location found in PR diff`
+          `❌ Skipping inline comment for ${file}:${originalLine} - no valid location found in PR diff`
         );
+
+        // Show what lines ARE available for debugging
+        const fileChange = fileChanges.find(fc => fc.filename === file);
+        if (fileChange?.patch) {
+          const validLines = this.parseValidLinesFromPatch(fileChange.patch);
+          logger.warn(`Available lines for comments: [${validLines.join(', ')}]`);
+          logger.warn(`Requested line ${originalLine} is not in the diff`);
+        }
         continue;
       }
+
+      logger.info(`✅ Valid location found: line ${validLocation.line} (${validLocation.reason})`);
+      logger.info(`=================================\n`);
 
       // Create inline comment
       if (locationIssues.length === 0) {
@@ -356,18 +372,27 @@ export class CommentManager {
       return null;
     }
 
+    logger.debug(`\n--- LINE VALIDATION DEBUG ---`);
+    logger.debug(`Requested line: ${requestedLine}`);
+    logger.debug(`Valid lines in diff: [${validLines.join(', ')}]`);
+    logger.debug(`File: ${file}`);
+
     // If requested line is valid, use it
     if (validLines.includes(requestedLine)) {
+      logger.debug(`✅ Exact match: line ${requestedLine} is in diff`);
       return { line: requestedLine, reason: 'exact_match' };
     }
 
+    logger.debug(`❌ Line ${requestedLine} not in diff, looking for nearby lines...`);
+
     // Find the closest valid line (within reasonable range)
-    const maxDistance = 5; // Don't place comments too far from intended location
+    const maxDistance = 10; // Increased from 5 to catch more nearby lines
     let closestLine: number | null = null;
     let minDistance = Infinity;
 
     for (const validLine of validLines) {
       const distance = Math.abs(validLine - requestedLine);
+      logger.debug(`  Line ${validLine}: distance ${distance}`);
       if (distance <= maxDistance && distance < minDistance) {
         minDistance = distance;
         closestLine = validLine;
@@ -376,22 +401,27 @@ export class CommentManager {
 
     if (closestLine !== null) {
       logger.info(
-        `Adjusted comment location from line ${requestedLine} to ${closestLine} (distance: ${minDistance})`
+        `🔄 Adjusted comment location from line ${requestedLine} to ${closestLine} (distance: ${minDistance})`
       );
       return { line: closestLine, reason: 'nearby_match' };
     }
 
+    logger.debug(`❌ No lines within ${maxDistance} distance of ${requestedLine}`);
+
     // As a last resort, use the first valid line in the file (for file-level issues)
-    if (requestedLine <= 5) {
-      // Only for issues near top of file
+    if (requestedLine <= 10) {
+      // Increased from 5 to handle more cases
       const firstValidLine = Math.min(...validLines);
       logger.info(
-        `Using first valid line ${firstValidLine} for file-level issue at line ${requestedLine}`
+        `📌 Using first valid line ${firstValidLine} for file-level issue at line ${requestedLine}`
       );
       return { line: firstValidLine, reason: 'file_level_fallback' };
     }
 
-    logger.warn(`No suitable comment location found for ${file}:${requestedLine}`);
+    logger.warn(`❌ No suitable comment location found for ${file}:${requestedLine}`);
+    logger.debug(`Valid lines were: [${validLines.join(', ')}]`);
+    logger.debug(`Max distance allowed: ${maxDistance}`);
+    logger.debug(`----------------------------\n`);
     return null;
   }
 

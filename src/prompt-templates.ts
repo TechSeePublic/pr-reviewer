@@ -505,7 +505,8 @@ ${fileChange.patch}
       const changedLines = this.extractChangedLines(fileChange.patch);
       if (changedLines.length > 0) {
         context += `### Changed Lines to Review
-**Focus analysis on lines**: ${changedLines.join(', ')}
+**ONLY analyze these line numbers from the complete file below**: ${changedLines.join(', ')}
+**These are the ONLY lines where issues should be reported**
 
 `;
       }
@@ -542,11 +543,16 @@ ${this.getLanguageSpecificGuidelines(fileChange.filename)}
 **CONTEXT**: The complete file content below provides context to understand the changes, but focus your review only on the modified areas shown in the diff above.
 
 ### Complete File Content (with line numbers)
-**CRITICAL**: When reporting issues, use the EXACT line numbers shown below.
+**CRITICAL FOR ACCURACY**: 
+1. When reporting issues, use the EXACT line numbers shown below (format: "123| code")
+2. ONLY report issues for lines that appear in the diff above (lines marked with + or context)
+3. DO NOT report issues for unchanged lines not shown in the diff
 
 \`\`\`${this.getLanguageFromFilename(fileChange.filename)}
 ${this.addLineNumbers(fileContent)}
 \`\`\`
+
+**VALIDATION REMINDER**: Before submitting, verify that your reported line numbers correspond to lines that were actually changed or are context lines in the diff shown above.
 
 `;
 
