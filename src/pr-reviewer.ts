@@ -221,15 +221,8 @@ export class PRReviewer {
     try {
       return await this.aiProvider.generatePRPlan(fileChanges, rules);
     } catch (error) {
-      core.warning(`Failed to generate PR plan: ${error}`);
-      // Return a fallback plan
-      return {
-        overview: 'Unable to generate PR plan - proceeding with standard review',
-        keyChanges: fileChanges.map(f => `${f.status}: ${f.filename}`),
-        riskAreas: ['Review all changes carefully'],
-        reviewFocus: ['Critical issues', 'Rule compliance'],
-        context: 'Fallback plan due to AI provider error',
-      };
+      core.error(`Failed to generate PR plan: ${error}`);
+      throw new Error(`AI PR plan generation failed: ${error}`);
     }
   }
 
@@ -272,13 +265,9 @@ export class PRReviewer {
           await this.delay(delayMs);
         }
       } catch (error) {
-        // Log error but continue with other batches
+        // AI provider failed - this should fail the entire review process
         core.error(`Error reviewing batch ${i + 1}: ${error}`);
-
-        // Fallback to single file review for this batch
-        core.info(`Falling back to single-file review for batch ${i + 1}`);
-        const fallbackIssues = await this.reviewBatchFallback(batch.files, rules);
-        allIssues.push(...fallbackIssues);
+        throw new Error(`AI review failed for batch ${i + 1}: ${error}`);
       }
     }
 
@@ -446,9 +435,9 @@ export class PRReviewer {
         summary = this.generateFallbackSummary(issues, fileChanges.length);
       }
     } catch (error) {
-      // Log the error but don't fail the action - use fallback summary instead
-      core.warning(`AI provider error generating summary: ${error}`);
-      summary = this.generateFallbackSummary(issues, fileChanges.length);
+      // AI provider failed - this should fail the entire review process
+      core.error(`AI provider error generating summary: ${error}`);
+      throw new Error(`AI summary generation failed: ${error}`);
     }
 
     return {

@@ -169,7 +169,7 @@ Always use explicit types for variables.`;
     expect(result.summary).toContain('No Cursor rules found');
   });
 
-  it('should use fallback summary when AI provider errors occur', async () => {
+  it('should fail when AI provider errors occur', async () => {
     // Setup basic cursor rules
     mockFs.existsSync.mockReturnValue(true);
     mockFs.readdirSync.mockReturnValue([
@@ -197,12 +197,7 @@ Always use explicit types for variables.`;
 
     const reviewer = new PRReviewer(mockInputs, '/mock/workspace');
 
-    // Should succeed with fallback summary instead of failing
-    const result = await reviewer.reviewPR();
-    
-    // Verify it used fallback summary
-    expect(result.summary).toContain('Excellent work!');
-    expect(result.summary).toContain('clean with no issues detected');
-    expect(result.status).toBe('passed');
+    // Should now throw an error instead of using fallback
+    await expect(reviewer.reviewPR()).rejects.toThrow('AI summary generation failed');
   });
 });
