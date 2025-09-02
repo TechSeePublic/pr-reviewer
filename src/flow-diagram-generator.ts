@@ -357,6 +357,11 @@ MAKE IT USER-CENTRIC:
 - End with the value/benefit users get
 - Use language stakeholders understand
 
+CRITICAL SYNTAX RULES:
+- DO NOT use parentheses, quotes, or brackets inside node labels
+- Keep node labels simple and descriptive
+- Use hyphens or spaces instead of special characters
+
 EXAMPLE STRUCTURE:
 flowchart TD
     A[User needs to upload document] --> B[User clicks upload button]
@@ -405,6 +410,11 @@ SHOW THE IMPROVEMENT:
 - Highlight the fixed behavior
 - Demonstrate the improved user experience
 - Include error handling improvements
+
+CRITICAL SYNTAX RULES:
+- DO NOT use parentheses, quotes, or brackets inside node labels
+- Keep node labels simple and descriptive
+- Use hyphens or spaces instead of special characters
 
 EXAMPLE STRUCTURE:
 flowchart TD
@@ -458,6 +468,11 @@ HIGHLIGHT THE GAINS:
 - Demonstrate reduced waiting times
 - Highlight better resource usage
 - Show measurable improvements
+
+CRITICAL SYNTAX RULES:
+- DO NOT use parentheses, quotes, or brackets inside node labels
+- Keep node labels simple and descriptive
+- Use hyphens or spaces instead of special characters
 
 EXAMPLE STRUCTURE:
 flowchart TD
@@ -513,6 +528,12 @@ SHOW INTERNAL IMPROVEMENTS:
 - Show better separation of concerns
 - Indicate improved error handling
 - Demonstrate better code organization
+
+CRITICAL SYNTAX RULES:
+- DO NOT use parentheses, quotes, or brackets inside node labels
+- Keep node labels simple and descriptive
+- Use hyphens or spaces instead of special characters
+- Example: Use "Controllers - Async Refactor" not "Controllers (Async/Await Refactor)"
 
 EXAMPLE STRUCTURE:
 flowchart TD
@@ -573,6 +594,11 @@ SHOW MAINTENANCE VALUE:
 - Indicate compatibility improvements
 - Demonstrate system health benefits
 - Keep user impact minimal focus
+
+CRITICAL SYNTAX RULES:
+- DO NOT use parentheses, quotes, or brackets inside node labels
+- Keep node labels simple and descriptive
+- Use hyphens or spaces instead of special characters
 
 EXAMPLE STRUCTURE:
 flowchart TD
@@ -837,11 +863,34 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
       return false;
     }
 
-    // Check for problematic quotes in node labels
+    // Check for problematic characters in node labels
     const nodeWithQuotes = trimmed.match(/\[[^\]]*"[^\]]*\]/);
     if (nodeWithQuotes) {
       logger.warn('Mermaid validation failed: node labels contain quotes which break syntax');
       return false;
+    }
+
+    // Check for problematic parentheses in node labels
+    const nodeWithParens = trimmed.match(/\[[^\]]*\([^\]]*\]/);
+    if (nodeWithParens) {
+      logger.warn('Mermaid validation failed: node labels contain parentheses which break syntax');
+      return false;
+    }
+
+    // Check for other problematic characters
+    const problematicChars = /[[\]{}()"'`]/;
+    const codeLines2 = trimmed.split('\n');
+    for (const line of codeLines2) {
+      const nodeMatch = line.match(/\[([^\]]+)\]/);
+      if (nodeMatch && nodeMatch[1]) {
+        const nodeText = nodeMatch[1];
+        if (problematicChars.test(nodeText)) {
+          logger.warn(
+            `Mermaid validation failed: node label "${nodeText}" contains problematic characters`
+          );
+          return false;
+        }
+      }
     }
 
     // Check for very long lines that might cause rendering issues
