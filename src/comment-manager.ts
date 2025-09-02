@@ -226,9 +226,14 @@ export class CommentManager {
       );
 
       try {
-        logger.info(
-          `Posting inline comment at ${file}:${validLocation.line} (originally ${originalLine})`
-        );
+        logger.info(`\n=== POSTING INLINE COMMENT ===`);
+        logger.info(`File: ${file}`);
+        logger.info(`AI suggested line: ${originalLine}`);
+        logger.info(`Validated line: ${validLocation.line}`);
+        logger.info(`Adjustment reason: ${validLocation.reason}`);
+        logger.info(`Issue type: ${locationIssues[0]?.type} - ${locationIssues[0]?.message}`);
+        logger.info(`==============================\n`);
+
         await this.githubClient.postInlineComment(comment, existingComment?.id);
       } catch (error) {
         logger.warn(`Failed to post inline comment for ${file}:${validLocation.line}:`, error);
@@ -393,32 +398,52 @@ export class CommentManager {
   /**
    * Parse patch to extract valid line numbers for comments
    * Returns absolute file line numbers that can be commented on
+   * Uses the same logic as extractChangedLines but allows comments on context lines too
    */
   private parseValidLinesFromPatch(patch: string): number[] {
     const validLines: number[] = [];
     const lines = patch.split('\n');
     let currentLine = 0;
 
-    for (const line of lines) {
-      if (line.startsWith('@@')) {
+    logger.debug(`\n=== PARSING PATCH FOR VALID COMMENT LINES ===`);
+    logger.debug(`Patch preview:\n${patch.substring(0, 200)}${patch.length > 200 ? '...' : ''}`);
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (line && line.startsWith('@@')) {
         // Parse hunk header: @@ -oldStart,oldLines +newStart,newLines @@
         const match = line.match(/\+(\d+)/);
         if (match && match[1]) {
           currentLine = parseInt(match[1], 10) - 1;
+          logger.debug(`Hunk header: ${line} -> Starting at line ${currentLine + 1}`);
         }
-      } else if (line.startsWith('+')) {
+      } else if (line && line.startsWith('+') && !line.startsWith('+++')) {
         // Added line - can be commented on
         currentLine++;
         validLines.push(currentLine);
-      } else if (line.startsWith(' ')) {
-        // Context line - can be commented on
+        logger.debug(`+ Line ${currentLine}: Can comment (ADDED)`);
+      } else if (line && line.startsWith(' ')) {
+        // Context line - can be commented on (GitHub allows this)
         currentLine++;
         validLines.push(currentLine);
+        logger.debug(`  Line ${currentLine}: Can comment (CONTEXT)`);
+      } else if (line && line.startsWith('-') && !line.startsWith('---')) {
+        // Deleted line - ignore, don't increment currentLine
+        logger.debug(`- Line: DELETED (ignored)`);
+      } else if (line) {
+        // File headers or other content
+        logger.debug(`? Line: ${line.substring(0, 30)}... (ignored)`);
       }
-      // Deleted lines (-) are ignored as they can't be commented on in the new version
     }
 
-    logger.debug(`Valid comment lines for patch: ${validLines.join(', ')}`);
+    logger.debug(`Valid comment lines: [${validLines.join(', ')}]`);
+    logger.debug(`Total valid lines: ${validLines.length}`);
+    if (validLines.length > 0) {
+      logger.debug(`Range: ${Math.min(...validLines)} to ${Math.max(...validLines)}`);
+    }
+    logger.debug(`===============================================\n`);
+
     return validLines;
   }
 
