@@ -269,6 +269,9 @@ export class GitHubClient {
         });
       } else {
         await this.applyRateLimit();
+        logger.debug(
+          `Creating review comment at ${comment.location.file}:${comment.location.line} (${comment.location.side})`
+        );
         await this.octokit.rest.pulls.createReviewComment({
           owner: this.context.owner,
           repo: this.context.repo,
@@ -279,9 +282,30 @@ export class GitHubClient {
           side: comment.location.side,
           body,
         });
+        logger.info(
+          `✅ Successfully posted inline comment at ${comment.location.file}:${comment.location.line}`
+        );
       }
     } catch (error) {
-      logger.warn(`Warning: Could not post inline comment: ${error}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.warn(
+        `Warning: Could not post inline comment at ${comment.location.file}:${comment.location.line}: ${errorMessage}`
+      );
+
+      // Log more details for debugging random positioning issues
+      if (
+        errorMessage.includes('line') ||
+        errorMessage.includes('position') ||
+        errorMessage.includes('422')
+      ) {
+        logger.warn(`GitHub API error details for comment positioning:`, {
+          file: comment.location.file,
+          line: comment.location.line,
+          side: comment.location.side,
+          error: errorMessage,
+        });
+      }
+
       // Don't throw - inline comments might fail due to line positioning
     }
   }

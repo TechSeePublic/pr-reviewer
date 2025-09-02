@@ -182,17 +182,24 @@ export class CommentManager {
     // Group issues by file and line
     const issuesByLocation = this.groupIssuesByLocation(filteredIssues);
 
+    logger.info(
+      `Processing ${Object.keys(issuesByLocation).length} unique locations for inline comments`
+    );
+
     for (const [locationKey, locationIssues] of Object.entries(issuesByLocation)) {
       const [file, lineStr] = locationKey.split(':');
       if (!file || !lineStr) {
         logger.warn(`Invalid location key: ${locationKey}`);
         continue;
       }
-      const line = parseInt(lineStr, 10);
+      const originalLine = parseInt(lineStr, 10);
 
-      // Validate that the line exists in the PR changes
-      if (!this.isValidCommentLocation(file, line, fileChanges)) {
-        logger.warn(`Skipping inline comment for ${file}:${line} - not in PR diff`);
+      // Find the actual line to comment on
+      const validLocation = this.findValidCommentLocation(file, originalLine, fileChanges);
+      if (!validLocation) {
+        logger.warn(
+          `Skipping inline comment for ${file}:${originalLine} - no valid location found in PR diff`
+        );
         continue;
       }
 
@@ -206,7 +213,7 @@ export class CommentManager {
         body: this.formatInlineCommentBody(locationIssues),
         location: {
           file,
-          line,
+          line: validLocation.line,
           side: 'RIGHT', // Always comment on new code
         },
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -215,13 +222,16 @@ export class CommentManager {
 
       // Check if we should update existing comment
       const existingComment = existingComments.find(
-        c => c.location.file === file && c.location.line === line
+        c => c.location.file === file && c.location.line === validLocation.line
       );
 
       try {
+        logger.info(
+          `Posting inline comment at ${file}:${validLocation.line} (originally ${originalLine})`
+        );
         await this.githubClient.postInlineComment(comment, existingComment?.id);
       } catch (error) {
-        logger.warn(`Failed to post inline comment for ${file}:${line}:`, error);
+        logger.warn(`Failed to post inline comment for ${file}:${validLocation.line}:`, error);
       }
     }
   }
@@ -320,7 +330,69 @@ export class CommentManager {
   }
 
   /**
+   * Find the best valid location for a comment, with fallback options
+   */
+  private findValidCommentLocation(
+    file: string,
+    requestedLine: number,
+    fileChanges: FileChange[]
+  ): { line: number; reason: string } | null {
+    const fileChange = fileChanges.find(fc => fc.filename === file);
+
+    if (!fileChange || !fileChange.patch) {
+      logger.warn(`No file change found for ${file}`);
+      return null;
+    }
+
+    const validLines = this.parseValidLinesFromPatch(fileChange.patch);
+
+    if (validLines.length === 0) {
+      logger.warn(`No valid comment lines found in patch for ${file}`);
+      return null;
+    }
+
+    // If requested line is valid, use it
+    if (validLines.includes(requestedLine)) {
+      return { line: requestedLine, reason: 'exact_match' };
+    }
+
+    // Find the closest valid line (within reasonable range)
+    const maxDistance = 5; // Don't place comments too far from intended location
+    let closestLine: number | null = null;
+    let minDistance = Infinity;
+
+    for (const validLine of validLines) {
+      const distance = Math.abs(validLine - requestedLine);
+      if (distance <= maxDistance && distance < minDistance) {
+        minDistance = distance;
+        closestLine = validLine;
+      }
+    }
+
+    if (closestLine !== null) {
+      logger.info(
+        `Adjusted comment location from line ${requestedLine} to ${closestLine} (distance: ${minDistance})`
+      );
+      return { line: closestLine, reason: 'nearby_match' };
+    }
+
+    // As a last resort, use the first valid line in the file (for file-level issues)
+    if (requestedLine <= 5) {
+      // Only for issues near top of file
+      const firstValidLine = Math.min(...validLines);
+      logger.info(
+        `Using first valid line ${firstValidLine} for file-level issue at line ${requestedLine}`
+      );
+      return { line: firstValidLine, reason: 'file_level_fallback' };
+    }
+
+    logger.warn(`No suitable comment location found for ${file}:${requestedLine}`);
+    return null;
+  }
+
+  /**
    * Parse patch to extract valid line numbers for comments
+   * Returns absolute file line numbers that can be commented on
    */
   private parseValidLinesFromPatch(patch: string): number[] {
     const validLines: number[] = [];
@@ -335,17 +407,18 @@ export class CommentManager {
           currentLine = parseInt(match[1], 10) - 1;
         }
       } else if (line.startsWith('+')) {
-        // Added line
+        // Added line - can be commented on
         currentLine++;
         validLines.push(currentLine);
       } else if (line.startsWith(' ')) {
-        // Context line
+        // Context line - can be commented on
         currentLine++;
         validLines.push(currentLine);
       }
-      // Ignore deleted lines (-)
+      // Deleted lines (-) are ignored as they can't be commented on in the new version
     }
 
+    logger.debug(`Valid comment lines for patch: ${validLines.join(', ')}`);
     return validLines;
   }
 
