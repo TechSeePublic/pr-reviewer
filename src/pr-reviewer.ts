@@ -9,6 +9,7 @@ import * as path from 'path';
 import {
   ActionInputs,
   AIProvider,
+  ArchitecturalReviewResult,
   CodeIssue,
   CursorRule,
   CursorRulesConfig,
@@ -102,11 +103,34 @@ export class PRReviewer {
       const prPlan = await this.generatePRPlan(fileChanges, applicableRules);
       core.info(`Plan created: ${prPlan.overview}`);
 
-      // Step 5: Review files in batches with PR context
-      core.info('🔍 Reviewing files in batches with AI...');
-      const allIssues = await this.reviewFilesInBatches(fileChanges, applicableRules, prPlan);
+      // Step 5: Architectural review (if enabled)
+      let architecturalIssues: CodeIssue[] = [];
+      if (this.inputs.enableArchitecturalReview) {
+        core.info('🏗️ Conducting architectural review...');
+        const architecturalResult = await this.conductArchitecturalReview(
+          fileChanges,
+          applicableRules
+        );
+        // Mark architectural issues as such
+        architecturalIssues = architecturalResult.issues.map(issue => ({
+          ...issue,
+          reviewType: 'architectural' as const,
+        }));
+        core.info(`Architectural review completed: ${architecturalIssues.length} issues found`);
+      }
 
-      // Step 6: Generate review result
+      // Step 6: Review files in detailed batches with PR context
+      core.info('🔍 Reviewing files in detail batches with AI...');
+      const detailedIssues = await this.reviewFilesInBatches(fileChanges, applicableRules, prPlan);
+
+      // Mark detailed issues and combine with architectural issues
+      const markedDetailedIssues = detailedIssues.map(issue => ({
+        ...issue,
+        reviewType: 'detailed' as const,
+      }));
+      const allIssues = [...architecturalIssues, ...markedDetailedIssues];
+
+      // Step 7: Generate review result
       const reviewResult = await this.generateReviewResult(
         allIssues,
         fileChanges,
@@ -114,7 +138,7 @@ export class PRReviewer {
         cursorRules
       );
 
-      // Step 7: Apply auto-fixes if enabled
+      // Step 8: Apply auto-fixes if enabled
       if (this.inputs.enableAutoFix) {
         core.info('🔧 Applying auto-fixes...');
         const autoFixResults = await this.autoFixManager.applyAutoFixes(allIssues, fileChanges);
@@ -130,11 +154,11 @@ export class PRReviewer {
         }
       }
 
-      // Step 8: Post comments
+      // Step 9: Post comments
       core.info('💬 Posting review comments...');
       await this.commentManager.postReviewComments(reviewResult, fileChanges, prPlan);
 
-      // Step 9: Set outputs
+      // Step 10: Set outputs
       this.setActionOutputs(reviewResult);
 
       core.info(`✅ Review completed: ${reviewResult.status} (${allIssues.length} issues found)`);
@@ -229,6 +253,21 @@ export class PRReviewer {
     } catch (error) {
       core.error(`Failed to generate PR plan: ${error}`);
       throw new Error(`AI PR plan generation failed: ${error}`);
+    }
+  }
+
+  /**
+   * Conduct architectural review of all changes
+   */
+  private async conductArchitecturalReview(
+    fileChanges: FileChange[],
+    rules: CursorRule[]
+  ): Promise<ArchitecturalReviewResult> {
+    try {
+      return await this.aiProvider.reviewArchitecture(fileChanges, rules);
+    } catch (error) {
+      core.error(`Failed to conduct architectural review: ${error}`);
+      throw new Error(`Architectural review failed: ${error}`);
     }
   }
 

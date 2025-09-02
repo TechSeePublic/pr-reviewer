@@ -604,6 +604,19 @@ export class CommentManager {
     body += `|--------|-------|\n`;
     body += `| Files Reviewed | ${filesReviewed}/${totalFiles} |\n`;
     body += `| Issues Found | ${issues.length} |\n`;
+
+    // Break down by review type if we have both types
+    const architecturalIssues = issues.filter(issue => issue.reviewType === 'architectural');
+    const detailedIssues = issues.filter(issue => issue.reviewType === 'detailed');
+    if (architecturalIssues.length > 0 && detailedIssues.length > 0) {
+      body += `| - Architectural | ${architecturalIssues.length} |\n`;
+      body += `| - Detailed | ${detailedIssues.length} |\n`;
+    } else if (architecturalIssues.length > 0) {
+      body += `| - Architectural Only | ${architecturalIssues.length} |\n`;
+    } else if (detailedIssues.length > 0) {
+      body += `| - Detailed Only | ${detailedIssues.length} |\n`;
+    }
+
     body += `| Rules Applied | ${rulesApplied.length} |\n`;
     body += `| Status | ${statusIcon} ${status.replace('_', ' ').toUpperCase()} |\n\n`;
 
@@ -645,36 +658,78 @@ export class CommentManager {
 
     // Issues found
     if (issues.length > 0) {
-      const issuesByCategory = this.groupIssuesByCategory(issues);
+      const architecturalIssues = issues.filter(issue => issue.reviewType === 'architectural');
+      const detailedIssues = issues.filter(issue => issue.reviewType === 'detailed');
 
       // Show all issues directly
       if (this.inputs.summaryFormat === 'detailed' && issues.length <= 15) {
         body += `### 📋 **All Issues**\n\n`;
 
-        for (const [category, categoryIssues] of Object.entries(issuesByCategory)) {
-          if (categoryIssues.length > 0) {
-            const categoryIcon = this.getCategoryIcon(category);
-            body += `**${categoryIcon} ${this.formatCategoryName(category)} (${categoryIssues.length})**\n`;
-            for (const issue of categoryIssues) {
-              const typeIcon = this.getIssueIcon(issue.type);
-              const fileURL = this.generateGitHubFileURL(issue.file, issue.line);
-              body += `- ${typeIcon} **[${issue.file}:${issue.line || '?'}](${fileURL})** - ${issue.message}\n`;
+        // Show architectural issues first if they exist
+        if (architecturalIssues.length > 0) {
+          body += `#### 🏗️ **Architectural Issues** (${architecturalIssues.length})\n`;
+          body += `*High-level structural and design concerns affecting maintainability*\n\n`;
 
-              // Add description if it's different from message and provides additional context
-              if (
-                issue.description &&
-                issue.description !== issue.message &&
-                issue.description.length > 0
-              ) {
-                body += `  - *${issue.description}*\n`;
-              }
+          const archIssuesByCategory = this.groupIssuesByCategory(architecturalIssues);
+          for (const [category, categoryIssues] of Object.entries(archIssuesByCategory)) {
+            if (categoryIssues.length > 0) {
+              const categoryIcon = this.getCategoryIcon(category);
+              body += `**${categoryIcon} ${this.formatCategoryName(category)} (${categoryIssues.length})**\n`;
+              for (const issue of categoryIssues) {
+                const typeIcon = this.getIssueIcon(issue.type);
+                const fileURL = this.generateGitHubFileURL(issue.file, issue.line);
+                body += `- ${typeIcon} **[${issue.file}:${issue.line || '?'}](${fileURL})** - ${issue.message}\n`;
 
-              // Add suggestion if available
-              if (issue.suggestion && issue.suggestion.length > 0) {
-                body += `  - 💡 **Suggestion:** ${issue.suggestion}\n`;
+                // Add description if it's different from message and provides additional context
+                if (
+                  issue.description &&
+                  issue.description !== issue.message &&
+                  issue.description.length > 0
+                ) {
+                  body += `  - *${issue.description}*\n`;
+                }
+
+                // Add suggestion if available
+                if (issue.suggestion && issue.suggestion.length > 0) {
+                  body += `  - 💡 **Suggestion:** ${issue.suggestion}\n`;
+                }
               }
+              body += '\n';
             }
-            body += '\n';
+          }
+        }
+
+        // Show detailed issues if they exist
+        if (detailedIssues.length > 0) {
+          body += `#### 🔍 **Detailed Issues** (${detailedIssues.length})\n`;
+          body += `*Code-level issues and rule violations*\n\n`;
+
+          const detailedIssuesByCategory = this.groupIssuesByCategory(detailedIssues);
+          for (const [category, categoryIssues] of Object.entries(detailedIssuesByCategory)) {
+            if (categoryIssues.length > 0) {
+              const categoryIcon = this.getCategoryIcon(category);
+              body += `**${categoryIcon} ${this.formatCategoryName(category)} (${categoryIssues.length})**\n`;
+              for (const issue of categoryIssues) {
+                const typeIcon = this.getIssueIcon(issue.type);
+                const fileURL = this.generateGitHubFileURL(issue.file, issue.line);
+                body += `- ${typeIcon} **[${issue.file}:${issue.line || '?'}](${fileURL})** - ${issue.message}\n`;
+
+                // Add description if it's different from message and provides additional context
+                if (
+                  issue.description &&
+                  issue.description !== issue.message &&
+                  issue.description.length > 0
+                ) {
+                  body += `  - *${issue.description}*\n`;
+                }
+
+                // Add suggestion if available
+                if (issue.suggestion && issue.suggestion.length > 0) {
+                  body += `  - 💡 **Suggestion:** ${issue.suggestion}\n`;
+                }
+              }
+              body += '\n';
+            }
           }
         }
       } else if (issues.length > 15) {

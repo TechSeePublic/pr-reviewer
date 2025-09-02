@@ -40,6 +40,7 @@ describe('PR Reviewer Integration', () => {
     batchSize: 5,
     githubRateLimit: 1000,
     deterministicMode: true,
+    enableArchitecturalReview: true,
   };
 
   beforeEach(() => {
@@ -143,9 +144,15 @@ Always use explicit types for variables.`;
     const result = await reviewer.reviewPR();
 
     expect(result.status).toBe('needs_attention');
-    expect(result.issues).toHaveLength(1);
+    expect(result.issues).toHaveLength(2); // Now expecting 2 issues: 1 architectural + 1 detailed
     expect(result.filesReviewed).toBe(1);
     expect(result.rulesApplied).toHaveLength(1);
+
+    // Verify we have both review types
+    const architecturalIssues = result.issues.filter(issue => issue.reviewType === 'architectural');
+    const detailedIssues = result.issues.filter(issue => issue.reviewType === 'detailed');
+    expect(architecturalIssues).toHaveLength(1);
+    expect(detailedIssues).toHaveLength(1);
 
     // Verify AI was called
     expect(mockCreate).toHaveBeenCalled();
@@ -198,7 +205,7 @@ Always use explicit types for variables.`;
 
     const reviewer = new PRReviewer(mockInputs, '/mock/workspace');
 
-    // Should now throw an error instead of using fallback
-    await expect(reviewer.reviewPR()).rejects.toThrow('AI summary generation failed');
+    // Should now throw an error during the AI review process
+    await expect(reviewer.reviewPR()).rejects.toThrow('AI review failed for batch');
   });
 });

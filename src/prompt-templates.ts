@@ -878,4 +878,177 @@ Remember: You're reviewing the changes as they relate to the overall PR goals, n
 
     return prompt;
   }
+
+  /**
+   * Build architectural review prompt for analyzing code structure and patterns
+   */
+  static buildArchitecturalReviewPrompt(
+    files: FileChange[],
+    rules: CursorRule[],
+    config: PromptConfig
+  ): string {
+    const jsonInstructions = config.supportsJsonMode
+      ? 'Return your response as a valid JSON object only.'
+      : 'Return your response as a valid JSON object only. Start your response with { and end with }.';
+
+    let prompt = `# Architectural Code Review Assistant
+
+You are a senior software architect conducting a high-level architectural review of code changes.
+
+## ARCHITECTURAL REVIEW SCOPE
+
+Your primary focus is on **STRUCTURAL and DESIGN ISSUES** that affect the overall codebase quality:
+
+### 🏗️ CODE DUPLICATION ANALYSIS
+- **Exact Duplication**: Identify identical or near-identical code blocks across files
+- **Functional Duplication**: Find code that achieves the same result using different approaches
+- **Pattern Duplication**: Spot repeated patterns that could be abstracted
+- **Configuration Duplication**: Locate duplicated constants, configurations, or magic numbers
+
+### 🔄 LOGICAL FLOW PROBLEMS
+- **Control Flow Issues**: Inconsistent error handling patterns, complex conditionals
+- **Data Flow Problems**: Unclear data transformations, state management issues
+- **Dependency Issues**: Circular dependencies, tight coupling, unclear relationships
+- **State Management**: Inconsistent state updates, potential race conditions
+
+### 📂 MISPLACED CODE ANALYSIS
+- **Separation of Concerns**: Business logic in presentation layers, UI logic in data layers
+- **Layer Violations**: Direct database access from UI components, mixing concerns
+- **Module Boundaries**: Code that belongs in utility modules, shared libraries, or different domains
+- **Responsibility Misalignment**: Functions/classes doing too much or having unclear responsibilities
+
+### 🏛️ ARCHITECTURAL PATTERNS
+- **Design Pattern Violations**: Inconsistent use of established patterns
+- **Architecture Compliance**: Violations of project architecture (MVC, MVVM, Clean Architecture)
+- **Interface Design**: Poor abstractions, leaky abstractions, inconsistent APIs
+- **Modularity Issues**: Monolithic functions, classes that violate Single Responsibility Principle
+
+## ANALYSIS APPROACH
+
+1. **Cross-File Analysis**: Look for patterns and issues that span multiple files
+2. **Structural Assessment**: Evaluate how the code fits into the broader codebase structure
+3. **Design Consistency**: Check for consistent design patterns and approaches
+4. **Maintainability Impact**: Assess how changes affect long-term code maintainability
+
+## CURSOR RULES CONSIDERATION
+
+${rules.length > 0 ? 'Apply these project-specific architectural rules:' : 'No specific architectural rules provided - focus on general best practices.'}
+
+`;
+
+    if (rules.length > 0) {
+      rules.forEach((rule, index) => {
+        prompt += `### Rule ${index + 1}: "${rule.id}"
+**Type**: ${rule.type}
+${rule.description ? `**Purpose**: ${rule.description}` : ''}
+**Content**: ${rule.content}
+${rule.globs ? `**Applies to**: ${rule.globs.join(', ')}` : ''}
+
+`;
+      });
+    }
+
+    prompt += `
+## FILES UNDER REVIEW (${files.length} files)
+
+`;
+
+    files.forEach((file, index) => {
+      prompt += `### File ${index + 1}: ${file.filename}
+**Status**: ${file.status} | **Changes**: +${file.additions} -${file.deletions}
+
+`;
+
+      if (file.patch) {
+        // Truncate very long patches for architectural review
+        const patchPreview =
+          file.patch.length > 3000
+            ? file.patch.substring(0, 3000) + '\n... (truncated for architectural review)'
+            : file.patch;
+        prompt += `**Changes Summary**:
+\`\`\`diff
+${patchPreview}
+\`\`\`
+
+`;
+      }
+    });
+
+    prompt += `
+## REQUIRED JSON RESPONSE FORMAT
+
+${jsonInstructions}
+
+Your response MUST be a valid JSON object with this exact structure:
+
+\`\`\`json
+{
+  "issues": [
+    {
+      "type": "error|warning",
+      "category": "duplication|logical_flow|misplaced_code|architecture",
+      "message": "Brief description of the architectural issue",
+      "description": "Detailed explanation of the problem and its architectural impact",
+      "suggestion": "Specific recommendation for fixing the architectural issue",
+      "ruleId": "cursor_rule_id or 'architectural_review'",
+      "ruleName": "Architectural Review or specific rule name",
+      "file": "EXACT filename where the issue is primarily located",
+      "line": "Primary line number (if applicable)",
+      "severity": "high|medium|low",
+      "relatedFiles": ["file1.ts", "file2.ts"],
+      "reviewType": "architectural"
+    }
+  ],
+  "duplications": [
+    {
+      "pattern": "Description of the duplicated pattern",
+      "files": ["file1.ts", "file2.ts"],
+      "lines": [45, 123],
+      "severity": "high|medium|low",
+      "suggestion": "How to eliminate the duplication"
+    }
+  ],
+  "logicalProblems": [
+    {
+      "description": "Description of the logical flow problem",
+      "affectedFiles": ["file1.ts", "file2.ts"],
+      "problemType": "flow|dependency|state|data|control",
+      "impact": "How this affects the codebase",
+      "suggestion": "How to fix the logical problem"
+    }
+  ],
+  "misplacedCode": [
+    {
+      "code": "Brief description of the misplaced code",
+      "currentFile": "current-file.ts",
+      "currentLine": 42,
+      "suggestedFile": "suggested-file.ts",
+      "reason": "Why the code should be moved",
+      "impact": "Impact of the current placement"
+    }
+  ],
+  "summary": "Overall architectural assessment and key recommendations",
+  "confidence": 0.85
+}
+\`\`\`
+
+## QUALITY GUIDELINES
+
+- **Focus on Structure**: Look beyond syntax to see architectural patterns
+- **Cross-File Perspective**: Consider how files work together
+- **Impact Assessment**: Evaluate long-term maintainability implications
+- **Actionable Advice**: Provide specific, implementable recommendations
+- **Severity Appropriate**: Mark architectural debt as warnings, structural problems as errors
+
+## ARCHITECTURAL ISSUE CATEGORIES
+
+- **duplication**: Code that is repeated and could be consolidated
+- **logical_flow**: Problems with control flow, data flow, or process logic
+- **misplaced_code**: Code that violates separation of concerns or layer boundaries
+- **architecture**: Broader architectural pattern violations or design issues
+
+Remember: This is a high-level architectural review. Focus on structure, design, and maintainability rather than syntax or minor code quality issues.`;
+
+    return prompt;
+  }
 }

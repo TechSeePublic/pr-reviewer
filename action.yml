@@ -126,9 +126,9 @@ inputs:
     default: '2000'
     
   batch_size:
-    description: 'Number of files to process in each batch (default: 50)'
+    description: 'Number of files to process in each batch (default: 1)'
     required: false
-    default: '50'
+    default: '1'
     
   github_rate_limit:
     description: 'Delay in milliseconds between GitHub API calls to avoid rate limits (default: 1000)'
@@ -137,6 +137,11 @@ inputs:
     
   deterministic_mode:
     description: 'Force deterministic behavior for consistent results (temperature=0, stable parsing)'
+    required: false
+    default: 'true'
+    
+  enable_architectural_review:
+    description: 'Enable architectural review that checks for code duplication, logical problems, and misplaced code'
     required: false
     default: 'true'
 

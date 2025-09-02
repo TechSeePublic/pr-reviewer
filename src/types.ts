@@ -29,9 +29,10 @@ export interface ActionInputs {
   enableAutoFix: boolean;
   autoFixSeverity: 'error' | 'warning' | 'all';
   requestDelay: number; // Delay in milliseconds between AI provider requests
-  batchSize: number; // Number of files to process in each batch (default: 50)
+  batchSize: number; // Number of files to process in each batch (default: 1)
   githubRateLimit: number; // Delay in milliseconds between GitHub API calls (default: 1000ms)
   deterministicMode: boolean; // Force deterministic behavior (temperature=0, stable parsing)
+  enableArchitecturalReview: boolean; // Enable architectural review for code duplication, logical problems, and misplaced code
 }
 
 export interface PRContext {
@@ -84,7 +85,10 @@ export interface CodeIssue {
     | 'i18n'
     | 'api_design'
     | 'data_flow'
-    | 'business_logic';
+    | 'business_logic'
+    | 'duplication'
+    | 'misplaced_code'
+    | 'logical_flow';
   message: string;
   description: string;
   suggestion?: string;
@@ -97,6 +101,8 @@ export interface CodeIssue {
   endLine?: number;
   endColumn?: number;
   severity: 'high' | 'medium' | 'low';
+  relatedFiles?: string[]; // For architectural issues that span multiple files
+  reviewType?: 'architectural' | 'detailed'; // Indicates which type of review found this issue
 }
 
 export interface ReviewResult {
@@ -113,6 +119,10 @@ export interface AIProvider {
   model: string;
   reviewCode(prompt: string, code: string, rules: CursorRule[]): Promise<CodeIssue[]>;
   reviewBatch(files: FileChange[], rules: CursorRule[], prPlan: PRPlan): Promise<CodeIssue[]>;
+  reviewArchitecture(
+    fileChanges: FileChange[],
+    rules: CursorRule[]
+  ): Promise<ArchitecturalReviewResult>;
   generatePRPlan(fileChanges: FileChange[], rules: CursorRule[]): Promise<PRPlan>;
   generateSummary(issues: CodeIssue[], context: ReviewContext): Promise<string>;
 }
@@ -220,4 +230,38 @@ export interface FileBatch {
   files: FileChange[];
   batchIndex: number;
   totalBatches: number;
+}
+
+export interface ArchitecturalReviewResult {
+  issues: CodeIssue[];
+  duplications: DuplicationPattern[];
+  logicalProblems: LogicalProblem[];
+  misplacedCode: MisplacedCodeIssue[];
+  summary: string;
+  confidence: number;
+}
+
+export interface DuplicationPattern {
+  pattern: string;
+  files: string[];
+  lines: number[];
+  severity: 'high' | 'medium' | 'low';
+  suggestion: string;
+}
+
+export interface LogicalProblem {
+  description: string;
+  affectedFiles: string[];
+  problemType: 'flow' | 'dependency' | 'state' | 'data' | 'control';
+  impact: string;
+  suggestion: string;
+}
+
+export interface MisplacedCodeIssue {
+  code: string;
+  currentFile: string;
+  currentLine: number;
+  suggestedFile: string;
+  reason: string;
+  impact: string;
 }

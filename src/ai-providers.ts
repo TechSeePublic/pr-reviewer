@@ -8,6 +8,7 @@ import {
   ActionInputs,
   AIProvider,
   AIResponse,
+  ArchitecturalReviewResult,
   CodeIssue,
   CursorRule,
   FileChange,
@@ -182,6 +183,43 @@ export class OpenAIProvider implements AIProvider {
     }
   }
 
+  async reviewArchitecture(
+    fileChanges: FileChange[],
+    rules: CursorRule[]
+  ): Promise<ArchitecturalReviewResult> {
+    try {
+      const prompt = PromptTemplates.buildArchitecturalReviewPrompt(fileChanges, rules, {
+        supportsJsonMode: this.supportsJsonMode(),
+        provider: this.name,
+      });
+
+      // Build the request configuration
+      const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
+        model: this.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: this.deterministicMode ? 0.0 : 0.1,
+        max_tokens: 8000,
+      };
+
+      // Only add response_format if the model supports it
+      if (this.supportsJsonMode()) {
+        requestConfig.response_format = { type: 'json_object' };
+      }
+
+      const response = await this.client.chat.completions.create(requestConfig);
+
+      const result = response.choices[0]?.message?.content;
+      if (!result) {
+        throw new Error('No response from OpenAI');
+      }
+
+      return this.parseArchitecturalResponse(result);
+    } catch (error) {
+      logger.error('OpenAI architectural review error:', error);
+      throw new Error(`OpenAI architectural review failed: ${error}`);
+    }
+  }
+
   async generateSummary(issues: CodeIssue[], context: ReviewContext): Promise<string> {
     try {
       const prompt = PromptTemplates.buildSummaryPrompt(issues, context);
@@ -308,6 +346,45 @@ export class OpenAIProvider implements AIProvider {
         riskAreas: ['Unknown risk areas'],
         reviewFocus: ['General code review'],
         context: 'PR plan generation failed',
+      };
+    }
+  }
+
+  private parseArchitecturalResponse(response: string): ArchitecturalReviewResult {
+    try {
+      // Clean up the response for better JSON parsing
+      let cleanedResponse = response.trim();
+
+      // If response doesn't start with {, try to find JSON content
+      if (!cleanedResponse.startsWith('{')) {
+        const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          cleanedResponse = jsonMatch[0];
+        }
+      }
+
+      const parsed = JSON.parse(cleanedResponse);
+
+      return {
+        issues: parsed.issues || [],
+        duplications: parsed.duplications || [],
+        logicalProblems: parsed.logicalProblems || [],
+        misplacedCode: parsed.misplacedCode || [],
+        summary: parsed.summary || 'No architectural summary provided',
+        confidence: parsed.confidence || 0.5,
+      };
+    } catch (error) {
+      logger.warn('Failed to parse architectural review response as JSON:', error);
+      logger.warn('Response content:', response.substring(0, 500) + '...');
+
+      // Return a fallback result
+      return {
+        issues: [],
+        duplications: [],
+        logicalProblems: [],
+        misplacedCode: [],
+        summary: 'Failed to generate architectural review',
+        confidence: 0,
       };
     }
   }
@@ -536,6 +613,35 @@ export class AnthropicProvider implements AIProvider {
     }
   }
 
+  async reviewArchitecture(
+    fileChanges: FileChange[],
+    rules: CursorRule[]
+  ): Promise<ArchitecturalReviewResult> {
+    try {
+      const prompt = PromptTemplates.buildArchitecturalReviewPrompt(fileChanges, rules, {
+        supportsJsonMode: false,
+        provider: this.name,
+      });
+
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 8000,
+        temperature: this.deterministicMode ? 0.0 : 0.1,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      const result = response.content[0];
+      if (!result || result.type !== 'text') {
+        throw new Error('No response from Anthropic for architectural review');
+      }
+
+      return this.parseArchitecturalResponse(result.text);
+    } catch (error) {
+      logger.error('Anthropic architectural review error:', error);
+      throw new Error(`Anthropic architectural review failed: ${error}`);
+    }
+  }
+
   async generateSummary(issues: CodeIssue[], context: ReviewContext): Promise<string> {
     try {
       const prompt = PromptTemplates.buildSummaryPrompt(issues, context);
@@ -757,6 +863,45 @@ export class AnthropicProvider implements AIProvider {
 
     return null;
   }
+
+  private parseArchitecturalResponse(response: string): ArchitecturalReviewResult {
+    try {
+      // Clean up the response for better JSON parsing
+      let cleanedResponse = response.trim();
+
+      // If response doesn't start with {, try to find JSON content
+      if (!cleanedResponse.startsWith('{')) {
+        const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          cleanedResponse = jsonMatch[0];
+        }
+      }
+
+      const parsed = JSON.parse(cleanedResponse);
+
+      return {
+        issues: parsed.issues || [],
+        duplications: parsed.duplications || [],
+        logicalProblems: parsed.logicalProblems || [],
+        misplacedCode: parsed.misplacedCode || [],
+        summary: parsed.summary || 'No architectural summary provided',
+        confidence: parsed.confidence || 0.5,
+      };
+    } catch (error) {
+      logger.warn('Failed to parse architectural review response as JSON:', error);
+      logger.warn('Response content:', response.substring(0, 500) + '...');
+
+      // Return a fallback result
+      return {
+        issues: [],
+        duplications: [],
+        logicalProblems: [],
+        misplacedCode: [],
+        summary: 'Failed to generate architectural review',
+        confidence: 0,
+      };
+    }
+  }
 }
 
 export class AzureOpenAIProvider implements AIProvider {
@@ -964,6 +1109,47 @@ export class AzureOpenAIProvider implements AIProvider {
     } catch (error) {
       logger.error('Azure OpenAI batch review error:', error);
       throw new Error(`Azure OpenAI batch review failed: ${error}`);
+    }
+  }
+
+  async reviewArchitecture(
+    fileChanges: FileChange[],
+    rules: CursorRule[]
+  ): Promise<ArchitecturalReviewResult> {
+    try {
+      const prompt = PromptTemplates.buildArchitecturalReviewPrompt(fileChanges, rules, {
+        supportsJsonMode: this.supportsJsonMode(),
+        provider: this.name,
+      });
+
+      // Build the request configuration
+      const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
+        model: this.model,
+        messages: [{ role: 'user', content: prompt }],
+        ...(this.supportsTemperature() && {
+          temperature: this.deterministicMode ? 0.0 : 0.1,
+        }),
+        ...(this.requiresMaxCompletionTokens()
+          ? { max_completion_tokens: 8000 }
+          : { max_tokens: 8000 }),
+      };
+
+      // Only add response_format if the model supports it
+      if (this.supportsJsonMode()) {
+        requestConfig.response_format = { type: 'json_object' };
+      }
+
+      const response = await this.client.chat.completions.create(requestConfig);
+
+      const result = response.choices[0]?.message?.content;
+      if (!result) {
+        throw new Error('No response from Azure OpenAI');
+      }
+
+      return this.parseArchitecturalResponse(result);
+    } catch (error) {
+      logger.error('Azure OpenAI architectural review error:', error);
+      throw new Error(`Azure OpenAI architectural review failed: ${error}`);
     }
   }
 
@@ -1193,6 +1379,45 @@ export class AzureOpenAIProvider implements AIProvider {
     }
 
     return null;
+  }
+
+  private parseArchitecturalResponse(response: string): ArchitecturalReviewResult {
+    try {
+      // Clean up the response for better JSON parsing
+      let cleanedResponse = response.trim();
+
+      // If response doesn't start with {, try to find JSON content
+      if (!cleanedResponse.startsWith('{')) {
+        const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          cleanedResponse = jsonMatch[0];
+        }
+      }
+
+      const parsed = JSON.parse(cleanedResponse);
+
+      return {
+        issues: parsed.issues || [],
+        duplications: parsed.duplications || [],
+        logicalProblems: parsed.logicalProblems || [],
+        misplacedCode: parsed.misplacedCode || [],
+        summary: parsed.summary || 'No architectural summary provided',
+        confidence: parsed.confidence || 0.5,
+      };
+    } catch (error) {
+      logger.warn('Failed to parse architectural review response as JSON:', error);
+      logger.warn('Response content:', response.substring(0, 500) + '...');
+
+      // Return a fallback result
+      return {
+        issues: [],
+        duplications: [],
+        logicalProblems: [],
+        misplacedCode: [],
+        summary: 'Failed to generate architectural review',
+        confidence: 0,
+      };
+    }
   }
 }
 
