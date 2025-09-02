@@ -16,7 +16,10 @@ export interface FlowDiagram {
   title: string;
   description: string;
   mermaidCode: string;
+  diagramType?: 'feature' | 'bugfix' | 'optimization' | 'refactor' | 'maintenance';
 }
+
+export type PRType = 'feature' | 'bugfix' | 'optimization' | 'refactor' | 'maintenance' | 'unknown';
 
 export class FlowDiagramGenerator {
   private config: FlowDiagramConfig;
@@ -88,7 +91,9 @@ export class FlowDiagramGenerator {
         return null;
       }
 
-      return this.generateAIDiagram(relevantFiles, prPlan);
+      // Detect PR type and generate appropriate diagram
+      const prType = this.detectPRType(prPlan, relevantFiles);
+      return this.generateAIDiagram(relevantFiles, prPlan, prType);
     } catch (error) {
       logger.error('Failed to generate flow diagram:', error);
       return null;
@@ -98,11 +103,15 @@ export class FlowDiagramGenerator {
   /**
    * Generate diagram using AI to create Mermaid text directly
    */
-  private async generateAIDiagram(files: FileChange[], prPlan: PRPlan): Promise<FlowDiagram> {
-    logger.info('Generating AI flow diagram...');
+  private async generateAIDiagram(
+    files: FileChange[],
+    prPlan: PRPlan,
+    prType: PRType
+  ): Promise<FlowDiagram> {
+    logger.info(`Generating AI flow diagram for ${prType} PR...`);
 
     try {
-      const prompt = this.buildMermaidPrompt(files, prPlan);
+      const prompt = this.buildSpecializedPrompt(files, prPlan, prType);
       const context = this.buildFileContext(files);
 
       // Ask AI to generate the Mermaid diagram directly using a custom method
@@ -121,9 +130,10 @@ export class FlowDiagramGenerator {
       }
 
       const diagram: FlowDiagram = {
-        title: `What This PR Does: ${prPlan.overview.substring(0, 50)}${prPlan.overview.length > 50 ? '...' : ''}`,
-        description: this.generateSmartDescription(prPlan, files.length),
+        title: this.generateTitle(prPlan, prType),
+        description: this.generateSmartDescription(prPlan, files.length, prType),
         mermaidCode,
+        ...(prType !== 'unknown' && { diagramType: prType }),
       };
 
       logger.info('Generated AI flow diagram successfully');
@@ -224,9 +234,368 @@ export class FlowDiagramGenerator {
   }
 
   /**
-   * Build prompt for AI to generate Mermaid diagram
+   * Detect the type of PR based on overview and changes
    */
-  private buildMermaidPrompt(files: FileChange[], prPlan: PRPlan): string {
+  private detectPRType(prPlan: PRPlan, files: FileChange[]): PRType {
+    const overview = prPlan.overview.toLowerCase();
+    const keyChanges = prPlan.keyChanges.join(' ').toLowerCase();
+    const fileNames = files.map(f => f.filename.toLowerCase()).join(' ');
+    const allText = `${overview} ${keyChanges} ${fileNames}`;
+
+    // Feature detection
+    if (
+      allText.includes('add') ||
+      allText.includes('create') ||
+      allText.includes('implement') ||
+      allText.includes('new feature') ||
+      allText.includes('introduce')
+    ) {
+      return 'feature';
+    }
+
+    // Bug fix detection
+    if (
+      allText.includes('fix') ||
+      allText.includes('bug') ||
+      allText.includes('resolve') ||
+      allText.includes('patch') ||
+      allText.includes('correct')
+    ) {
+      return 'bugfix';
+    }
+
+    // Optimization detection
+    if (
+      allText.includes('optimize') ||
+      allText.includes('performance') ||
+      allText.includes('speed up') ||
+      allText.includes('improve performance') ||
+      allText.includes('faster') ||
+      allText.includes('efficiency')
+    ) {
+      return 'optimization';
+    }
+
+    // Refactor detection
+    if (
+      allText.includes('refactor') ||
+      allText.includes('restructure') ||
+      allText.includes('reorganize') ||
+      allText.includes('clean up') ||
+      allText.includes('simplify')
+    ) {
+      return 'refactor';
+    }
+
+    // Maintenance detection
+    if (
+      allText.includes('update') ||
+      allText.includes('upgrade') ||
+      allText.includes('maintain') ||
+      allText.includes('dependency') ||
+      allText.includes('version')
+    ) {
+      return 'maintenance';
+    }
+
+    return 'unknown';
+  }
+
+  /**
+   * Build specialized prompt based on PR type
+   */
+  private buildSpecializedPrompt(files: FileChange[], prPlan: PRPlan, prType: PRType): string {
+    switch (prType) {
+      case 'feature':
+        return this.buildFeaturePrompt(files, prPlan);
+      case 'bugfix':
+        return this.buildBugfixPrompt(files, prPlan);
+      case 'optimization':
+        return this.buildOptimizationPrompt(files, prPlan);
+      case 'refactor':
+        return this.buildRefactorPrompt(files, prPlan);
+      case 'maintenance':
+        return this.buildMaintenancePrompt(files, prPlan);
+      default:
+        return this.buildGenericPrompt(files, prPlan);
+    }
+  }
+
+  /**
+   * Build prompt for new features - focus on user journey
+   */
+  private buildFeaturePrompt(files: FileChange[], prPlan: PRPlan): string {
+    const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
+
+    return `# NEW FEATURE FLOW DIAGRAM
+
+Create a Mermaid flowchart that explains the complete USER JOURNEY for this new feature.
+
+## New Feature Description:
+${prPlan.overview}
+
+## Key Implementation Details:
+${prPlan.keyChanges.join('\n')}
+
+## Files Modified:
+${fileList}
+
+YOUR GOAL: Show users and stakeholders WHAT this new feature does and HOW users will interact with it.
+
+FOCUS ON USER EXPERIENCE:
+1. HOW users discover/access this feature
+2. WHAT steps users take to use it
+3. WHAT happens behind the scenes (in simple terms)
+4. WHAT users see as results
+5. HOW this improves their workflow
+
+MAKE IT USER-CENTRIC:
+- Start with user action or need
+- Show clear steps users will take
+- Explain what users see at each step
+- Include decision points users face
+- End with the value/benefit users get
+- Use language stakeholders understand
+
+EXAMPLE STRUCTURE:
+flowchart TD
+    A[User needs to upload document] --> B[User clicks upload button]
+    B --> C[User selects file from device]
+    C --> D{File size acceptable?}
+    D -->|No| E[Show size warning]
+    D -->|Yes| F[File uploads with progress bar]
+    F --> G[System analyzes document]
+    G --> H[User sees analysis results]
+    H --> I[User can download report]
+
+Return only the Mermaid flowchart code that tells the complete user story.`;
+  }
+
+  /**
+   * Build prompt for bug fixes - focus on problem and solution
+   */
+  private buildBugfixPrompt(files: FileChange[], prPlan: PRPlan): string {
+    const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
+
+    return `# BUG FIX FLOW DIAGRAM
+
+Create a Mermaid flowchart that shows HOW this bug fix changes the user experience.
+
+## Bug Fix Description:
+${prPlan.overview}
+
+## What Was Fixed:
+${prPlan.keyChanges.join('\n')}
+
+## Files Modified:
+${fileList}
+
+YOUR GOAL: Show the BEFORE vs AFTER behavior so users understand what changed.
+
+FOCUS ON PROBLEM & SOLUTION:
+1. WHAT scenario triggered the bug
+2. WHERE the problem occurred in the flow
+3. HOW the fix changes the behavior
+4. WHAT users experience now instead
+5. HOW this prevents the issue
+
+SHOW THE IMPROVEMENT:
+- Start with the scenario that had problems
+- Show where the bug occurred
+- Highlight the fixed behavior
+- Demonstrate the improved user experience
+- Include error handling improvements
+
+EXAMPLE STRUCTURE:
+flowchart TD
+    A[User submits form] --> B[System validates data]
+    B --> C{All required fields?}
+    C -->|No| D[Show specific field errors]
+    C -->|Yes| E[Process submission]
+    E --> F{Processing successful?}
+    F -->|No| G[Show helpful error message]
+    F -->|Yes| H[Confirm success to user]
+    
+    style D fill:#90EE90
+    style G fill:#90EE90
+    
+Use green highlighting for the parts that were fixed/improved.
+
+Return only the Mermaid flowchart code that shows the fix.`;
+  }
+
+  /**
+   * Build prompt for optimizations - focus on improvements
+   */
+  private buildOptimizationPrompt(files: FileChange[], prPlan: PRPlan): string {
+    const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
+
+    return `# OPTIMIZATION FLOW DIAGRAM
+
+Create a Mermaid flowchart that shows HOW this optimization improves performance or efficiency.
+
+## Optimization Description:
+${prPlan.overview}
+
+## Performance Improvements:
+${prPlan.keyChanges.join('\n')}
+
+## Files Modified:
+${fileList}
+
+YOUR GOAL: Show WHAT was optimized and HOW it affects the user experience.
+
+FOCUS ON IMPROVEMENTS:
+1. WHAT process was slow/inefficient before
+2. WHERE the bottlenecks were
+3. HOW the optimization works
+4. WHAT users notice as improvement
+5. WHEN the benefits are most apparent
+
+HIGHLIGHT THE GAINS:
+- Show the improved process flow
+- Indicate faster/more efficient steps
+- Demonstrate reduced waiting times
+- Highlight better resource usage
+- Show measurable improvements
+
+EXAMPLE STRUCTURE:
+flowchart TD
+    A[User requests data] --> B[Check cache first]
+    B --> C{Data in cache?}
+    C -->|Yes| D[Return cached data instantly]
+    C -->|No| E[Fetch from database]
+    E --> F[Store in cache]
+    F --> G[Return data to user]
+    D --> H[User sees results quickly]
+    G --> H
+    
+    style B fill:#FFD700
+    style D fill:#90EE90
+    style F fill:#FFD700
+    
+Use gold for optimization points and green for speed improvements.
+
+Return only the Mermaid flowchart code that shows the optimization.`;
+  }
+
+  /**
+   * Build prompt for refactoring - focus on structural improvements
+   */
+  private buildRefactorPrompt(files: FileChange[], prPlan: PRPlan): string {
+    const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
+
+    return `# REFACTORING FLOW DIAGRAM
+
+Create a Mermaid flowchart that shows HOW the code structure was improved while maintaining functionality.
+
+## Refactoring Description:
+${prPlan.overview}
+
+## Structural Changes:
+${prPlan.keyChanges.join('\n')}
+
+## Files Modified:
+${fileList}
+
+YOUR GOAL: Show WHAT was restructured and WHY it's better for maintenance/development.
+
+FOCUS ON STRUCTURAL IMPROVEMENTS:
+1. WHAT the main process flow is (unchanged for users)
+2. HOW the internal structure is now better organized
+3. WHERE complexity was reduced
+4. WHAT makes it easier to maintain
+5. HOW it improves code quality
+
+SHOW INTERNAL IMPROVEMENTS:
+- Maintain the same user-facing flow
+- Highlight cleaner internal processes
+- Show better separation of concerns
+- Indicate improved error handling
+- Demonstrate better code organization
+
+EXAMPLE STRUCTURE:
+flowchart TD
+    A[User request] --> B[Unified validation layer]
+    B --> C[Business logic handler]
+    C --> D[Data access layer]
+    D --> E[Response formatter]
+    E --> F[User receives response]
+    
+    subgraph "Improved Structure"
+        B
+        C
+        D
+        E
+    end
+    
+    style B fill:#E6E6FA
+    style C fill:#E6E6FA
+    style D fill:#E6E6FA
+    style E fill:#E6E6FA
+
+Use light purple for refactored components.
+
+Return only the Mermaid flowchart code that shows the improved structure.`;
+  }
+
+  /**
+   * Build prompt for maintenance - focus on what was updated
+   */
+  private buildMaintenancePrompt(files: FileChange[], prPlan: PRPlan): string {
+    const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
+
+    return `# MAINTENANCE UPDATE DIAGRAM
+
+Create a Mermaid flowchart that shows WHAT was updated and HOW it affects the system.
+
+## Maintenance Description:
+${prPlan.overview}
+
+## Updates Made:
+${prPlan.keyChanges.join('\n')}
+
+## Files Modified:
+${fileList}
+
+YOUR GOAL: Show WHAT components were updated and WHY this matters for the system.
+
+FOCUS ON UPDATES:
+1. WHAT components were updated
+2. HOW the updates improve reliability/security
+3. WHERE the changes have impact
+4. WHAT users can expect (if anything)
+5. HOW this keeps the system healthy
+
+SHOW MAINTENANCE VALUE:
+- Highlight updated components
+- Show improved reliability/security
+- Indicate compatibility improvements
+- Demonstrate system health benefits
+- Keep user impact minimal focus
+
+EXAMPLE STRUCTURE:
+flowchart TD
+    A[System operates normally] --> B[Updated dependencies]
+    B --> C[Enhanced security checks]
+    C --> D[Improved compatibility]
+    D --> E[Better performance]
+    E --> F[Users enjoy stable system]
+    
+    style B fill:#87CEEB
+    style C fill:#98FB98
+    style D fill:#87CEEB
+    style E fill:#98FB98
+
+Use blue for updates and light green for improvements.
+
+Return only the Mermaid flowchart code that shows the maintenance updates.`;
+  }
+
+  /**
+   * Build generic prompt for unknown PR types
+   */
+  private buildGenericPrompt(files: FileChange[], prPlan: PRPlan): string {
     const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
 
     return `# EXPLANATORY FLOW DIAGRAM GENERATION
@@ -260,29 +629,7 @@ MAKE IT EXPLANATORY:
 - Use business terms that stakeholders understand
 - Show the value/outcome for users
 
-GOOD EXAMPLES OF NODES:
-- "User uploads document"
-- "System validates file format"
-- "Document processed for analysis"
-- "AI extracts key information"
-- "Results saved to database"
-- "User receives summary report"
-
-AVOID TECHNICAL JARGON:
-- Don't use internal function names
-- Don't focus on implementation details
-- Don't use developer-only terminology
-- Don't create generic "process data" nodes
-
-STRUCTURE REQUIREMENTS:
-- Start with user action or trigger event
-- Show logical flow of what happens next
-- Include meaningful decision points
-- End with clear outcome/result
-- Use 6-12 nodes for comprehensive explanation
-- Keep labels under 40 characters but descriptive
-
-EXAMPLE - For a document analysis feature:
+EXAMPLE STRUCTURE:
 flowchart TD
     A[User uploads document] --> B[System validates file]
     B --> C{File format supported?}
@@ -693,46 +1040,62 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
   }
 
   /**
+   * Generate specialized title based on PR type
+   */
+  private generateTitle(prPlan: PRPlan, prType: PRType): string {
+    const shortOverview =
+      prPlan.overview.substring(0, 50) + (prPlan.overview.length > 50 ? '...' : '');
+
+    switch (prType) {
+      case 'feature':
+        return `🆕 New Feature: ${shortOverview}`;
+      case 'bugfix':
+        return `🐛 Bug Fix: ${shortOverview}`;
+      case 'optimization':
+        return `⚡ Performance: ${shortOverview}`;
+      case 'refactor':
+        return `🔧 Refactor: ${shortOverview}`;
+      case 'maintenance':
+        return `🔄 Maintenance: ${shortOverview}`;
+      default:
+        return `What This PR Does: ${shortOverview}`;
+    }
+  }
+
+  /**
    * Generate a smart, contextual description for the flow diagram
    */
-  private generateSmartDescription(prPlan: PRPlan, fileCount: number): string {
-    const overview = prPlan.overview.toLowerCase();
+  private generateSmartDescription(prPlan: PRPlan, fileCount: number, prType: PRType): string {
     let description = '';
 
-    // Determine the type of change
-    if (overview.includes('add') || overview.includes('create') || overview.includes('implement')) {
-      description = `This diagram explains the complete user journey for the new feature being added. `;
-    } else if (
-      overview.includes('fix') ||
-      overview.includes('bug') ||
-      overview.includes('resolve')
-    ) {
-      description = `This diagram shows how the bug fix changes the user experience and system behavior. `;
-    } else if (
-      overview.includes('improve') ||
-      overview.includes('enhance') ||
-      overview.includes('optimize')
-    ) {
-      description = `This diagram illustrates the improved workflow and enhanced user experience. `;
-    } else if (
-      overview.includes('update') ||
-      overview.includes('modify') ||
-      overview.includes('change')
-    ) {
-      description = `This diagram shows how the updates change the existing flow and user experience. `;
-    } else if (overview.includes('refactor') || overview.includes('restructure')) {
-      description = `This diagram explains how the refactoring improves the internal logic while maintaining user functionality. `;
-    } else {
-      description = `This diagram explains what happens when users interact with the changes in this PR. `;
+    // Generate description based on PR type
+    switch (prType) {
+      case 'feature':
+        description = `This diagram shows the complete user journey for the new feature. Follow the flow to understand how users will discover, use, and benefit from this addition. `;
+        break;
+      case 'bugfix':
+        description = `This diagram illustrates how the bug fix improves the user experience. Green highlighted sections show the corrected behavior that prevents the original issue. `;
+        break;
+      case 'optimization':
+        description = `This diagram demonstrates the performance improvements made to the system. Gold sections show optimization points, while green areas highlight speed/efficiency gains users will notice. `;
+        break;
+      case 'refactor':
+        description = `This diagram shows how the code structure was improved while maintaining the same user functionality. Purple sections highlight the cleaner, more maintainable internal organization. `;
+        break;
+      case 'maintenance':
+        description = `This diagram explains what system components were updated and how these changes improve reliability, security, or compatibility. Blue sections show updates, green shows benefits. `;
+        break;
+      default:
+        description = `This diagram explains what happens when users interact with the changes in this PR. `;
     }
 
     // Add context about scope
     if (fileCount === 1) {
-      description += `The change affects one key component, showing a focused improvement to the system.`;
+      description += `The change affects one key component, delivering a focused improvement.`;
     } else if (fileCount <= 3) {
-      description += `The changes span ${fileCount} components, showing how they work together to deliver the feature.`;
+      description += `The changes span ${fileCount} components, showing how they coordinate to deliver the enhancement.`;
     } else {
-      description += `The changes involve ${fileCount} components, illustrating the comprehensive nature of this update.`;
+      description += `The changes involve ${fileCount} components, demonstrating the comprehensive scope of this update.`;
     }
 
     return description;

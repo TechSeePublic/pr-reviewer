@@ -494,19 +494,24 @@ ${JSON.stringify(
         );
 
         if (flowDiagram) {
-          body += `### 🔄 **Technical Flow Diagram**\n\n`;
+          const diagramTitle = flowDiagram.diagramType
+            ? `### 🌊 **${flowDiagram.title}**\n\n`
+            : `### 🌊 **What This PR Does - Flow Explanation**\n\n`;
+
+          body += diagramTitle;
           body += `${flowDiagram.description}\n\n`;
           // Ensure mermaid code ends with newline
           const cleanMermaidCode = flowDiagram.mermaidCode.trim();
           body += `\`\`\`mermaid\n${cleanMermaidCode}\n\`\`\`\n\n`;
-          body += `<details>\n<summary>📊 About This Diagram</summary>\n\n`;
-          body += `This flow diagram shows the technical implementation and code flow for the changes in this PR.\n\n`;
-          body += `**Diagram Elements:**\n`;
-          body += `- **Rectangles** \`[]\`: Process steps or actions\n`;
-          body += `- **Diamonds** \`{}\`: Decision points or conditions\n`;
-          body += `- **Rounded rectangles** \`()\`: Start/end points\n`;
-          body += `- **Solid arrows** \`-->\`: Flow direction\n`;
-          body += `- **Labeled arrows** \`-->|label|\`: Conditional flows\n\n`;
+          body += `<details>\n<summary>💡 How to Read This Diagram</summary>\n\n`;
+          body += `This flow diagram tells the complete story of what happens when users interact with the changes in this PR. Follow the arrows to understand the journey from start to finish.\n\n`;
+          body += `**Visual Guide:**\n`;
+          body += `- **📋 Rectangles** \`[]\`: Actions that happen or processes that run\n`;
+          body += `- **💭 Diamonds** \`{}\`: Decision points where the system chooses what to do next\n`;
+          body += `- **🎯 Rounded rectangles** \`()\`: Starting points or final outcomes\n`;
+          body += `- **➡️ Arrows** \`-->\`: Shows what happens next in the flow\n`;
+          body += `- **🏷️ Arrow labels** \`-->|condition|\`: Explains when a specific path is taken\n\n`;
+          body += `**💡 Pro tip:** Start from the top and follow the arrows to understand the complete user journey and business logic behind these changes.\n\n`;
           body += `</details>\n\n`;
         }
       } catch (error) {
