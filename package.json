@@ -1,6 +1,6 @@
 {
   "name": "techsee-ai-pr-reviewer",
-  "version": "1.0.57",
+  "version": "1.0.58",
   "description": "AI-powered PR reviewer that respects Cursor AI rules",
   "main": "dist/main.js",
   "scripts": {
