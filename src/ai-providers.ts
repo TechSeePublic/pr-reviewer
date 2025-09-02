@@ -170,7 +170,10 @@ export class OpenAIProvider implements AIProvider {
         throw new Error('No response from OpenAI for batch review');
       }
 
-      return this.parseAIResponse(result);
+      const issues = this.parseAIResponse(result);
+
+      // Ensure all issues have valid file names
+      return this.assignFilesToIssues(issues, files);
     } catch (error) {
       logger.error('OpenAI batch review error:', error);
       throw new Error(`OpenAI batch review failed: ${error}`);
@@ -310,6 +313,102 @@ export class OpenAIProvider implements AIProvider {
     // Reasoning models don't support temperature parameter
     return !this.requiresMaxCompletionTokens();
   }
+
+  /**
+   * Assign proper file names to issues when AI doesn't provide them correctly
+   */
+  private assignFilesToIssues(issues: CodeIssue[], files: FileChange[]): CodeIssue[] {
+    return issues.map(issue => {
+      // If issue already has a valid filename from the files list, keep it
+      if (issue.file && files.some(f => f.filename === issue.file)) {
+        return issue;
+      }
+
+      // If only one file in batch, assign it
+      if (files.length === 1 && files[0]) {
+        return { ...issue, file: files[0].filename };
+      }
+
+      // Try to match based on file extensions or patterns in the message
+      const matchedFile = this.matchIssueToFile(issue, files);
+      if (matchedFile) {
+        return { ...issue, file: matchedFile.filename };
+      }
+
+      // As last resort, keep original file name but log a warning
+      if (issue.file === 'unknown' || !issue.file) {
+        logger.warn(
+          `Could not determine specific file for issue: ${issue.message}. Will show as affecting multiple files.`
+        );
+        return { ...issue, file: 'Multiple Files' };
+      }
+
+      return issue;
+    });
+  }
+
+  /**
+   * Attempt to match an issue to a specific file based on context clues
+   */
+  private matchIssueToFile(issue: CodeIssue, files: FileChange[]): FileChange | null {
+    const lowerMessage = issue.message.toLowerCase();
+    const lowerDescription = issue.description.toLowerCase();
+
+    // Look for file extensions or names mentioned in the issue
+    for (const file of files) {
+      const fileName = file.filename.toLowerCase();
+      const baseName = fileName.split('/').pop() || fileName;
+
+      // Check if filename or extension is mentioned in the issue
+      if (lowerMessage.includes(baseName) || lowerDescription.includes(baseName)) {
+        return file;
+      }
+
+      // Check for file extension patterns
+      const ext = fileName.split('.').pop();
+      if (ext && (lowerMessage.includes(`.${ext}`) || lowerDescription.includes(`.${ext}`))) {
+        return file;
+      }
+    }
+
+    // Look for technology-specific patterns
+    for (const file of files) {
+      const fileName = file.filename.toLowerCase();
+
+      // React/TypeScript patterns
+      if (fileName.includes('.tsx') || fileName.includes('.jsx')) {
+        if (
+          lowerMessage.includes('react') ||
+          lowerMessage.includes('component') ||
+          lowerMessage.includes('jsx') ||
+          lowerMessage.includes('hook')
+        ) {
+          return file;
+        }
+      }
+
+      // API/Backend patterns
+      if (fileName.includes('api') || fileName.includes('server') || fileName.includes('route')) {
+        if (
+          lowerMessage.includes('api') ||
+          lowerMessage.includes('endpoint') ||
+          lowerMessage.includes('route') ||
+          lowerMessage.includes('server')
+        ) {
+          return file;
+        }
+      }
+
+      // Test file patterns
+      if (fileName.includes('.test.') || fileName.includes('.spec.')) {
+        if (lowerMessage.includes('test') || lowerMessage.includes('spec')) {
+          return file;
+        }
+      }
+    }
+
+    return null;
+  }
 }
 
 export class AnthropicProvider implements AIProvider {
@@ -416,7 +515,10 @@ export class AnthropicProvider implements AIProvider {
         throw new Error('No response from Anthropic for batch review');
       }
 
-      return this.parseAIResponse(result.text);
+      const issues = this.parseAIResponse(result.text);
+
+      // Ensure all issues have valid file names
+      return this.assignFilesToIssues(issues, files);
     } catch (error) {
       logger.error('Anthropic batch review error:', error);
       throw new Error(`Anthropic batch review failed: ${error}`);
@@ -540,6 +642,102 @@ export class AnthropicProvider implements AIProvider {
         context: 'PR plan generation failed',
       };
     }
+  }
+
+  /**
+   * Assign proper file names to issues when AI doesn't provide them correctly
+   */
+  private assignFilesToIssues(issues: CodeIssue[], files: FileChange[]): CodeIssue[] {
+    return issues.map(issue => {
+      // If issue already has a valid filename from the files list, keep it
+      if (issue.file && files.some(f => f.filename === issue.file)) {
+        return issue;
+      }
+
+      // If only one file in batch, assign it
+      if (files.length === 1 && files[0]) {
+        return { ...issue, file: files[0].filename };
+      }
+
+      // Try to match based on file extensions or patterns in the message
+      const matchedFile = this.matchIssueToFile(issue, files);
+      if (matchedFile) {
+        return { ...issue, file: matchedFile.filename };
+      }
+
+      // As last resort, keep original file name but log a warning
+      if (issue.file === 'unknown' || !issue.file) {
+        logger.warn(
+          `Could not determine specific file for issue: ${issue.message}. Will show as affecting multiple files.`
+        );
+        return { ...issue, file: 'Multiple Files' };
+      }
+
+      return issue;
+    });
+  }
+
+  /**
+   * Attempt to match an issue to a specific file based on context clues
+   */
+  private matchIssueToFile(issue: CodeIssue, files: FileChange[]): FileChange | null {
+    const lowerMessage = issue.message.toLowerCase();
+    const lowerDescription = issue.description.toLowerCase();
+
+    // Look for file extensions or names mentioned in the issue
+    for (const file of files) {
+      const fileName = file.filename.toLowerCase();
+      const baseName = fileName.split('/').pop() || fileName;
+
+      // Check if filename or extension is mentioned in the issue
+      if (lowerMessage.includes(baseName) || lowerDescription.includes(baseName)) {
+        return file;
+      }
+
+      // Check for file extension patterns
+      const ext = fileName.split('.').pop();
+      if (ext && (lowerMessage.includes(`.${ext}`) || lowerDescription.includes(`.${ext}`))) {
+        return file;
+      }
+    }
+
+    // Look for technology-specific patterns
+    for (const file of files) {
+      const fileName = file.filename.toLowerCase();
+
+      // React/TypeScript patterns
+      if (fileName.includes('.tsx') || fileName.includes('.jsx')) {
+        if (
+          lowerMessage.includes('react') ||
+          lowerMessage.includes('component') ||
+          lowerMessage.includes('jsx') ||
+          lowerMessage.includes('hook')
+        ) {
+          return file;
+        }
+      }
+
+      // API/Backend patterns
+      if (fileName.includes('api') || fileName.includes('server') || fileName.includes('route')) {
+        if (
+          lowerMessage.includes('api') ||
+          lowerMessage.includes('endpoint') ||
+          lowerMessage.includes('route') ||
+          lowerMessage.includes('server')
+        ) {
+          return file;
+        }
+      }
+
+      // Test file patterns
+      if (fileName.includes('.test.') || fileName.includes('.spec.')) {
+        if (lowerMessage.includes('test') || lowerMessage.includes('spec')) {
+          return file;
+        }
+      }
+    }
+
+    return null;
   }
 }
 
@@ -738,7 +936,10 @@ export class AzureOpenAIProvider implements AIProvider {
         throw new Error('No response from Azure OpenAI for batch review');
       }
 
-      return this.parseAIResponse(result);
+      const issues = this.parseAIResponse(result);
+
+      // Ensure all issues have valid file names
+      return this.assignFilesToIssues(issues, files);
     } catch (error) {
       logger.error('Azure OpenAI batch review error:', error);
       throw new Error(`Azure OpenAI batch review failed: ${error}`);
@@ -868,6 +1069,102 @@ export class AzureOpenAIProvider implements AIProvider {
         context: 'PR plan generation failed',
       };
     }
+  }
+
+  /**
+   * Assign proper file names to issues when AI doesn't provide them correctly
+   */
+  private assignFilesToIssues(issues: CodeIssue[], files: FileChange[]): CodeIssue[] {
+    return issues.map(issue => {
+      // If issue already has a valid filename from the files list, keep it
+      if (issue.file && files.some(f => f.filename === issue.file)) {
+        return issue;
+      }
+
+      // If only one file in batch, assign it
+      if (files.length === 1 && files[0]) {
+        return { ...issue, file: files[0].filename };
+      }
+
+      // Try to match based on file extensions or patterns in the message
+      const matchedFile = this.matchIssueToFile(issue, files);
+      if (matchedFile) {
+        return { ...issue, file: matchedFile.filename };
+      }
+
+      // As last resort, keep original file name but log a warning
+      if (issue.file === 'unknown' || !issue.file) {
+        logger.warn(
+          `Could not determine specific file for issue: ${issue.message}. Will show as affecting multiple files.`
+        );
+        return { ...issue, file: 'Multiple Files' };
+      }
+
+      return issue;
+    });
+  }
+
+  /**
+   * Attempt to match an issue to a specific file based on context clues
+   */
+  private matchIssueToFile(issue: CodeIssue, files: FileChange[]): FileChange | null {
+    const lowerMessage = issue.message.toLowerCase();
+    const lowerDescription = issue.description.toLowerCase();
+
+    // Look for file extensions or names mentioned in the issue
+    for (const file of files) {
+      const fileName = file.filename.toLowerCase();
+      const baseName = fileName.split('/').pop() || fileName;
+
+      // Check if filename or extension is mentioned in the issue
+      if (lowerMessage.includes(baseName) || lowerDescription.includes(baseName)) {
+        return file;
+      }
+
+      // Check for file extension patterns
+      const ext = fileName.split('.').pop();
+      if (ext && (lowerMessage.includes(`.${ext}`) || lowerDescription.includes(`.${ext}`))) {
+        return file;
+      }
+    }
+
+    // Look for technology-specific patterns
+    for (const file of files) {
+      const fileName = file.filename.toLowerCase();
+
+      // React/TypeScript patterns
+      if (fileName.includes('.tsx') || fileName.includes('.jsx')) {
+        if (
+          lowerMessage.includes('react') ||
+          lowerMessage.includes('component') ||
+          lowerMessage.includes('jsx') ||
+          lowerMessage.includes('hook')
+        ) {
+          return file;
+        }
+      }
+
+      // API/Backend patterns
+      if (fileName.includes('api') || fileName.includes('server') || fileName.includes('route')) {
+        if (
+          lowerMessage.includes('api') ||
+          lowerMessage.includes('endpoint') ||
+          lowerMessage.includes('route') ||
+          lowerMessage.includes('server')
+        ) {
+          return file;
+        }
+      }
+
+      // Test file patterns
+      if (fileName.includes('.test.') || fileName.includes('.spec.')) {
+        if (lowerMessage.includes('test') || lowerMessage.includes('spec')) {
+          return file;
+        }
+      }
+    }
+
+    return null;
   }
 }
 

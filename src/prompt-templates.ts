@@ -117,7 +117,7 @@ Your response MUST be a valid JSON object with this exact structure:
       "fixedCode": "Complete corrected code snippet for auto-fix (optional)",
       "ruleId": "cursor_rule_id or 'general_review'",
       "ruleName": "Human-readable rule name or issue category",
-      "file": "filename from context",
+      "file": "EXACT filename from context - NEVER use 'unknown' or 'Multiple Files'",
       "line": 0,
       "severity": "high|medium|low"
     }
@@ -126,6 +126,8 @@ Your response MUST be a valid JSON object with this exact structure:
   "reasoning": "Brief explanation of your analysis approach and confidence level"
 }
 \`\`\`
+
+**CRITICAL**: The "file" field must ALWAYS contain the exact filename where the issue is found. Never use generic terms like "unknown", "Multiple Files", or "various files". If reviewing multiple files, specify the exact file for each individual issue.
 
 ## ISSUE CLASSIFICATION GUIDE
 
@@ -740,6 +742,14 @@ Given the PR context above, please review these ${files.length} files as a cohes
 3. **Integration** - How do these files interact with each other?
 4. **PR Goals** - Do the changes achieve the stated objectives?
 
+## CRITICAL: File Assignment Requirements
+
+For EVERY issue you identify, you MUST specify the exact filename where the issue occurs. Use the complete filename exactly as shown above:
+
+${files.map(f => `- "${f.filename}"`).join('\n')}
+
+**NEVER use generic terms like "Multiple Files" or "unknown". Always specify the exact file where each issue is found.**
+
 Apply the same JSON response format as single-file reviews, but consider the **collective impact** of all files together.
 
 Look for:
@@ -749,7 +759,9 @@ Look for:
 - Security implications of the combined changes
 - Performance impact of the overall feature/fix
 
-Remember: You're reviewing the changes as they relate to the overall PR goals, not just individual file quality.`;
+Remember: You're reviewing the changes as they relate to the overall PR goals, not just individual file quality.
+
+**Final Reminder**: In your JSON response, ensure every issue has a "file" property set to one of the exact filenames listed above.`;
 
     return prompt;
   }

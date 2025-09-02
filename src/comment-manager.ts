@@ -99,10 +99,10 @@ export class CommentManager {
       existingComments = await this.githubClient.getExistingBotComments();
     }
 
-    // Filter issues based on log level for inline comments
-    const filteredIssuesForInline = this.filterIssuesByLogLevel(reviewResult.issues);
+    // Filter issues based on inline severity for inline comments
+    const filteredIssuesForInline = this.filterIssuesBySeverity(reviewResult.issues);
 
-    // Post inline comments (only critical issues based on log level)
+    // Post inline comments (based on inline_severity setting)
     if (shouldPostInline) {
       logger.info(`Posting ${filteredIssuesForInline.length} inline comments...`);
       await this.postInlineComments(

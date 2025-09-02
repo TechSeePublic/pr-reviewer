@@ -121,8 +121,8 @@ export class FlowDiagramGenerator {
       }
 
       const diagram: FlowDiagram = {
-        title: `Technical Flow: ${prPlan.overview.substring(0, 45)}${prPlan.overview.length > 45 ? '...' : ''}`,
-        description: `This diagram shows the technical implementation and code flow for the changes in this PR.`,
+        title: `What This PR Does: ${prPlan.overview.substring(0, 50)}${prPlan.overview.length > 50 ? '...' : ''}`,
+        description: this.generateSmartDescription(prPlan, files.length),
         mermaidCode,
       };
 
@@ -229,67 +229,72 @@ export class FlowDiagramGenerator {
   private buildMermaidPrompt(files: FileChange[], prPlan: PRPlan): string {
     const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
 
-    return `# TECHNICAL FLOW DIAGRAM GENERATION
+    return `# EXPLANATORY FLOW DIAGRAM GENERATION
 
-Create a Mermaid flowchart that shows the TECHNICAL IMPLEMENTATION and CODE FLOW of the changes in this PR.
+Create a Mermaid flowchart that CLEARLY EXPLAINS what this PR does and why it matters.
 
-## Feature Description:
+## What This PR Accomplishes:
 ${prPlan.overview}
 
-## Technical Changes Made:
+## Key Changes Made:
 ${prPlan.keyChanges.join('\n')}
 
 ## Files Modified:
 ${fileList}
 
-YOUR TASK: Create a flowchart showing the TECHNICAL FLOW from a DEVELOPER'S perspective.
+YOUR GOAL: Create a flowchart that explains the COMPLETE USER JOURNEY and BUSINESS LOGIC, not just technical implementation.
 
-FOCUS ON TECHNICAL IMPLEMENTATION:
-- Function calls and method execution
-- Data flow and transformations
-- API calls and responses
-- Validation and error handling
-- Database operations
-- System components interactions
-- Key algorithms and logic
+FOCUS ON EXPLAINING:
+1. WHAT triggers this flow (user action, event, condition)
+2. WHAT business problem is being solved
+3. WHAT decisions are made and why
+4. WHAT data is processed and transformed
+5. WHAT the end result means for users
+6. HOW different components work together
 
-SHOW TECHNICAL ELEMENTS:
-- Function/method entry points
-- Data validation steps
-- Processing logic and calculations
-- External API calls
-- Database queries/updates
-- Error handling paths
-- Return values and responses
+MAKE IT EXPLANATORY:
+- Use clear, descriptive labels that explain PURPOSE
+- Show the logical progression of events
+- Include decision points with meaningful conditions
+- Explain what happens in success vs error cases
+- Use business terms that stakeholders understand
+- Show the value/outcome for users
 
-DO NOT SHOW:
-- End-user UI interactions
-- Generic user actions like "clicks button"
-- PR review processes
+GOOD EXAMPLES OF NODES:
+- "User uploads document"
+- "System validates file format"
+- "Document processed for analysis"
+- "AI extracts key information"
+- "Results saved to database"
+- "User receives summary report"
 
-SYNTAX REQUIREMENTS:
-- Keep node labels simple and short (under 30 characters)
-- Do NOT use quotes (") inside node labels
-- Use technical terms like "validate", "process", "query", "return"
-- Keep the diagram focused (maximum 8-10 nodes)
-- Use clear, technical language
+AVOID TECHNICAL JARGON:
+- Don't use internal function names
+- Don't focus on implementation details
+- Don't use developer-only terminology
+- Don't create generic "process data" nodes
 
-EXAMPLE - For an authentication API:
+STRUCTURE REQUIREMENTS:
+- Start with user action or trigger event
+- Show logical flow of what happens next
+- Include meaningful decision points
+- End with clear outcome/result
+- Use 6-12 nodes for comprehensive explanation
+- Keep labels under 40 characters but descriptive
+
+EXAMPLE - For a document analysis feature:
 flowchart TD
-    A[Receive login request] --> B[Extract credentials]
-    B --> C[Validate input format]
-    C --> D{Input valid?}
-    D -->|No| E[Return validation error]
-    D -->|Yes| F[Query user database]
-    F --> G{User exists?}
-    G -->|No| H[Return user not found]
-    G -->|Yes| I[Verify password hash]
-    I --> J{Password correct?}
-    J -->|No| K[Return auth failed]
-    J -->|Yes| L[Generate JWT token]
-    L --> M[Return success response]
+    A[User uploads document] --> B[System validates file]
+    B --> C{File format supported?}
+    C -->|No| D[Show error message]
+    C -->|Yes| E[Extract text content]
+    E --> F[AI analyzes document]
+    F --> G[Generate insights report]
+    G --> H[Save results to user account]
+    H --> I[Display analysis to user]
+    D --> J[User can try again]
 
-Return only the Mermaid flowchart code, nothing else.`;
+Return only the Mermaid flowchart code that explains the complete story of what this PR accomplishes.`;
   }
 
   /**
@@ -431,7 +436,7 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
   }
 
   /**
-   * Validate Mermaid code for basic syntax
+   * Validate Mermaid code for quality and usefulness
    */
   private isValidMermaidCode(code: string): boolean {
     if (!code || typeof code !== 'string') {
@@ -509,6 +514,79 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
         `Mermaid validation failed: diagram has only ${nodeCount} steps, minimum 3 required`
       );
       return false;
+    }
+
+    // Quality checks for explanatory value
+    if (!this.hasExplanatoryValue(trimmed)) {
+      logger.warn('Mermaid validation failed: diagram lacks explanatory value');
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if the diagram has good explanatory value
+   */
+  private hasExplanatoryValue(mermaidCode: string): boolean {
+    const text = mermaidCode.toLowerCase();
+
+    // Check for generic/poor node labels that don't explain anything
+    const badPatterns = [
+      'function call',
+      'process data',
+      'handle request',
+      'return response',
+      'execute logic',
+      'perform operation',
+      'run code',
+      'call method',
+      'step 1',
+      'step 2',
+      'step 3',
+    ];
+
+    const hasGenericNodes = badPatterns.some(pattern => text.includes(pattern));
+    if (hasGenericNodes) {
+      logger.warn("Diagram contains generic nodes that don't explain the specific purpose");
+      return false;
+    }
+
+    // Check for good explanatory terms that indicate value
+    const goodPatterns = [
+      'user',
+      'validate',
+      'save',
+      'create',
+      'update',
+      'delete',
+      'send',
+      'receive',
+      'check',
+      'verify',
+      'analyze',
+      'generate',
+      'upload',
+      'download',
+      'authenticate',
+      'authorize',
+      'process',
+      'transform',
+      'calculate',
+    ];
+
+    const hasExplanatoryTerms = goodPatterns.some(pattern => text.includes(pattern));
+    if (!hasExplanatoryTerms) {
+      logger.warn('Diagram lacks explanatory terms that describe what actually happens');
+      return false;
+    }
+
+    // Check for decision points (good flow diagrams have logical branches)
+    const hasDecisions = text.includes('{') && text.includes('}');
+    const hasConditionalFlows = text.includes('|');
+
+    if (!hasDecisions && !hasConditionalFlows) {
+      logger.info('Diagram could be improved with decision points, but this is not required');
     }
 
     return true;
@@ -612,5 +690,51 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
 
     // Limit to max files to avoid overly complex diagrams
     return filtered.slice(0, this.config.maxFiles);
+  }
+
+  /**
+   * Generate a smart, contextual description for the flow diagram
+   */
+  private generateSmartDescription(prPlan: PRPlan, fileCount: number): string {
+    const overview = prPlan.overview.toLowerCase();
+    let description = '';
+
+    // Determine the type of change
+    if (overview.includes('add') || overview.includes('create') || overview.includes('implement')) {
+      description = `This diagram explains the complete user journey for the new feature being added. `;
+    } else if (
+      overview.includes('fix') ||
+      overview.includes('bug') ||
+      overview.includes('resolve')
+    ) {
+      description = `This diagram shows how the bug fix changes the user experience and system behavior. `;
+    } else if (
+      overview.includes('improve') ||
+      overview.includes('enhance') ||
+      overview.includes('optimize')
+    ) {
+      description = `This diagram illustrates the improved workflow and enhanced user experience. `;
+    } else if (
+      overview.includes('update') ||
+      overview.includes('modify') ||
+      overview.includes('change')
+    ) {
+      description = `This diagram shows how the updates change the existing flow and user experience. `;
+    } else if (overview.includes('refactor') || overview.includes('restructure')) {
+      description = `This diagram explains how the refactoring improves the internal logic while maintaining user functionality. `;
+    } else {
+      description = `This diagram explains what happens when users interact with the changes in this PR. `;
+    }
+
+    // Add context about scope
+    if (fileCount === 1) {
+      description += `The change affects one key component, showing a focused improvement to the system.`;
+    } else if (fileCount <= 3) {
+      description += `The changes span ${fileCount} components, showing how they work together to deliver the feature.`;
+    } else {
+      description += `The changes involve ${fileCount} components, illustrating the comprehensive nature of this update.`;
+    }
+
+    return description;
   }
 }
