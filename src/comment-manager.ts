@@ -116,6 +116,17 @@ export class CommentManager {
         .map(([type, count]) => `${type}:${count}`)
         .join(', ')}`
     );
+
+    // Log first few issues for detailed debugging
+    if (reviewResult.issues.length > 0) {
+      logger.info(`Sample issues for debugging:`);
+      reviewResult.issues.slice(0, 3).forEach((issue, i) => {
+        logger.info(
+          `  Issue ${i + 1}: type="${issue.type}", category="${issue.category}", message="${issue.message}", file="${issue.file}", line=${issue.line}`
+        );
+      });
+    }
+
     logger.info(
       `Issue filtering: ${reviewResult.issues.length} total → ${filteredIssuesForInline.length} eligible for inline comments (severity: ${this.inputs.inlineSeverity}+)`
     );
@@ -266,9 +277,14 @@ export class CommentManager {
    */
   private groupIssuesByLocation(issues: CodeIssue[]): Record<string, CodeIssue[]> {
     const grouped: Record<string, CodeIssue[]> = {};
+    let skippedCount = 0;
 
     for (const issue of issues) {
       if (!issue.file || !issue.line) {
+        skippedCount++;
+        logger.warn(
+          `Skipping issue for inline comment - missing location: file="${issue.file}", line=${issue.line}, message="${issue.message}"`
+        );
         continue; // Skip issues without location info
       }
 
@@ -277,6 +293,12 @@ export class CommentManager {
         grouped[key] = [];
       }
       grouped[key].push(issue);
+    }
+
+    if (skippedCount > 0) {
+      logger.info(
+        `Skipped ${skippedCount} issues for inline comments due to missing file/line info`
+      );
     }
 
     return grouped;

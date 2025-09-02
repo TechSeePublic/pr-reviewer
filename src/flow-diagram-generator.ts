@@ -17,9 +17,24 @@ export interface FlowDiagram {
   description: string;
   mermaidCode: string;
   diagramType?: 'feature' | 'bugfix' | 'optimization' | 'refactor' | 'maintenance';
+  visualizationType?:
+    | 'flowchart'
+    | 'graph'
+    | 'gitgraph'
+    | 'classDiagram'
+    | 'sequenceDiagram'
+    | 'stateDiagram';
 }
 
 export type PRType = 'feature' | 'bugfix' | 'optimization' | 'refactor' | 'maintenance' | 'unknown';
+
+export type VisualizationType =
+  | 'flowchart'
+  | 'graph'
+  | 'gitgraph'
+  | 'classDiagram'
+  | 'sequenceDiagram'
+  | 'stateDiagram';
 
 export class FlowDiagramGenerator {
   private config: FlowDiagramConfig;
@@ -91,9 +106,10 @@ export class FlowDiagramGenerator {
         return null;
       }
 
-      // Detect PR type and generate appropriate diagram
+      // Detect PR type and visualization type
       const prType = this.detectPRType(prPlan, relevantFiles);
-      return this.generateAIDiagram(relevantFiles, prPlan, prType);
+      const visualizationType = this.selectVisualizationType(prType, relevantFiles, prPlan);
+      return this.generateAIDiagram(relevantFiles, prPlan, prType, visualizationType);
     } catch (error) {
       logger.error('Failed to generate flow diagram:', error);
       return null;
@@ -106,12 +122,13 @@ export class FlowDiagramGenerator {
   private async generateAIDiagram(
     files: FileChange[],
     prPlan: PRPlan,
-    prType: PRType
+    prType: PRType,
+    visualizationType: VisualizationType
   ): Promise<FlowDiagram> {
-    logger.info(`Generating AI flow diagram for ${prType} PR...`);
+    logger.info(`Generating AI ${visualizationType} diagram for ${prType} PR...`);
 
     try {
-      const prompt = this.buildSpecializedPrompt(files, prPlan, prType);
+      const prompt = this.buildSpecializedPrompt(files, prPlan, prType, visualizationType);
       const context = this.buildFileContext(files);
 
       // Ask AI to generate the Mermaid diagram directly using a custom method
@@ -131,9 +148,10 @@ export class FlowDiagramGenerator {
 
       const diagram: FlowDiagram = {
         title: this.generateTitle(prPlan, prType),
-        description: this.generateSmartDescription(prPlan, files.length, prType),
+        description: this.generateSmartDescription(prPlan, files.length, prType, visualizationType),
         mermaidCode,
         ...(prType !== 'unknown' && { diagramType: prType }),
+        visualizationType,
       };
 
       logger.info('Generated AI flow diagram successfully');
@@ -302,34 +320,117 @@ export class FlowDiagramGenerator {
   }
 
   /**
-   * Build specialized prompt based on PR type
+   * Select the best visualization type for the PR
    */
-  private buildSpecializedPrompt(files: FileChange[], prPlan: PRPlan, prType: PRType): string {
+  private selectVisualizationType(
+    prType: PRType,
+    files: FileChange[],
+    prPlan: PRPlan
+  ): VisualizationType {
+    const overview = prPlan.overview.toLowerCase();
+    const keyChanges = prPlan.keyChanges.join(' ').toLowerCase();
+    const fileNames = files.map(f => f.filename.toLowerCase()).join(' ');
+
     switch (prType) {
       case 'feature':
-        return this.buildFeaturePrompt(files, prPlan);
+        // For features, use flowchart to show user journey
+        return 'flowchart';
+
       case 'bugfix':
-        return this.buildBugfixPrompt(files, prPlan);
+        // For bug fixes, use stateDiagram to show before/after states
+        if (
+          overview.includes('state') ||
+          overview.includes('status') ||
+          keyChanges.includes('state')
+        ) {
+          return 'stateDiagram';
+        }
+        return 'flowchart';
+
       case 'optimization':
-        return this.buildOptimizationPrompt(files, prPlan);
+        // For optimizations, use graph to show performance relationships
+        if (
+          overview.includes('performance') ||
+          overview.includes('cache') ||
+          overview.includes('speed')
+        ) {
+          return 'graph';
+        }
+        return 'flowchart';
+
       case 'refactor':
-        return this.buildRefactorPrompt(files, prPlan);
+        // For refactoring, use classDiagram if it involves class structure
+        if (
+          fileNames.includes('class') ||
+          fileNames.includes('model') ||
+          overview.includes('structure')
+        ) {
+          return 'classDiagram';
+        }
+        // Use graph for architectural changes
+        if (
+          overview.includes('architecture') ||
+          overview.includes('organize') ||
+          keyChanges.includes('module')
+        ) {
+          return 'graph';
+        }
+        return 'flowchart';
+
       case 'maintenance':
-        return this.buildMaintenancePrompt(files, prPlan);
+        // For maintenance, use gitgraph to show update progression
+        if (
+          overview.includes('dependency') ||
+          overview.includes('version') ||
+          overview.includes('update')
+        ) {
+          return 'gitgraph';
+        }
+        return 'graph';
+
       default:
-        return this.buildGenericPrompt(files, prPlan);
+        return 'flowchart';
+    }
+  }
+
+  /**
+   * Build specialized prompt based on PR type and visualization type
+   */
+  private buildSpecializedPrompt(
+    files: FileChange[],
+    prPlan: PRPlan,
+    prType: PRType,
+    visualizationType: VisualizationType
+  ): string {
+    switch (prType) {
+      case 'feature':
+        return this.buildFeaturePrompt(files, prPlan, visualizationType);
+      case 'bugfix':
+        return this.buildBugfixPrompt(files, prPlan, visualizationType);
+      case 'optimization':
+        return this.buildOptimizationPrompt(files, prPlan, visualizationType);
+      case 'refactor':
+        return this.buildRefactorPrompt(files, prPlan, visualizationType);
+      case 'maintenance':
+        return this.buildMaintenancePrompt(files, prPlan, visualizationType);
+      default:
+        return this.buildGenericPrompt(files, prPlan, visualizationType);
     }
   }
 
   /**
    * Build prompt for new features - focus on user journey
    */
-  private buildFeaturePrompt(files: FileChange[], prPlan: PRPlan): string {
+  private buildFeaturePrompt(
+    files: FileChange[],
+    prPlan: PRPlan,
+    visualizationType: VisualizationType
+  ): string {
     const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
 
-    return `# NEW FEATURE FLOW DIAGRAM
+    return `# NEW FEATURE ${visualizationType.toUpperCase()} DIAGRAM
 
-Create a Mermaid flowchart that explains the complete USER JOURNEY for this new feature.
+Create a Mermaid ${visualizationType} that explains the complete USER JOURNEY for this new feature.
 
 ## New Feature Description:
 ${prPlan.overview}
@@ -363,28 +464,24 @@ CRITICAL SYNTAX RULES:
 - Use hyphens or spaces instead of special characters
 
 EXAMPLE STRUCTURE:
-flowchart TD
-    A[User needs to upload document] --> B[User clicks upload button]
-    B --> C[User selects file from device]
-    C --> D{File size acceptable?}
-    D -->|No| E[Show size warning]
-    D -->|Yes| F[File uploads with progress bar]
-    F --> G[System analyzes document]
-    G --> H[User sees analysis results]
-    H --> I[User can download report]
+${this.getExampleDiagram(visualizationType, 'feature')}
 
-Return only the Mermaid flowchart code that tells the complete user story.`;
+Return only the Mermaid ${visualizationType} code that tells the complete user story.`;
   }
 
   /**
    * Build prompt for bug fixes - focus on problem and solution
    */
-  private buildBugfixPrompt(files: FileChange[], prPlan: PRPlan): string {
+  private buildBugfixPrompt(
+    files: FileChange[],
+    prPlan: PRPlan,
+    visualizationType: VisualizationType
+  ): string {
     const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
 
-    return `# BUG FIX FLOW DIAGRAM
+    return `# BUG FIX ${visualizationType.toUpperCase()} DIAGRAM
 
-Create a Mermaid flowchart that shows HOW this bug fix changes the user experience.
+Create a Mermaid ${visualizationType} that shows HOW this bug fix changes the user experience.
 
 ## Bug Fix Description:
 ${prPlan.overview}
@@ -437,7 +534,11 @@ Return only the Mermaid flowchart code that shows the fix.`;
   /**
    * Build prompt for optimizations - focus on improvements
    */
-  private buildOptimizationPrompt(files: FileChange[], prPlan: PRPlan): string {
+  private buildOptimizationPrompt(
+    files: FileChange[],
+    prPlan: PRPlan,
+    _visualizationType: VisualizationType
+  ): string {
     const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
 
     return `# OPTIMIZATION FLOW DIAGRAM
@@ -497,7 +598,11 @@ Return only the Mermaid flowchart code that shows the optimization.`;
   /**
    * Build prompt for refactoring - focus on structural improvements
    */
-  private buildRefactorPrompt(files: FileChange[], prPlan: PRPlan): string {
+  private buildRefactorPrompt(
+    files: FileChange[],
+    prPlan: PRPlan,
+    _visualizationType: VisualizationType
+  ): string {
     const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
 
     return `# REFACTORING FLOW DIAGRAM
@@ -563,7 +668,11 @@ Return only the Mermaid flowchart code that shows the improved structure.`;
   /**
    * Build prompt for maintenance - focus on what was updated
    */
-  private buildMaintenancePrompt(files: FileChange[], prPlan: PRPlan): string {
+  private buildMaintenancePrompt(
+    files: FileChange[],
+    prPlan: PRPlan,
+    _visualizationType: VisualizationType
+  ): string {
     const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
 
     return `# MAINTENANCE UPDATE DIAGRAM
@@ -621,7 +730,11 @@ Return only the Mermaid flowchart code that shows the maintenance updates.`;
   /**
    * Build generic prompt for unknown PR types
    */
-  private buildGenericPrompt(files: FileChange[], prPlan: PRPlan): string {
+  private buildGenericPrompt(
+    files: FileChange[],
+    prPlan: PRPlan,
+    _visualizationType: VisualizationType
+  ): string {
     const fileList = files.map(f => `- ${f.filename} (${f.status})`).join('\n');
 
     return `# EXPLANATORY FLOW DIAGRAM GENERATION
@@ -1114,28 +1227,53 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
   /**
    * Generate a smart, contextual description for the flow diagram
    */
-  private generateSmartDescription(prPlan: PRPlan, fileCount: number, prType: PRType): string {
+  private generateSmartDescription(
+    prPlan: PRPlan,
+    fileCount: number,
+    prType: PRType,
+    visualizationType: VisualizationType
+  ): string {
     let description = '';
 
-    // Generate description based on PR type
+    // Generate description based on PR type and visualization type
+    const visualName = this.getVisualizationDisplayName(visualizationType);
+
     switch (prType) {
       case 'feature':
-        description = `This diagram shows the complete user journey for the new feature. Follow the flow to understand how users will discover, use, and benefit from this addition. `;
+        description = `This ${visualName} shows the complete user journey for the new feature. Follow the flow to understand how users will discover, use, and benefit from this addition. `;
         break;
       case 'bugfix':
-        description = `This diagram illustrates how the bug fix improves the user experience. Green highlighted sections show the corrected behavior that prevents the original issue. `;
+        if (visualizationType === 'stateDiagram') {
+          description = `This state diagram shows how the bug fix changes system behavior. States represent different conditions, with the fix improving transitions and preventing problematic states. `;
+        } else {
+          description = `This ${visualName} illustrates how the bug fix improves the user experience. Green highlighted sections show the corrected behavior that prevents the original issue. `;
+        }
         break;
       case 'optimization':
-        description = `This diagram demonstrates the performance improvements made to the system. Gold sections show optimization points, while green areas highlight speed/efficiency gains users will notice. `;
+        if (visualizationType === 'graph') {
+          description = `This graph shows the relationships between system components and how optimization improves performance. Highlighted connections show where speed/efficiency gains occur. `;
+        } else {
+          description = `This ${visualName} demonstrates the performance improvements made to the system. Gold sections show optimization points, while green areas highlight speed/efficiency gains users will notice. `;
+        }
         break;
       case 'refactor':
-        description = `This diagram shows how the code structure was improved while maintaining the same user functionality. Purple sections highlight the cleaner, more maintainable internal organization. `;
+        if (visualizationType === 'classDiagram') {
+          description = `This class diagram shows how the code structure was improved through refactoring. Classes and relationships are now cleaner and more maintainable. `;
+        } else if (visualizationType === 'graph') {
+          description = `This graph illustrates the architectural improvements made during refactoring. Nodes represent components, with cleaner relationships and better organization. `;
+        } else {
+          description = `This ${visualName} shows how the code structure was improved while maintaining the same user functionality. Purple sections highlight the cleaner, more maintainable internal organization. `;
+        }
         break;
       case 'maintenance':
-        description = `This diagram explains what system components were updated and how these changes improve reliability, security, or compatibility. Blue sections show updates, green shows benefits. `;
+        if (visualizationType === 'gitgraph') {
+          description = `This git graph shows the progression of maintenance updates. Each commit represents an update, showing how the system evolves to stay healthy and secure. `;
+        } else {
+          description = `This ${visualName} explains what system components were updated and how these changes improve reliability, security, or compatibility. Blue sections show updates, green shows benefits. `;
+        }
         break;
       default:
-        description = `This diagram explains what happens when users interact with the changes in this PR. `;
+        description = `This ${visualName} explains what happens when users interact with the changes in this PR. `;
     }
 
     // Add context about scope
@@ -1148,5 +1286,85 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
     }
 
     return description;
+  }
+
+  /**
+   * Get example diagram based on visualization type and PR type
+   */
+  private getExampleDiagram(visualizationType: VisualizationType, _prType: PRType): string {
+    switch (visualizationType) {
+      case 'flowchart':
+        return `flowchart TD
+    A[User needs to upload document] --> B[User clicks upload button]
+    B --> C[User selects file from device]
+    C --> D{File size acceptable?}
+    D -->|No| E[Show size warning]
+    D -->|Yes| F[File uploads with progress bar]
+    F --> G[System analyzes document]
+    G --> H[User sees analysis results]`;
+
+      case 'stateDiagram':
+        return `stateDiagram-v2
+    [*] --> Idle
+    Idle --> Processing : User submits form
+    Processing --> ValidationError : Input invalid
+    Processing --> Success : Input valid
+    ValidationError --> Idle : User corrects input
+    Success --> [*]`;
+
+      case 'graph':
+        return `graph TD
+    A[Component A] --> B[Component B]
+    A --> C[Component C]
+    B --> D[Optimized Process]
+    C --> D
+    D --> E[Improved Performance]`;
+
+      case 'classDiagram':
+        return `classDiagram
+    class UserService {
+        +authenticate()
+        +getUserData()
+    }
+    class DatabaseLayer {
+        +query()
+        +update()
+    }
+    UserService --> DatabaseLayer`;
+
+      case 'gitgraph':
+        return `gitgraph
+    commit id: "Initial"
+    commit id: "Update deps"
+    commit id: "Security patch"
+    commit id: "Performance fix"`;
+
+      default:
+        return `flowchart TD
+    A[Start] --> B[Process]
+    B --> C[End]`;
+    }
+  }
+
+  /**
+   * Get display name for visualization type
+   */
+  private getVisualizationDisplayName(visualizationType: VisualizationType): string {
+    switch (visualizationType) {
+      case 'flowchart':
+        return 'flowchart';
+      case 'graph':
+        return 'graph';
+      case 'gitgraph':
+        return 'git graph';
+      case 'classDiagram':
+        return 'class diagram';
+      case 'sequenceDiagram':
+        return 'sequence diagram';
+      case 'stateDiagram':
+        return 'state diagram';
+      default:
+        return 'diagram';
+    }
   }
 }
