@@ -150,7 +150,8 @@ export class FlowDiagramGenerator {
 
       try {
         // Check if this is an Azure OpenAI provider that requires max_completion_tokens
-        const requiresMaxCompletionTokens = openaiProvider.requiresMaxCompletionTokens?.() || false;
+        const requiresMaxCompletionTokens = await (openaiProvider.requiresMaxCompletionTokens?.() ||
+          Promise.resolve(false));
         const response = await openaiProvider.client.chat.completions.create({
           model: openaiProvider.model,
           messages: [

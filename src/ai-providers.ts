@@ -536,6 +536,7 @@ export class AzureOpenAIProvider implements AIProvider {
   public readonly name = 'azure';
   public readonly model: string;
   private client: OpenAI;
+  private modelCapabilities: { requiresMaxCompletionTokens?: boolean } = {};
 
   constructor(apiKey: string, endpoint: string, apiVersion: string, model?: string) {
     this.model = model || DEFAULT_MODELS.azure;
@@ -576,11 +577,75 @@ export class AzureOpenAIProvider implements AIProvider {
     return supportedModels.some(supportedModel => this.model.startsWith(supportedModel));
   }
 
-  private requiresMaxCompletionTokens(): boolean {
-    // Models that require max_completion_tokens instead of max_tokens
-    const reasoningModels = ['o1', 'o1-preview', 'o1-mini', 'o3', 'o3-mini', 'o4-mini'];
+  private async detectModelCapabilities(): Promise<void> {
+    // If we already detected the capabilities, no need to test again
+    if (this.modelCapabilities.requiresMaxCompletionTokens !== undefined) {
+      return;
+    }
 
-    return reasoningModels.some(reasoningModel => this.model.startsWith(reasoningModel));
+    // First check if the deployment name matches known patterns
+    const knownReasoningModels = ['o1', 'o1-preview', 'o1-mini', 'o3', 'o3-mini', 'o4-mini'];
+    const isKnownReasoningModel = knownReasoningModels.some(reasoningModel =>
+      this.model.startsWith(reasoningModel)
+    );
+
+    if (isKnownReasoningModel) {
+      this.modelCapabilities.requiresMaxCompletionTokens = true;
+      return;
+    }
+
+    // For custom deployment names, make a test request to detect the model type
+    try {
+      logger.info(`Detecting model capabilities for Azure deployment: ${this.model}`);
+
+      // Try with max_tokens first (most common)
+      try {
+        await this.client.chat.completions.create({
+          model: this.model,
+          messages: [{ role: 'user', content: 'test' }],
+          max_tokens: 1,
+          temperature: 0,
+        });
+
+        // If successful, this model uses max_tokens
+        this.modelCapabilities.requiresMaxCompletionTokens = false;
+        logger.info(`✅ Model ${this.model} uses max_tokens parameter`);
+      } catch (error) {
+        // Check if the error is specifically about max_tokens parameter
+        const errorMessage = String(error);
+        if (errorMessage.includes('max_tokens') && errorMessage.includes('max_completion_tokens')) {
+          // This is a reasoning model that requires max_completion_tokens
+          this.modelCapabilities.requiresMaxCompletionTokens = true;
+          logger.info(`✅ Model ${this.model} requires max_completion_tokens parameter`);
+
+          // Verify it works with max_completion_tokens
+          await this.client.chat.completions.create({
+            model: this.model,
+            messages: [{ role: 'user', content: 'test' }],
+            max_completion_tokens: 1,
+            temperature: 0,
+          });
+        } else {
+          // Some other error, assume standard model
+          this.modelCapabilities.requiresMaxCompletionTokens = false;
+          logger.warn(
+            `⚠️ Could not detect model capabilities for ${this.model}, assuming max_tokens. Error: ${errorMessage}`
+          );
+        }
+      }
+    } catch (error) {
+      // Fallback: assume standard model if detection fails
+      this.modelCapabilities.requiresMaxCompletionTokens = false;
+      logger.error(
+        `❌ Model capability detection failed for ${this.model}, defaulting to max_tokens:`,
+        error
+      );
+    }
+  }
+
+  private async requiresMaxCompletionTokens(): Promise<boolean> {
+    await this.detectModelCapabilities();
+    return this.modelCapabilities.requiresMaxCompletionTokens || false;
   }
 
   async reviewCode(prompt: string, code: string, rules: CursorRule[]): Promise<CodeIssue[]> {
@@ -592,6 +657,7 @@ export class AzureOpenAIProvider implements AIProvider {
       const userPrompt = PromptTemplates.buildUserPrompt(prompt, code);
 
       // Build the request configuration
+      const usesMaxCompletionTokens = await this.requiresMaxCompletionTokens();
       const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
         model: this.model,
         messages: [
@@ -599,9 +665,7 @@ export class AzureOpenAIProvider implements AIProvider {
           { role: 'user', content: userPrompt },
         ],
         temperature: 0.1,
-        ...(this.requiresMaxCompletionTokens()
-          ? { max_completion_tokens: 4000 }
-          : { max_tokens: 4000 }),
+        ...(usesMaxCompletionTokens ? { max_completion_tokens: 4000 } : { max_tokens: 4000 }),
       };
 
       // Only add response_format if the model supports it
@@ -642,6 +706,7 @@ export class AzureOpenAIProvider implements AIProvider {
   async generatePRPlan(fileChanges: FileChange[], rules: CursorRule[]): Promise<PRPlan> {
     try {
       const prompt = PromptTemplates.buildPRPlanPrompt(fileChanges, rules);
+      const usesMaxCompletionTokens = await this.requiresMaxCompletionTokens();
 
       const response = await this.client.chat.completions.create({
         model: this.model,
@@ -654,9 +719,7 @@ export class AzureOpenAIProvider implements AIProvider {
           { role: 'user', content: prompt },
         ],
         temperature: 0.1,
-        ...(this.requiresMaxCompletionTokens()
-          ? { max_completion_tokens: 2000 }
-          : { max_tokens: 2000 }),
+        ...(usesMaxCompletionTokens ? { max_completion_tokens: 2000 } : { max_tokens: 2000 }),
         ...(this.supportsJsonMode() && { response_format: { type: 'json_object' } }),
       });
 
@@ -685,6 +748,7 @@ export class AzureOpenAIProvider implements AIProvider {
         provider: this.name,
       });
 
+      const usesMaxCompletionTokens = await this.requiresMaxCompletionTokens();
       const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParams = {
         model: this.model,
         messages: [
@@ -692,9 +756,7 @@ export class AzureOpenAIProvider implements AIProvider {
           { role: 'user', content: prompt },
         ],
         temperature: 0.1,
-        ...(this.requiresMaxCompletionTokens()
-          ? { max_completion_tokens: 6000 }
-          : { max_tokens: 6000 }),
+        ...(usesMaxCompletionTokens ? { max_completion_tokens: 6000 } : { max_tokens: 6000 }),
       };
 
       if (this.supportsJsonMode()) {
@@ -718,6 +780,7 @@ export class AzureOpenAIProvider implements AIProvider {
   async generateSummary(issues: CodeIssue[], context: ReviewContext): Promise<string> {
     try {
       const prompt = PromptTemplates.buildSummaryPrompt(issues, context);
+      const usesMaxCompletionTokens = await this.requiresMaxCompletionTokens();
 
       const response = await this.client.chat.completions.create({
         model: this.model,
@@ -730,9 +793,7 @@ export class AzureOpenAIProvider implements AIProvider {
           { role: 'user', content: prompt },
         ],
         temperature: 0.2,
-        ...(this.requiresMaxCompletionTokens()
-          ? { max_completion_tokens: 1500 }
-          : { max_tokens: 1500 }),
+        ...(usesMaxCompletionTokens ? { max_completion_tokens: 1500 } : { max_tokens: 1500 }),
       });
 
       return response.choices[0]?.message?.content || 'Summary generation failed';
