@@ -355,6 +355,15 @@ export class CommentManager {
     const statusIcon = this.getStatusIcon(status);
     body += `### ${statusIcon} **Overall Status: ${status.replace('_', ' ').toUpperCase()}**\n\n`;
 
+    // Changes summary from PR plan
+    if (prPlan && prPlan.keyChanges && prPlan.keyChanges.length > 0) {
+      body += `### 📝 **What Changed**\n`;
+      for (const change of prPlan.keyChanges) {
+        body += `• ${change}\n`;
+      }
+      body += '\n';
+    }
+
     // Quick overview
     body += `### 📊 **Review Overview**\n`;
     body += `| Metric | Value |\n`;
