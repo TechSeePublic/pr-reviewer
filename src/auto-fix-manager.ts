@@ -320,6 +320,25 @@ export class AutoFixManager {
   }
 
   /**
+   * Generate data for commit fix button
+   */
+  generateCommitFixData(issue: CodeIssue): string {
+    const fixData = {
+      file: issue.file,
+      line: issue.line,
+      endLine: issue.endLine,
+      fixedCode: issue.fixedCode,
+      suggestion: issue.suggestion,
+      message: issue.message,
+      category: issue.category,
+      type: issue.type,
+    };
+
+    // Base64 encode the fix data for safe URL transmission
+    return Buffer.from(JSON.stringify(fixData)).toString('base64');
+  }
+
+  /**
    * Generate commit message for auto-fixes
    */
   private generateCommitMessage(fixes: AutoFixResult[]): string {
