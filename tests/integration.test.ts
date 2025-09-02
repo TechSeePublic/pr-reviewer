@@ -39,6 +39,7 @@ describe('PR Reviewer Integration', () => {
     requestDelay: 1000,
     batchSize: 5,
     githubRateLimit: 1000,
+    deterministicMode: true,
   };
 
   beforeEach(() => {

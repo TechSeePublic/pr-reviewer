@@ -72,7 +72,7 @@ describe('AI Providers', () => {
       expect(issues[0]?.message).toBe('Missing type annotation');
     });
 
-    it('should handle malformed JSON responses', async () => {
+    it('should handle malformed JSON responses in deterministic mode', async () => {
       const mockResponse = {
         choices: [{
           message: {
@@ -85,6 +85,27 @@ describe('AI Providers', () => {
 
       const issues = await provider.reviewCode('context', 'code', [mockRule]);
 
+      // In deterministic mode, malformed JSON returns empty array instead of fallback parsing
+      expect(issues).toHaveLength(0);
+    });
+
+    it('should handle malformed JSON responses in non-deterministic mode', async () => {
+      // Create provider with deterministic mode disabled
+      const nonDeterministicProvider = new OpenAIProvider('test-api-key', 'gpt-4', false);
+      
+      const mockResponse = {
+        choices: [{
+          message: {
+            content: 'Invalid JSON response with violation mentioned',
+          },
+        }],
+      };
+
+      mockCreate.mockResolvedValue(mockResponse as any);
+
+      const issues = await nonDeterministicProvider.reviewCode('context', 'code', [mockRule]);
+
+      // In non-deterministic mode, fallback parsing should work
       expect(issues).toHaveLength(1);
       expect(issues[0]?.ruleId).toBe('unknown');
     });
