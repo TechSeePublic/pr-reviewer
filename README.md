@@ -1,4 +1,4 @@
-# <img src="./assets/techsee-logo.png" width="32" height="32" alt="TechSee"> TechSee AI PR Reviewer
+# <img src="https://raw.githubusercontent.com/amitwa1/pr-reviewer/main/assets/techsee-logo.png" width="32" height="32" alt="TechSee"> TechSee AI PR Reviewer
 
 An AI-powered GitHub Action that automatically reviews pull requests according to your project's Cursor AI rules. This bot respects all Cursor rule formats including the new `.cursor/rules/*.mdc` format, `AGENTS.md`, and legacy `.cursorrules`.
 
@@ -258,7 +258,7 @@ const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
 
 ### Summary Comments
 ```markdown
-## <img src="./assets/techsee-logo.png" width="24" height="24" alt="TechSee"> TechSee AI PR Review Summary
+## <img src="https://raw.githubusercontent.com/amitwa1/pr-reviewer/main/assets/techsee-logo.png" width="24" height="24" alt="TechSee"> TechSee AI PR Review Summary
 
 ### ⚠️ **Overall Status: NEEDS ATTENTION**
 
