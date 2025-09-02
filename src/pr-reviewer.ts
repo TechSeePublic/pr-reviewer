@@ -463,12 +463,10 @@ export class PRReviewer {
   private determineReviewStatus(issues: CodeIssue[]): ReviewResult['status'] {
     const errorCount = issues.filter(i => i.type === 'error').length;
     const warningCount = issues.filter(i => i.type === 'warning').length;
-    const infoCount = issues.filter(i => i.type === 'info').length;
-    const suggestionCount = issues.filter(i => i.type === 'suggestion').length;
 
-    // If there are any issues (errors, warnings, info, suggestions), mark as needs_attention
+    // If there are any issues (errors or warnings), mark as needs_attention
     // This allows the reviewer to report all types of findings without failing the PR
-    if (errorCount > 0 || warningCount > 0 || infoCount > 0 || suggestionCount > 0) {
+    if (errorCount > 0 || warningCount > 0) {
       return 'needs_attention';
     } else {
       return 'passed';
@@ -485,7 +483,6 @@ export class PRReviewer {
 
     const errorCount = issues.filter(i => i.type === 'error').length;
     const warningCount = issues.filter(i => i.type === 'warning').length;
-    const infoCount = issues.filter(i => i.type === 'info' || i.type === 'suggestion').length;
     const criticalCount = issues.filter(i => i.severity === 'high').length;
 
     let summary = `📋 **Review Summary:** Found ${issues.length} issue${issues.length > 1 ? 's' : ''} across ${filesReviewed} file${filesReviewed > 1 ? 's' : ''}`;
@@ -493,7 +490,6 @@ export class PRReviewer {
     const parts = [];
     if (errorCount > 0) parts.push(`${errorCount} error${errorCount > 1 ? 's' : ''}`);
     if (warningCount > 0) parts.push(`${warningCount} warning${warningCount > 1 ? 's' : ''}`);
-    if (infoCount > 0) parts.push(`${infoCount} suggestion${infoCount > 1 ? 's' : ''}`);
 
     if (parts.length > 0) {
       summary += ` (${parts.join(', ')})`;

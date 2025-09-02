@@ -20,14 +20,14 @@ export interface ActionInputs {
   excludePatterns: string[];
   maxFiles: number;
   commentStyle: 'inline' | 'summary' | 'both';
-  inlineSeverity: 'error' | 'warning' | 'info' | 'all';
+  inlineSeverity: 'error' | 'warning' | 'all';
   summaryFormat: 'brief' | 'detailed' | 'minimal';
-  logLevel: 'error' | 'warning' | 'info' | 'all';
+  logLevel: 'error' | 'warning' | 'all';
   enableSuggestions: boolean;
   skipIfNoRules: boolean;
   updateExistingComments: boolean;
   enableAutoFix: boolean;
-  autoFixSeverity: 'error' | 'warning' | 'info' | 'all';
+  autoFixSeverity: 'error' | 'warning' | 'all';
   requestDelay: number; // Delay in milliseconds between AI provider requests
   batchSize: number; // Number of files to process in each batch (default: 50)
   githubRateLimit: number; // Delay in milliseconds between GitHub API calls (default: 1000ms)
@@ -70,7 +70,7 @@ export interface FileChange {
 }
 
 export interface CodeIssue {
-  type: 'error' | 'warning' | 'info' | 'suggestion';
+  type: 'error' | 'warning';
   category:
     | 'rule_violation'
     | 'bug'

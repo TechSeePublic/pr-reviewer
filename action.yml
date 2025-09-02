@@ -81,7 +81,7 @@ inputs:
     default: 'both'
     
   inline_severity:
-    description: 'Minimum severity for inline comments (error, warning, info, all)'
+    description: 'Minimum severity for inline comments (error, warning, all)'
     required: false
     default: 'error'
     
@@ -91,7 +91,7 @@ inputs:
     default: 'detailed'
     
   log_level:
-    description: 'Minimum severity level for posting comments (error, warning, info, all)'
+    description: 'Minimum severity level for posting comments (error, warning, all)'
     required: false
     default: 'error'
 
@@ -116,7 +116,7 @@ inputs:
     default: 'false'
     
   auto_fix_severity:
-    description: 'Minimum severity for auto-fix (error, warning, info, all)'
+    description: 'Minimum severity for auto-fix (error, warning, all)'
     required: false
     default: 'error'
     

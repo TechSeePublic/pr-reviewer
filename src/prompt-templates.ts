@@ -109,7 +109,7 @@ Your response MUST be a valid JSON object with this exact structure:
 {
   "issues": [
     {
-      "type": "error|warning|info|suggestion",
+      "type": "error|warning",
       "category": "rule_violation|bug|security|performance|best_practice|maintainability|documentation",
       "message": "Brief, clear description of the issue (50-80 chars)",
       "description": "Detailed explanation of the problem and its impact",
@@ -132,10 +132,17 @@ Your response MUST be a valid JSON object with this exact structure:
 ## ISSUE CLASSIFICATION GUIDE
 
 ### Issue Types
-- **error**: Critical issues that will cause runtime failures or security vulnerabilities
-- **warning**: Important issues that could lead to bugs or poor performance
-- **info**: Minor improvements or style suggestions
-- **suggestion**: Optional enhancements that would improve code quality
+- **error**: Critical issues that WILL cause failures, security vulnerabilities, or break functionality
+  - Runtime exceptions, null pointer errors, infinite loops
+  - Security vulnerabilities, SQL injection, XSS
+  - Syntax errors, undefined variables, missing imports
+  - Data corruption, memory leaks, deadlocks
+- **warning**: Issues that COULD lead to bugs, poor performance, or maintenance problems
+  - Logic errors that may cause incorrect behavior
+  - Performance bottlenecks, inefficient algorithms
+  - Code quality issues affecting maintainability
+  - Best practice violations, style inconsistencies
+  - Missing error handling, deprecated API usage
 
 ### Categories
 - **bug**: Logic errors or potential runtime failures (highest priority)
