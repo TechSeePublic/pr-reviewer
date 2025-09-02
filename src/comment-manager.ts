@@ -349,7 +349,7 @@ export class CommentManager {
   ): Promise<string> {
     const { issues, filesReviewed, totalFiles, rulesApplied, status } = reviewResult;
 
-    let body = `## 🤖 TechSee AI PR Review Summary\n\n`;
+    let body = `## <img src="./assets/techsee-logo.png" width="24" height="24" alt="TechSee"> TechSee AI PR Review Summary\n\n`;
 
     // Status indicator
     const statusIcon = this.getStatusIcon(status);
