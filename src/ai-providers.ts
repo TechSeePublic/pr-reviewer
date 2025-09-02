@@ -576,6 +576,13 @@ export class AzureOpenAIProvider implements AIProvider {
     return supportedModels.some(supportedModel => this.model.startsWith(supportedModel));
   }
 
+  private requiresMaxCompletionTokens(): boolean {
+    // Models that require max_completion_tokens instead of max_tokens
+    const reasoningModels = ['o1', 'o1-preview', 'o1-mini', 'o3', 'o3-mini', 'o4-mini'];
+
+    return reasoningModels.some(reasoningModel => this.model.startsWith(reasoningModel));
+  }
+
   async reviewCode(prompt: string, code: string, rules: CursorRule[]): Promise<CodeIssue[]> {
     try {
       const systemPrompt = PromptTemplates.buildCodeReviewSystemPrompt(rules, {
@@ -592,7 +599,9 @@ export class AzureOpenAIProvider implements AIProvider {
           { role: 'user', content: userPrompt },
         ],
         temperature: 0.1,
-        max_tokens: 4000,
+        ...(this.requiresMaxCompletionTokens()
+          ? { max_completion_tokens: 4000 }
+          : { max_tokens: 4000 }),
       };
 
       // Only add response_format if the model supports it
@@ -645,7 +654,9 @@ export class AzureOpenAIProvider implements AIProvider {
           { role: 'user', content: prompt },
         ],
         temperature: 0.1,
-        max_tokens: 2000,
+        ...(this.requiresMaxCompletionTokens()
+          ? { max_completion_tokens: 2000 }
+          : { max_tokens: 2000 }),
         ...(this.supportsJsonMode() && { response_format: { type: 'json_object' } }),
       });
 
@@ -681,7 +692,9 @@ export class AzureOpenAIProvider implements AIProvider {
           { role: 'user', content: prompt },
         ],
         temperature: 0.1,
-        max_tokens: 6000,
+        ...(this.requiresMaxCompletionTokens()
+          ? { max_completion_tokens: 6000 }
+          : { max_tokens: 6000 }),
       };
 
       if (this.supportsJsonMode()) {
@@ -717,7 +730,9 @@ export class AzureOpenAIProvider implements AIProvider {
           { role: 'user', content: prompt },
         ],
         temperature: 0.2,
-        max_tokens: 1500,
+        ...(this.requiresMaxCompletionTokens()
+          ? { max_completion_tokens: 1500 }
+          : { max_tokens: 1500 }),
       });
 
       return response.choices[0]?.message?.content || 'Summary generation failed';

@@ -145,10 +145,12 @@ export class FlowDiagramGenerator {
     // Access the underlying AI provider to make a direct call
     // This bypasses the code review format and gets raw text response
     if ('client' in this.aiProvider) {
-      // Handle OpenAI provider
+      // Handle OpenAI provider (including Azure OpenAI)
       const openaiProvider = this.aiProvider as any;
 
       try {
+        // Check if this is an Azure OpenAI provider that requires max_completion_tokens
+        const requiresMaxCompletionTokens = openaiProvider.requiresMaxCompletionTokens?.() || false;
         const response = await openaiProvider.client.chat.completions.create({
           model: openaiProvider.model,
           messages: [
@@ -163,7 +165,7 @@ export class FlowDiagramGenerator {
             },
           ],
           temperature: 0.1,
-          max_tokens: 1000,
+          ...(requiresMaxCompletionTokens ? { max_completion_tokens: 1000 } : { max_tokens: 1000 }),
         });
 
         const result = response.choices[0]?.message?.content;
