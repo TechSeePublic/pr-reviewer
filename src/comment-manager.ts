@@ -236,9 +236,23 @@ export class CommentManager {
         issue: locationIssues[0]!, // Store primary issue for reference (already validated above)
       };
 
+      // Debug: Log the exact line number being sent to GitHub
+      logger.debug(
+        `📍 Sending to GitHub API: line ${validLocation.line} for issue at original line ${originalLine}`
+      );
+
+      // EXPERIMENTAL: Try +1 adjustment to fix off-by-one issue
+      // TODO: Remove this once we identify the root cause
+      const adjustedLine = validLocation.line + 1;
+      logger.info(
+        `🧪 EXPERIMENTAL: Trying line ${adjustedLine} instead of ${validLocation.line} to fix off-by-one`
+      );
+
+      comment.location.line = adjustedLine;
+
       // Check if we should update existing comment
       const existingComment = existingComments.find(
-        c => c.location.file === file && c.location.line === validLocation.line
+        c => c.location.file === file && c.location.line === adjustedLine
       );
 
       try {
@@ -445,8 +459,13 @@ export class CommentManager {
         // Parse hunk header: @@ -oldStart,oldLines +newStart,newLines @@
         const match = line.match(/\+(\d+)/);
         if (match && match[1]) {
-          currentLine = parseInt(match[1], 10) - 1;
-          logger.debug(`Hunk header: ${line} -> Starting at line ${currentLine + 1}`);
+          const hunkStartLine = parseInt(match[1], 10);
+          currentLine = hunkStartLine - 1;
+          logger.debug(`Hunk header: ${line}`);
+          logger.debug(`  Parsed start line: ${hunkStartLine}`);
+          logger.debug(
+            `  Setting currentLine to: ${currentLine} (will increment for first actual line)`
+          );
         }
       } else if (line && line.startsWith('+') && !line.startsWith('+++')) {
         // Added line - can be commented on
