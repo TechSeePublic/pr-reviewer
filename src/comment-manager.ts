@@ -459,9 +459,14 @@ export class CommentManager {
       if (primaryIssue.fixedCode) {
         body += `**💡 Suggested Fix:**\n\`\`\`${this.getLanguageFromFile(primaryIssue.file)}\n${primaryIssue.fixedCode}\n\`\`\`\n\n`;
       } else {
-        // Use suggestion as code if it looks like code, otherwise as text
-        const codeLanguage = this.getLanguageFromFile(primaryIssue.file);
-        body += `**💡 Suggested Fix:**\n\`\`\`${codeLanguage}\n${primaryIssue.suggestion}\n\`\`\`\n\n`;
+        // Determine if suggestion is code or advice text
+        if (this.isCodeSuggestion(primaryIssue.suggestion)) {
+          const codeLanguage = this.getLanguageFromFile(primaryIssue.file);
+          body += `**💡 Suggested Fix:**\n\`\`\`${codeLanguage}\n${primaryIssue.suggestion}\n\`\`\`\n\n`;
+        } else {
+          // Display as regular text for advice/recommendations
+          body += `**💡 Suggestion:**\n${primaryIssue.suggestion}\n\n`;
+        }
       }
     }
 
@@ -775,6 +780,72 @@ export class CommentManager {
       default:
         return 'Other';
     }
+  }
+
+  /**
+   * Determine if a suggestion contains code or is general advice
+   */
+  private isCodeSuggestion(suggestion: string): boolean {
+    // Check for common code patterns
+    const codeIndicators = [
+      /^[\s]*[a-zA-Z_$][a-zA-Z0-9_$]*\s*[=:]/m, // Variable assignments
+      /^[\s]*[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(/m, // Function calls
+      /^[\s]*[{}[\]]/m, // Brackets/braces
+      /^[\s]*import\s+/m, // Import statements
+      /^[\s]*export\s+/m, // Export statements
+      /^[\s]*function\s+/m, // Function declarations
+      /^[\s]*const\s+|let\s+|var\s+/m, // Variable declarations
+      /^[\s]*if\s*\(|while\s*\(|for\s*\(/m, // Control structures
+      /^[\s]*class\s+/m, // Class declarations
+      /^[\s]*interface\s+/m, // Interface declarations
+      /^[\s]*type\s+/m, // Type declarations
+      /^[\s]*\/\*|\/\//m, // Comments
+      /[\s]*;[\s]*$/m, // Statements ending with semicolon
+      /^[\s]*<[a-zA-Z]/m, // HTML/JSX tags
+      /^[\s]*\./m, // Method chaining
+    ];
+
+    // Check if suggestion contains typical code patterns
+    const hasCodePatterns = codeIndicators.some(pattern => pattern.test(suggestion));
+
+    // Check for common advice phrases that indicate it's not code
+    const adviceIndicators = [
+      /consider/i,
+      /recommend/i,
+      /suggest/i,
+      /should/i,
+      /could/i,
+      /might/i,
+      /try/i,
+      /use.*instead/i,
+      /avoid/i,
+      /ensure/i,
+      /make sure/i,
+      /be careful/i,
+      /note that/i,
+      /remember to/i,
+      /don't forget/i,
+    ];
+
+    const hasAdviceLanguage = adviceIndicators.some(pattern => pattern.test(suggestion));
+
+    // If it has clear advice language but no code patterns, it's advice
+    if (hasAdviceLanguage && !hasCodePatterns) {
+      return false;
+    }
+
+    // If it has code patterns, it's likely code
+    if (hasCodePatterns) {
+      return true;
+    }
+
+    // Check length and structure - very short suggestions are often advice
+    if (suggestion.length < 50 && !suggestion.includes('\n') && !suggestion.includes(';')) {
+      return false;
+    }
+
+    // Default to treating as advice if uncertain
+    return false;
   }
 
   /**

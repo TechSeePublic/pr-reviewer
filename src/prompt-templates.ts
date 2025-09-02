@@ -120,8 +120,8 @@ Your response MUST be a valid JSON object with this exact structure:
       "category": "rule_violation|bug|security|performance|best_practice|maintainability|documentation",
       "message": "Brief, clear description of the issue (50-80 chars)",
       "description": "Detailed explanation of the problem and its impact",
-      "suggestion": "Specific, actionable fix suggestion (optional)",
-      "fixedCode": "Complete corrected code snippet for auto-fix (optional)",
+      "suggestion": "Brief advice or recommendation text (for general guidance)",
+      "fixedCode": "Complete corrected code snippet (for specific code fixes)",
       "ruleId": "cursor_rule_id or 'general_review'",
       "ruleName": "Human-readable rule name or issue category",
       "file": "EXACT filename from context - NEVER use 'unknown' or 'Multiple Files'",
@@ -135,6 +135,12 @@ Your response MUST be a valid JSON object with this exact structure:
 \`\`\`
 
 **CRITICAL**: The "file" field must ALWAYS contain the exact filename where the issue is found. Never use generic terms like "unknown", "Multiple Files", or "various files". If reviewing multiple files, specify the exact file for each individual issue.
+
+**IMPORTANT - Suggestion vs FixedCode Guidelines:**
+- Use **"suggestion"** for general advice, recommendations, or guidance text (e.g., "Consider using async/await for better readability")
+- Use **"fixedCode"** for specific, complete code that can directly replace the problematic code
+- When providing actual code fixes, always use "fixedCode" - never put code snippets in "suggestion"
+- The "suggestion" field should be human-readable advice, not code blocks
 
 ## ISSUE CLASSIFICATION GUIDE
 
