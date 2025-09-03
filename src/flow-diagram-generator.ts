@@ -443,30 +443,55 @@ ${fileList}
 
 YOUR GOAL: Show users and stakeholders WHAT this new feature does and HOW users will interact with it.
 
-FOCUS ON USER EXPERIENCE:
-1. HOW users discover/access this feature
-2. WHAT steps users take to use it
-3. WHAT happens behind the scenes (in simple terms)
-4. WHAT users see as results
-5. HOW this improves their workflow
+**MANDATORY REQUIREMENTS - YOUR DIAGRAM MUST INCLUDE:**
+1. **AT LEAST 3 DECISION POINTS** using diamond shapes {Is condition met?}
+2. **MULTIPLE BRANCHING PATHS** - success/error/alternative flows
+3. **CONDITIONAL ARROWS** with labels like -->|Yes| or -->|No|
+4. **ERROR HANDLING FLOWS** showing what happens when things go wrong
+5. **PARALLEL PROCESSES** where applicable (multiple things happening)
+6. **VALIDATION STEPS** that can pass or fail
+7. **USER CHOICE POINTS** where users must decide between options
 
-MAKE IT USER-CENTRIC:
+FOCUS ON COMPLEX USER EXPERIENCE:
+1. HOW users discover/access this feature
+2. WHAT validation/checks happen at each step
+3. WHAT decisions the system or users need to make
+4. WHAT happens in success vs failure scenarios  
+5. WHAT alternative paths exist
+6. HOW errors are handled and recovery works
+7. WHAT parallel processes might run
+8. HOW this improves their workflow
+
+MAKE IT REALISTIC AND BRANCHING:
 - Start with user action or need
-- Show clear steps users will take
-- Explain what users see at each step
-- Include decision points users face
-- End with the value/benefit users get
-- Use language stakeholders understand
+- Add validation checks that can fail
+- Show decision points where flow splits
+- Include error scenarios and recovery paths
+- Add conditional logic and user choices
+- Show parallel processing where relevant
+- End with multiple possible outcomes
+- Use business language stakeholders understand
 
 CRITICAL SYNTAX RULES:
 - DO NOT use parentheses, quotes, or brackets inside node labels
 - Keep node labels simple and descriptive
 - Use hyphens or spaces instead of special characters
+- MUST include diamond shapes {} for decisions
+- MUST include conditional arrows -->|condition|
 
-EXAMPLE STRUCTURE:
-${this.getExampleDiagram(visualizationType, 'feature')}
+**CREATIVE FREEDOM GUIDELINES:**
+- Design a UNIQUE flow that matches the specific changes in this PR
+- Think about the REAL user scenarios and business logic involved
+- Create decision points that make sense for THIS specific feature
+- Include error handling that's relevant to THIS implementation
+- Show the actual complexity and edge cases for THIS feature
 
-Return only the Mermaid ${visualizationType} code that tells the complete user story.`;
+**SYNTAX REMINDERS:**
+- Decision nodes: {Is this condition true?}
+- Conditional flows: -->|Yes| or -->|No| or -->|Error|
+- Keep labels clear and specific to this feature
+
+Return only the Mermaid ${visualizationType} code with creative, PR-specific branching logic.`;
   }
 
   /**
@@ -494,41 +519,56 @@ ${fileList}
 
 YOUR GOAL: Show the BEFORE vs AFTER behavior so users understand what changed.
 
-FOCUS ON PROBLEM & SOLUTION:
-1. WHAT scenario triggered the bug
-2. WHERE the problem occurred in the flow
-3. HOW the fix changes the behavior
-4. WHAT users experience now instead
-5. HOW this prevents the issue
+**MANDATORY REQUIREMENTS - YOUR DIAGRAM MUST INCLUDE:**
+1. **MULTIPLE DECISION POINTS** showing where validation/checks occur
+2. **BEFORE/AFTER PATHS** comparing old broken vs new fixed flows
+3. **ERROR SCENARIOS** that were problematic before the fix
+4. **VALIDATION STEPS** that now work correctly
+5. **CONDITIONAL BRANCHING** for success/failure cases
+6. **RECOVERY MECHANISMS** that are now improved
+7. **EDGE CASE HANDLING** that was previously broken
 
-SHOW THE IMPROVEMENT:
-- Start with the scenario that had problems
-- Show where the bug occurred
-- Highlight the fixed behavior
-- Demonstrate the improved user experience
-- Include error handling improvements
+FOCUS ON COMPLEX PROBLEM & SOLUTION:
+1. WHAT scenario triggered the bug (with decision points)
+2. WHERE validation failed in the old flow
+3. WHAT conditions caused the problem
+4. HOW the fix adds proper checks and branches
+5. WHAT new validation logic prevents issues
+6. HOW error handling now works with multiple paths
+7. WHAT alternative scenarios now work correctly
+
+SHOW THE COMPREHENSIVE IMPROVEMENT:
+- Start with the problematic user scenario
+- Show decision points where old logic failed
+- Add new validation steps with pass/fail branches
+- Demonstrate improved error handling paths
+- Include multiple success/failure scenarios
+- Show recovery and retry mechanisms
+- Highlight conditional logic improvements
+- End with robust user experience
 
 CRITICAL SYNTAX RULES:
 - DO NOT use parentheses, quotes, or brackets inside node labels
 - Keep node labels simple and descriptive
 - Use hyphens or spaces instead of special characters
+- MUST include diamond shapes {} for decisions
+- MUST include conditional arrows -->|condition|
 
-EXAMPLE STRUCTURE:
-flowchart TD
-    A[User submits form] --> B[System validates data]
-    B --> C{All required fields?}
-    C -->|No| D[Show specific field errors]
-    C -->|Yes| E[Process submission]
-    E --> F{Processing successful?}
-    F -->|No| G[Show helpful error message]
-    F -->|Yes| H[Confirm success to user]
-    
-    style D fill:#90EE90
-    style G fill:#90EE90
-    
-Use green highlighting for the parts that were fixed/improved.
+**CREATIVE FREEDOM GUIDELINES:**
+- Design a UNIQUE flow that shows the specific bug and how this fix addresses it
+- Think about the REAL scenarios where the bug occurred
+- Create decision points that demonstrate the improved validation/logic
+- Show the actual error conditions that are now handled properly
+- Include recovery paths that are specific to this bug fix
 
-Return only the Mermaid flowchart code that shows the fix.`;
+**SYNTAX REMINDERS:**
+- Decision nodes: {Does this check pass now?}
+- Conditional flows: -->|Fixed| or -->|Still fails| or -->|Retry|
+- Keep labels specific to the actual bug being fixed
+
+Use green styling for improved/fixed parts: style NodeId fill:#90EE90
+
+Return only the Mermaid flowchart code with creative, bug-specific branching logic.`;
   }
 
   /**
@@ -556,43 +596,55 @@ ${fileList}
 
 YOUR GOAL: Show WHAT was optimized and HOW it affects the user experience.
 
-FOCUS ON IMPROVEMENTS:
-1. WHAT process was slow/inefficient before
-2. WHERE the bottlenecks were
-3. HOW the optimization works
-4. WHAT users notice as improvement
-5. WHEN the benefits are most apparent
+**MANDATORY REQUIREMENTS - YOUR DIAGRAM MUST INCLUDE:**
+1. **MULTIPLE DECISION POINTS** for optimization logic
+2. **BEFORE/AFTER COMPARISONS** showing old vs new paths
+3. **CACHE/PERFORMANCE CHECKS** with conditional flows
+4. **FALLBACK MECHANISMS** when optimizations fail
+5. **PARALLEL PROCESSING** where performance is gained
+6. **BOTTLENECK IDENTIFICATION** and resolution paths
+7. **RESOURCE MANAGEMENT** decisions and flows
 
-HIGHLIGHT THE GAINS:
-- Show the improved process flow
-- Indicate faster/more efficient steps
-- Demonstrate reduced waiting times
-- Highlight better resource usage
-- Show measurable improvements
+FOCUS ON COMPLEX PERFORMANCE IMPROVEMENTS:
+1. WHAT process was slow/inefficient with decision points
+2. WHERE bottlenecks occurred with conditional checks
+3. HOW optimization logic decides between paths
+4. WHAT validation ensures optimization works
+5. WHEN fallbacks are needed if optimization fails
+6. HOW parallel processes improve speed
+7. WHAT monitoring detects performance issues
+
+HIGHLIGHT THE COMPREHENSIVE GAINS:
+- Show optimization decision logic
+- Include cache hit/miss scenarios
+- Demonstrate parallel vs sequential paths
+- Add performance monitoring branches
+- Show resource optimization choices
+- Include error handling for failed optimizations
+- Demonstrate measurable improvement paths
 
 CRITICAL SYNTAX RULES:
 - DO NOT use parentheses, quotes, or brackets inside node labels
 - Keep node labels simple and descriptive
 - Use hyphens or spaces instead of special characters
+- MUST include diamond shapes {} for decisions
+- MUST include conditional arrows -->|condition|
 
-EXAMPLE STRUCTURE:
-flowchart TD
-    A[User requests data] --> B[Check cache first]
-    B --> C{Data in cache?}
-    C -->|Yes| D[Return cached data instantly]
-    C -->|No| E[Fetch from database]
-    E --> F[Store in cache]
-    F --> G[Return data to user]
-    D --> H[User sees results quickly]
-    G --> H
-    
-    style B fill:#FFD700
-    style D fill:#90EE90
-    style F fill:#FFD700
-    
-Use gold for optimization points and green for speed improvements.
+**CREATIVE FREEDOM GUIDELINES:**
+- Design a UNIQUE flow showing the specific performance improvements in this PR
+- Think about the REAL bottlenecks that were addressed
+- Create decision points for cache hits/misses, load balancing, etc. based on actual changes
+- Show the specific optimization strategies used in this implementation
+- Include monitoring and fallback logic relevant to these optimizations
 
-Return only the Mermaid flowchart code that shows the optimization.`;
+**SYNTAX REMINDERS:**
+- Decision nodes: {Is cache available?} {Load high?} {Optimization successful?}
+- Conditional flows: -->|Hit| -->|Miss| -->|Fast| -->|Slow|
+- Keep labels specific to the actual optimizations made
+
+Use green styling for optimized parts: style NodeId fill:#90EE90
+
+Return only the Mermaid flowchart code with creative, optimization-specific branching logic.`;
   }
 
   /**
@@ -752,35 +804,54 @@ ${fileList}
 
 YOUR GOAL: Create a flowchart that explains the COMPLETE USER JOURNEY and BUSINESS LOGIC, not just technical implementation.
 
-FOCUS ON EXPLAINING:
-1. WHAT triggers this flow (user action, event, condition)
-2. WHAT business problem is being solved
-3. WHAT decisions are made and why
-4. WHAT data is processed and transformed
-5. WHAT the end result means for users
-6. HOW different components work together
+**MANDATORY REQUIREMENTS - YOUR DIAGRAM MUST INCLUDE:**
+1. **AT LEAST 3 DECISION POINTS** using diamond shapes {Is condition met?}
+2. **MULTIPLE BRANCHING PATHS** for different scenarios and outcomes
+3. **CONDITIONAL ARROWS** with clear labels like -->|Yes| or -->|Error|
+4. **ERROR HANDLING FLOWS** showing what happens when things fail
+5. **VALIDATION STEPS** that can pass or fail with consequences
+6. **USER CHOICE POINTS** where users make decisions
+7. **RECOVERY MECHANISMS** for handling failures and retries
 
-MAKE IT EXPLANATORY:
-- Use clear, descriptive labels that explain PURPOSE
-- Show the logical progression of events
-- Include decision points with meaningful conditions
-- Explain what happens in success vs error cases
-- Use business terms that stakeholders understand
-- Show the value/outcome for users
+FOCUS ON COMPREHENSIVE EXPLANATION:
+1. WHAT triggers this flow with validation checkpoints
+2. WHAT business problem is solved with decision logic
+3. WHAT decisions are made and WHY with conditional paths
+4. WHAT data validation and processing occurs
+5. WHAT happens in success vs multiple failure scenarios
+6. HOW different components interact with error handling
+7. WHAT the end result means for users in each case
 
-EXAMPLE STRUCTURE:
-flowchart TD
-    A[User uploads document] --> B[System validates file]
-    B --> C{File format supported?}
-    C -->|No| D[Show error message]
-    C -->|Yes| E[Extract text content]
-    E --> F[AI analyzes document]
-    F --> G[Generate insights report]
-    G --> H[Save results to user account]
-    H --> I[Display analysis to user]
-    D --> J[User can try again]
+MAKE IT REALISTICALLY COMPLEX:
+- Use clear, descriptive labels that explain PURPOSE and CONDITIONS
+- Show the complete logical progression with branching
+- Include decision points with meaningful conditions and outcomes
+- Explain what happens in success, error, and edge cases
+- Add validation steps that can fail with recovery options
+- Use business terms stakeholders understand
+- Show comprehensive value/outcome for different user paths
+- Include parallel processes where applicable
 
-Return only the Mermaid flowchart code that explains the complete story of what this PR accomplishes.`;
+CRITICAL SYNTAX RULES:
+- DO NOT use parentheses, quotes, or brackets inside node labels
+- Keep node labels simple and descriptive
+- Use hyphens or spaces instead of special characters
+- MUST include diamond shapes {} for decisions
+- MUST include conditional arrows -->|condition|
+
+**CREATIVE FREEDOM GUIDELINES:**
+- Design a UNIQUE flow that tells the specific story of this PR
+- Think about the REAL user journey and business value being created
+- Create decision points that reflect the actual logic in the code changes
+- Show the genuine complexity and edge cases introduced by these changes
+- Include validation, error handling, and user choices specific to this implementation
+
+**SYNTAX REMINDERS:**
+- Decision nodes: {Does condition match the actual code?}
+- Conditional flows: -->|ActualCondition| based on the real logic
+- Keep labels descriptive of what this PR actually does
+
+Return only the Mermaid flowchart code that creatively explains this specific PR's story.`;
   }
 
   /**
@@ -1016,11 +1087,11 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
       return false;
     }
 
-    // Check for minimum number of steps (nodes) - must have at least 3 steps
+    // Check for minimum number of steps (nodes) - must have at least 5 steps for meaningful complexity
     const nodeCount = this.countMermaidNodes(trimmed);
-    if (nodeCount < 3) {
+    if (nodeCount < 5) {
       logger.warn(
-        `Mermaid validation failed: diagram has only ${nodeCount} steps, minimum 3 required`
+        `Mermaid validation failed: diagram has only ${nodeCount} steps, minimum 5 required for meaningful flow`
       );
       return false;
     }
@@ -1090,12 +1161,46 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
       return false;
     }
 
-    // Check for decision points (good flow diagrams have logical branches)
+    // ENFORCE decision points (good flow diagrams MUST have logical branches)
     const hasDecisions = text.includes('{') && text.includes('}');
     const hasConditionalFlows = text.includes('|');
+    const decisionCount = (text.match(/\{[^}]*\}/g) || []).length;
+    const conditionalCount = (text.match(/\|[^|]*\|/g) || []).length;
 
-    if (!hasDecisions && !hasConditionalFlows) {
-      logger.info('Diagram could be improved with decision points, but this is not required');
+    if (!hasDecisions) {
+      logger.warn('Mermaid validation failed: diagram lacks decision points (diamond shapes {})');
+      return false;
+    }
+
+    if (decisionCount < 2) {
+      logger.warn(
+        `Mermaid validation failed: diagram has only ${decisionCount} decision points, minimum 2 required for proper branching`
+      );
+      return false;
+    }
+
+    if (!hasConditionalFlows) {
+      logger.warn('Mermaid validation failed: diagram lacks conditional arrows (-->|condition|)');
+      return false;
+    }
+
+    if (conditionalCount < 2) {
+      logger.warn(
+        `Mermaid validation failed: diagram has only ${conditionalCount} conditional flows, minimum 2 required for meaningful branching`
+      );
+      return false;
+    }
+
+    // Check for branching complexity - count arrow connections
+    const arrowCount = (text.match(/-->/g) || []).length;
+    const nodeCount = this.countMermaidNodes(mermaidCode);
+
+    // Good diagrams should have more arrows than nodes (indicating branching)
+    if (arrowCount <= nodeCount) {
+      logger.warn(
+        `Mermaid validation failed: diagram appears too linear (${arrowCount} arrows for ${nodeCount} nodes). Need more branching.`
+      );
+      return false;
     }
 
     return true;
@@ -1286,6 +1391,44 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
     }
 
     return description;
+  }
+
+  /**
+   * Get basic syntax guidelines instead of rigid examples
+   */
+  private getEnhancedExampleDiagram(visualizationType: VisualizationType, prType: PRType): string {
+    switch (visualizationType) {
+      case 'flowchart':
+        return `**FLOWCHART SYNTAX GUIDE:**
+- Start with: flowchart TD (top-down) or flowchart LR (left-right)
+- Rectangle nodes: [Action or process]
+- Diamond decisions: {Question or condition?}
+- Conditional arrows: -->|Yes| or -->|No| or -->|Error|
+- Styling: style NodeId fill:#color
+
+**BE CREATIVE:** Design a flow unique to this PR's actual functionality and business logic.`;
+
+      case 'stateDiagram':
+        return `**STATE DIAGRAM SYNTAX GUIDE:**
+- Start with: stateDiagram-v2
+- States: StateName
+- Transitions: State1 --> State2 : trigger/condition
+- Entry/exit: [*] --> InitialState or FinalState --> [*]
+
+**BE CREATIVE:** Show the actual state changes relevant to this PR.`;
+
+      case 'graph':
+        return `**GRAPH SYNTAX GUIDE:**
+- Start with: graph TD (top-down) or graph LR (left-right)
+- Nodes: [Component] or (Service) or {Decision}
+- Connections: A --> B or A -->|label| B
+- Styling: style NodeId fill:#color
+
+**BE CREATIVE:** Show the actual component relationships changed in this PR.`;
+
+      default:
+        return this.getExampleDiagram(visualizationType, prType);
+    }
   }
 
   /**

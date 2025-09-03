@@ -186,6 +186,40 @@ export class CommentManager {
       `Processing ${Object.keys(issuesByLocation).length} unique locations for inline comments`
     );
 
+    // Debug: Show all AI-reported issues and their line numbers
+    logger.info(`\n=== AI REPORTED ISSUES DEBUG ===`);
+    filteredIssues.forEach((issue, index) => {
+      logger.info(`Issue ${index + 1}:`);
+      logger.info(`  File: ${issue.file}`);
+      logger.info(`  Line: ${issue.line} (AI reported)`);
+      logger.info(`  Message: ${issue.message}`);
+      logger.info(`  Type: ${issue.type}`);
+      const issueWithReviewType = issue as CodeIssue & { reviewType?: string };
+      if (issueWithReviewType.reviewType) {
+        logger.info(`  Review Type: ${issueWithReviewType.reviewType}`);
+      }
+
+      // Cross-check with file changes
+      const relatedFileChange = fileChanges.find(fc => fc.filename === issue.file);
+      if (relatedFileChange?.patch) {
+        const validLines = this.parseValidLinesFromPatch(relatedFileChange.patch);
+        const isValidLine = validLines.includes(issue.line || 0);
+        logger.info(`  ✓ Line ${issue.line} valid in diff: ${isValidLine ? 'YES' : 'NO'}`);
+        if (!isValidLine) {
+          logger.warn(`  ⚠️  Available lines in diff: [${validLines.join(', ')}]`);
+          const closestLine = validLines.reduce((prev, curr) =>
+            Math.abs(curr - (issue.line || 0)) < Math.abs(prev - (issue.line || 0)) ? curr : prev
+          );
+          logger.warn(
+            `  🔧 Closest valid line: ${closestLine} (distance: ${Math.abs(closestLine - (issue.line || 0))})`
+          );
+        }
+      } else {
+        logger.warn(`  ❌ No patch found for file ${issue.file}`);
+      }
+    });
+    logger.info(`====================================\n`);
+
     for (const [locationKey, locationIssues] of Object.entries(issuesByLocation)) {
       const [file, lineStr] = locationKey.split(':');
       if (!file || !lineStr) {
@@ -238,21 +272,12 @@ export class CommentManager {
 
       // Debug: Log the exact line number being sent to GitHub
       logger.debug(
-        `📍 Sending to GitHub API: line ${validLocation.line} for issue at original line ${originalLine}`
+        `📍 Original calculation: line ${validLocation.line} for issue at AI-reported line ${originalLine}`
       );
-
-      // EXPERIMENTAL: Try +1 adjustment to fix off-by-one issue
-      // TODO: Remove this once we identify the root cause
-      const adjustedLine = validLocation.line + 1;
-      logger.info(
-        `🧪 EXPERIMENTAL: Trying line ${adjustedLine} instead of ${validLocation.line} to fix off-by-one`
-      );
-
-      comment.location.line = adjustedLine;
 
       // Check if we should update existing comment
       const existingComment = existingComments.find(
-        c => c.location.file === file && c.location.line === adjustedLine
+        c => c.location.file === file && c.location.line === validLocation.line
       );
 
       try {
@@ -450,10 +475,14 @@ export class CommentManager {
     let currentLine = 0;
 
     logger.debug(`\n=== PARSING PATCH FOR VALID COMMENT LINES ===`);
-    logger.debug(`Patch preview:\n${patch.substring(0, 200)}${patch.length > 200 ? '...' : ''}`);
+    logger.debug(`Patch length: ${patch.length} characters`);
+    logger.debug(`Patch lines count: ${lines.length}`);
+    logger.debug(`Full patch content:\n${patch}`);
+    logger.debug(`================================`);
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      logger.debug(`[${i}] Processing: "${line}"`);
 
       if (line && line.startsWith('@@')) {
         // Parse hunk header: @@ -oldStart,oldLines +newStart,newLines @@

@@ -547,12 +547,18 @@ ${this.getLanguageSpecificGuidelines(fileChange.filename)}
 1. When reporting issues, use the EXACT line numbers shown below (format: "123| code")
 2. ONLY report issues for lines that appear in the diff above (lines marked with + or context)
 3. DO NOT report issues for unchanged lines not shown in the diff
+4. **CROSS-REFERENCE**: Match the numbered lines below with the diff lines above to ensure accuracy
 
 \`\`\`${this.getLanguageFromFilename(fileChange.filename)}
 ${this.addLineNumbers(fileContent)}
 \`\`\`
 
-**VALIDATION REMINDER**: Before submitting, verify that your reported line numbers correspond to lines that were actually changed or are context lines in the diff shown above.
+**MANDATORY VALIDATION STEPS**:
+1. Find the issue in the numbered file content above
+2. Note the line number (e.g., "139| language: Joi.string().default('en')" = line 139)
+3. Verify this line appears in the diff with + or as context
+4. Use that exact line number in your response
+5. **DOUBLE-CHECK**: Does your reported line number match both the numbered content AND the diff?
 
 `;
 
