@@ -305,7 +305,7 @@ CRITICAL RULES:
 
       // Use the Bedrock provider's invokeModel method directly
       const result = await bedrockProvider.invokeModel(userPrompt, systemPrompt);
-      
+
       if (!result) {
         throw new Error('No response from Bedrock for Mermaid generation');
       }

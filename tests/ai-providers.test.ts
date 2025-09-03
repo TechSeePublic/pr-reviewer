@@ -2,7 +2,7 @@
  * Tests for AI providers
  */
 
-import { AIProviderFactory, AnthropicProvider, OpenAIProvider } from '../src/ai';
+import { AIProviderFactory, AnthropicProvider, BedrockProvider, OpenAIProvider } from '../src/ai';
 import { ActionInputs, CursorRule } from '../src/types';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
@@ -10,6 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 // Mock the AI libraries
 jest.mock('openai');
 jest.mock('@anthropic-ai/sdk');
+jest.mock('@aws-sdk/client-bedrock-runtime');
 jest.mock('../src/logger');
 
 const MockedOpenAI = OpenAI as jest.MockedClass<typeof OpenAI>;
@@ -202,6 +203,18 @@ describe('AI Providers', () => {
       expect(provider.name).toBe('anthropic');
     });
 
+    it('should create Bedrock provider when specified', () => {
+      const inputs: ActionInputs = {
+        aiProvider: 'bedrock',
+        bedrockRegion: 'us-east-1',
+      } as ActionInputs;
+
+      const provider = AIProviderFactory.create(inputs);
+
+      expect(provider).toBeInstanceOf(BedrockProvider);
+      expect(provider.name).toBe('bedrock');
+    });
+
     it('should auto-detect provider based on available keys', () => {
       const inputs: ActionInputs = {
         aiProvider: 'auto',
@@ -211,6 +224,17 @@ describe('AI Providers', () => {
       const provider = AIProviderFactory.create(inputs);
 
       expect(provider).toBeInstanceOf(OpenAIProvider);
+    });
+
+    it('should auto-detect Bedrock provider when region is provided', () => {
+      const inputs: ActionInputs = {
+        aiProvider: 'auto',
+        bedrockRegion: 'us-west-2',
+      } as ActionInputs;
+
+      const provider = AIProviderFactory.create(inputs);
+
+      expect(provider).toBeInstanceOf(BedrockProvider);
     });
 
     it('should throw error when no API keys provided', () => {
@@ -225,11 +249,12 @@ describe('AI Providers', () => {
       const inputs: ActionInputs = {
         openaiApiKey: 'key1',
         anthropicApiKey: 'key2',
+        bedrockRegion: 'us-east-1',
       } as ActionInputs;
 
       const providers = AIProviderFactory.getAvailableProviders(inputs);
 
-      expect(providers).toEqual(['openai', 'anthropic']);
+      expect(providers).toEqual(['openai', 'anthropic', 'bedrock']);
     });
 
     it('should accept any model name without validation', () => {
@@ -260,6 +285,20 @@ describe('AI Providers', () => {
         const result = AIProviderFactory.resolveProviderAndModel(inputs);
         expect(result.provider).toBe('azure');
         expect(result.model).toBe('claude-3-5-sonnet');
+      }).not.toThrow();
+    });
+
+    it('should handle Bedrock models correctly', () => {
+      const inputs: ActionInputs = {
+        aiProvider: 'bedrock',
+        model: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+        bedrockRegion: 'us-east-1',
+      } as ActionInputs;
+
+      expect(() => {
+        const result = AIProviderFactory.resolveProviderAndModel(inputs);
+        expect(result.provider).toBe('bedrock');
+        expect(result.model).toBe('anthropic.claude-3-5-sonnet-20241022-v2:0');
       }).not.toThrow();
     });
   });
