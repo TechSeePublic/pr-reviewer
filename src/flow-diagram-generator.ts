@@ -163,91 +163,61 @@ export class FlowDiagramGenerator {
   }
 
   /**
-   * Generate Mermaid diagram using direct AI call (not code review format)
+   * Generate Mermaid diagram using the AI provider's standard interface
    */
   private async generateMermaidWithAI(prompt: string, context: string): Promise<string | unknown> {
     if (!this.aiProvider) {
       throw new Error('AI provider not available');
     }
 
-    // Access the underlying AI provider to make a direct call
-    // This bypasses the code review format and gets raw text response
-    if ('client' in this.aiProvider) {
-      // Handle OpenAI provider (including Azure OpenAI)
-      const openaiProvider = this.aiProvider as any;
+    try {
+      // Log provider information for debugging
+      const providerName = this.aiProvider.name || 'unknown';
+      const providerModel = this.aiProvider.model || 'unknown';
 
-      try {
-        // Check if this is an Azure/OpenAI provider that has the new methods
-        const requiresMaxCompletionTokens =
-          typeof openaiProvider.requiresMaxCompletionTokens === 'function'
-            ? openaiProvider.requiresMaxCompletionTokens()
-            : false;
-        const supportsTemperature =
-          typeof openaiProvider.supportsTemperature === 'function'
-            ? openaiProvider.supportsTemperature()
-            : true; // Default to true for backward compatibility
+      logger.info(`Flow diagram generation: provider=${providerName}, model=${providerModel}`);
 
-        logger.info(
-          `Flow diagram generation: model=${openaiProvider.model}, requiresMaxCompletionTokens=${requiresMaxCompletionTokens}, supportsTemperature=${supportsTemperature}`
-        );
+      // Use the AI provider's standard reviewCode method with a special prompt
+      // that requests only Mermaid code without review format
+      const mermaidPrompt = `You are a flow diagram generator. Your only task is to generate valid Mermaid flowchart code based on the request below.
 
-        const response = await openaiProvider.client.chat.completions.create({
-          model: openaiProvider.model,
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You are a flow diagram generator. Generate only valid Mermaid flowchart code. Do not provide code reviews or suggestions.',
-            },
-            {
-              role: 'user',
-              content: `${prompt}\n\n## Context:\n${context}`,
-            },
-          ],
-          ...(supportsTemperature && { temperature: 0.1 }),
-          ...(requiresMaxCompletionTokens ? { max_completion_tokens: 2000 } : { max_tokens: 2000 }),
-        });
+CRITICAL INSTRUCTIONS:
+- Generate ONLY the Mermaid flowchart code, nothing else
+- Do NOT provide code reviews, suggestions, or explanations
+- Do NOT format your response as JSON or include any wrapper format
+- Do NOT include markdown code blocks (no \`\`\` fences)
+- Start directly with "flowchart TD" or "flowchart LR"
+- Your entire response should be pure Mermaid syntax
 
-        const result = response.choices[0]?.message?.content;
-        if (!result) {
-          throw new Error('No response from OpenAI for Mermaid generation');
-        }
+REQUEST:
+${prompt}`;
 
-        logger.info('✅ Got direct AI response for Mermaid generation');
-        return result;
-      } catch (error) {
-        logger.error('Direct OpenAI call failed:', error);
+      const response = await this.aiProvider.reviewCode(mermaidPrompt, context, []);
 
-        // Provide more detailed error information
-        if (error && typeof error === 'object') {
-          const errorObj = error as any;
-          if (errorObj.status) {
-            logger.error(`API Error Status: ${errorObj.status}`);
-          }
-          if (errorObj.message) {
-            logger.error(`API Error Message: ${errorObj.message}`);
-          }
-          if (errorObj.code) {
-            logger.error(`API Error Code: ${errorObj.code}`);
-          }
-        }
-
-        throw error;
+      if (!response) {
+        throw new Error('No response from AI provider for Mermaid generation');
       }
-    } else {
-      // Fallback to reviewCode method but warn about it
-      logger.warn('Unable to make direct AI call, falling back to reviewCode method');
-      try {
-        const response = await this.aiProvider.reviewCode(prompt, context, []);
 
-        // For non-OpenAI providers, we still need to use the array response
-        // Mark this as an array response so the parser knows how to handle it
-        (response as any).__isArrayResponse = true;
-        return response as any;
-      } catch (error) {
-        logger.error('Fallback reviewCode method also failed:', error);
-        throw error;
+      logger.info('✅ Got AI response for Mermaid generation');
+      return response;
+    } catch (error) {
+      logger.error('AI provider call failed:', error);
+
+      // Provide more detailed error information
+      if (error && typeof error === 'object') {
+        const errorObj = error as any;
+        if (errorObj.message) {
+          logger.error(`AI Error Message: ${errorObj.message}`);
+        }
+        if (errorObj.status) {
+          logger.error(`AI Error Status: ${errorObj.status}`);
+        }
+        if (errorObj.code) {
+          logger.error(`AI Error Code: ${errorObj.code}`);
+        }
       }
+
+      throw error;
     }
   }
 
@@ -893,23 +863,47 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
         response.length > 0 && response.every(item => item.type && item.category && item.severity);
 
       if (isCodeReviewResponse) {
-        logger.error('AI returned code review issues instead of Mermaid diagram');
-        logger.error('This indicates the AI misunderstood the flow diagram request');
-        throw new Error(
-          'AI returned code review format instead of flow diagram - prompt may need adjustment'
+        logger.warn(
+          'AI returned code review issues instead of Mermaid diagram - extracting from message fields'
         );
-      }
 
-      for (const item of response) {
-        if (item.description || item.message) {
-          const text = item.description || item.message;
-          logger.info(`AI returned text (${text.length} chars): ${text.substring(0, 150)}...`);
+        // Try to extract from code review response fields
+        for (const item of response) {
+          if (item.description || item.message) {
+            const text = item.description || item.message;
+            logger.info(
+              `Trying to extract Mermaid from code review item: ${text.substring(0, 150)}...`
+            );
 
-          const extracted = this.extractMermaidFromText(text);
-          if (extracted) {
-            logger.info('✅ Successfully extracted Mermaid code from array item');
-            mermaidCode = extracted;
-            break;
+            const extracted = this.extractMermaidFromText(text);
+            if (extracted) {
+              logger.info('✅ Successfully extracted Mermaid code from code review item');
+              mermaidCode = extracted;
+              break;
+            }
+          }
+        }
+
+        // If we couldn't extract from code review format, it's a problem
+        if (!mermaidCode) {
+          logger.error('AI returned code review format and no Mermaid could be extracted');
+          throw new Error(
+            'AI returned code review format instead of flow diagram - prompt may need adjustment'
+          );
+        }
+      } else {
+        // Handle normal array response (hopefully containing Mermaid)
+        for (const item of response) {
+          if (item.description || item.message) {
+            const text = item.description || item.message;
+            logger.info(`AI returned text (${text.length} chars): ${text.substring(0, 150)}...`);
+
+            const extracted = this.extractMermaidFromText(text);
+            if (extracted) {
+              logger.info('✅ Successfully extracted Mermaid code from array item');
+              mermaidCode = extracted;
+              break;
+            }
           }
         }
       }

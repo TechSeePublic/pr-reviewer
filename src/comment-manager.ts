@@ -234,12 +234,28 @@ export class CommentManager {
       logger.info(`AI reported diff line: ${originalLine}`);
       logger.info(`Issue: ${locationIssues[0]?.message}`);
 
-      const actualFileLineNumber = this.convertDiffLineToFileLine(file, originalLine, fileChanges);
+      let actualFileLineNumber = this.convertDiffLineToFileLine(file, originalLine, fileChanges);
+
+      // Fallback: If conversion fails, AI might still be using old file line numbers
+      // This is a temporary bridge while AI adapts to new format
       if (!actualFileLineNumber) {
         logger.warn(
-          `❌ Skipping inline comment for ${file}:${originalLine} - could not convert diff line to file line`
+          `⚠️  Diff line conversion failed for line ${originalLine}. Checking if it's a valid file line...`
         );
-        continue;
+
+        // Check if the reported line is actually a valid file line in the diff
+        const validLines = this.parseValidLinesFromPatch(
+          fileChanges.find(fc => fc.filename === file)?.patch || ''
+        );
+        if (validLines.includes(originalLine)) {
+          logger.warn(`📍 FALLBACK: AI reported file line ${originalLine} directly, using as-is`);
+          actualFileLineNumber = originalLine;
+        } else {
+          logger.warn(
+            `❌ Skipping inline comment for ${file}:${originalLine} - not a valid line number in any format`
+          );
+          continue;
+        }
       }
 
       logger.info(`✅ Converted diff line ${originalLine} to file line ${actualFileLineNumber}`);

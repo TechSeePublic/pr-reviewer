@@ -4,6 +4,7 @@
  */
 
 import { CodeIssue, CursorRule, FileChange, PRPlan, ReviewContext } from './types';
+import { logger } from './logger';
 
 export interface PromptConfig {
   supportsJsonMode: boolean;
@@ -412,27 +413,23 @@ Remember: Your goal is to help developers write better, safer, more maintainable
 
   /**
    * Builds the user prompt with code context
+   * Note: The context already contains all necessary information including file content and numbered diff
    */
-  static buildUserPrompt(context: string, code: string): string {
+  static buildUserPrompt(context: string, _code: string): string {
     return `${context}
-
-## COMPLETE FILE CONTENT (For Context)
-
-\`\`\`
-${code}
-\`\`\`
 
 ## ANALYSIS REQUEST
 
-Please analyze this file, focusing ONLY on the changes shown in the diff above. 
+Please analyze this file, focusing ONLY on the changes shown in the numbered diff above.
 
-**Remember**: 
-- The complete file content above is for CONTEXT to understand the changes
-- Only review the specific lines that were ADDED/MODIFIED in the diff
-- Report critical issues: bugs, security problems, performance issues, or rule violations
+**CRITICAL REMINDER**: 
+- Use the numbered diff section to understand what changed
+- Use the context file section to understand the overall code
+- Report line numbers from the numbered diff ONLY (1, 2, 3, etc.)
+- Never use line numbers from the context file section
 - Return findings in the specified JSON format
 
-**Focus your analysis on the changed areas, use the complete file for understanding context.**`;
+**Line numbers must come from the numbered diff section - this is critical for accurate comment placement.**`;
   }
 
   /**
@@ -502,6 +499,12 @@ ${fileContent}
     // Then provide the numbered diff for precise line reporting
     if (fileChange.patch) {
       const numberedDiff = this.createNumberedDiff(fileChange.patch);
+
+      // Debug: Log the numbered diff to see what AI receives
+      logger.debug(`\n=== NUMBERED DIFF FOR ${fileChange.filename} ===`);
+      logger.debug(numberedDiff);
+      logger.debug('=== END NUMBERED DIFF ===\n');
+
       context += `### Changes to Review (Report Issues Using These Line Numbers)
 **CRITICAL**: When reporting issues, use ONLY the line numbers shown below (1, 2, 3, etc.)
 These line numbers correspond directly to GitHub's commenting system.
