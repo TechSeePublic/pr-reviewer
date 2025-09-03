@@ -177,22 +177,8 @@ export class FlowDiagramGenerator {
 
       logger.info(`Flow diagram generation: provider=${providerName}, model=${providerModel}`);
 
-      // Use the AI provider's standard reviewCode method with a special prompt
-      // that requests only Mermaid code without review format
-      const mermaidPrompt = `You are a flow diagram generator. Your only task is to generate valid Mermaid flowchart code based on the request below.
-
-CRITICAL INSTRUCTIONS:
-- Generate ONLY the Mermaid flowchart code, nothing else
-- Do NOT provide code reviews, suggestions, or explanations
-- Do NOT format your response as JSON or include any wrapper format
-- Do NOT include markdown code blocks (no \`\`\` fences)
-- Start directly with "flowchart TD" or "flowchart LR"
-- Your entire response should be pure Mermaid syntax
-
-REQUEST:
-${prompt}`;
-
-      const response = await this.aiProvider.reviewCode(mermaidPrompt, context, []);
+      // Use direct AI provider calls instead of reviewCode to avoid code review system prompts
+      const response = await this.callAIDirectly(prompt, context);
 
       if (!response) {
         throw new Error('No response from AI provider for Mermaid generation');
@@ -218,6 +204,129 @@ ${prompt}`;
       }
 
       throw error;
+    }
+  }
+
+  /**
+   * Call AI provider directly for non-review tasks
+   */
+  private async callAIDirectly(prompt: string, context: string): Promise<string> {
+    if (!this.aiProvider) {
+      throw new Error('AI provider not available');
+    }
+
+    // Create a specialized system prompt for Mermaid generation (not code review)
+    const systemPrompt = `You are a specialized flow diagram generator. Your sole purpose is to create Mermaid flowchart code.
+
+CRITICAL RULES:
+- Generate ONLY valid Mermaid flowchart syntax
+- Do NOT provide explanations, reviews, or comments
+- Do NOT wrap in JSON or any other format
+- Do NOT use markdown code blocks
+- Start directly with "flowchart TD" or "flowchart LR"
+- Use proper Mermaid syntax with nodes and arrows
+- Include decision points with {} diamond shapes
+- Include conditional arrows with -->|condition| syntax
+- Your entire response should be pure Mermaid code only`;
+
+    const userPrompt = `${prompt}\n\n## Context:\n${context}`;
+
+    // Handle different provider types with their specific APIs
+    if (this.aiProvider.name === 'openai' && 'client' in this.aiProvider) {
+      // OpenAI provider
+      const openaiProvider = this.aiProvider as any;
+
+      const requestConfig = {
+        model: openaiProvider.model,
+        messages: [
+          { role: 'system' as const, content: systemPrompt },
+          { role: 'user' as const, content: userPrompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 2000,
+      };
+
+      const response = await openaiProvider.client.chat.completions.create(requestConfig);
+      const result = response.choices[0]?.message?.content;
+
+      if (!result) {
+        throw new Error('No response from OpenAI for Mermaid generation');
+      }
+
+      return result;
+    } else if (this.aiProvider.name === 'azure' && 'client' in this.aiProvider) {
+      // Azure OpenAI provider
+      const azureProvider = this.aiProvider as any;
+
+      const requestConfig = {
+        model: azureProvider.model,
+        messages: [
+          { role: 'system' as const, content: systemPrompt },
+          { role: 'user' as const, content: userPrompt },
+        ],
+        ...(azureProvider.supportsTemperature &&
+          azureProvider.supportsTemperature() && { temperature: 0.1 }),
+        ...(azureProvider.requiresMaxCompletionTokens && azureProvider.requiresMaxCompletionTokens()
+          ? { max_completion_tokens: 2000 }
+          : { max_tokens: 2000 }),
+      };
+
+      const response = await azureProvider.client.chat.completions.create(requestConfig);
+      const result = response.choices[0]?.message?.content;
+
+      if (!result) {
+        throw new Error('No response from Azure OpenAI for Mermaid generation');
+      }
+
+      return result;
+    } else if (this.aiProvider.name === 'anthropic' && 'client' in this.aiProvider) {
+      // Anthropic provider
+      const anthropicProvider = this.aiProvider as any;
+
+      const response = await anthropicProvider.client.messages.create({
+        model: anthropicProvider.model,
+        max_tokens: 2000,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+
+      const result = response.content[0];
+      if (!result || result.type !== 'text') {
+        throw new Error('Unexpected response type from Anthropic for Mermaid generation');
+      }
+
+      return result.text;
+    } else {
+      // For custom providers, fall back to a modified reviewCode approach
+      logger.warn(
+        `Unknown provider type: ${this.aiProvider.name}, falling back to reviewCode method`
+      );
+
+      // Create a minimal prompt that tries to avoid the code review format
+      const fallbackPrompt = `Generate only Mermaid flowchart code. No JSON, no explanations, no code review format. Start with "flowchart TD":\n\n${userPrompt}`;
+
+      const response = await this.aiProvider.reviewCode(fallbackPrompt, '', []);
+
+      // Try to extract from whatever response format we get
+      if (Array.isArray(response) && response.length > 0) {
+        // Try to find Mermaid in the response items
+        for (const item of response) {
+          if (item.description || item.message) {
+            const text = item.description || item.message;
+            const extracted = this.extractMermaidFromText(text);
+            if (extracted) {
+              return extracted;
+            }
+          }
+        }
+      }
+
+      if (typeof response === 'string') {
+        return response;
+      }
+
+      throw new Error('Could not extract Mermaid code from custom provider response');
     }
   }
 
@@ -854,8 +963,25 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
     // Log the AI response for debugging
     logger.info(`AI Response type: ${typeof response}`);
 
-    // Handle array response (from reviewCode)
-    if (Array.isArray(response)) {
+    // Handle string response first (direct from callAIDirectly)
+    if (typeof response === 'string') {
+      logger.info(
+        `AI returned string (${response.length} chars): ${response.substring(0, 150)}...`
+      );
+      const extracted = this.extractMermaidFromText(response);
+      if (extracted) {
+        logger.info('✅ Successfully extracted Mermaid code from string');
+        mermaidCode = extracted;
+      } else {
+        // If extraction failed, try using the response directly if it looks like Mermaid
+        if (response.trim().startsWith('flowchart')) {
+          logger.info('✅ Using response directly as it starts with flowchart');
+          mermaidCode = response.trim();
+        }
+      }
+    }
+    // Handle array response (from reviewCode fallback)
+    else if (Array.isArray(response)) {
       logger.info(`Processing array response with ${response.length} items`);
 
       // Check if this looks like a code review response instead of a flow diagram
@@ -906,17 +1032,6 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
             }
           }
         }
-      }
-    }
-    // Handle string response
-    else if (typeof response === 'string') {
-      logger.info(
-        `AI returned string (${response.length} chars): ${response.substring(0, 150)}...`
-      );
-      const extracted = this.extractMermaidFromText(response);
-      if (extracted) {
-        logger.info('✅ Successfully extracted Mermaid code from string');
-        mermaidCode = extracted;
       }
     }
     // Handle object response
