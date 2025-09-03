@@ -46,7 +46,7 @@ jobs:
         
         ### Usage
         \`\`\`yaml
-        - uses: amit.wagner/pr-reviewer@v${{ steps.version.outputs.VERSION }}
+        - uses: amitwa1/pr-reviewer@v${{ steps.version.outputs.VERSION }}
           with:
             openai_api_key: \${{ secrets.OPENAI_API_KEY }}
             review_level: 'standard'
@@ -55,7 +55,7 @@ jobs:
         ### What's Changed
         - See commit history for detailed changes
         
-        **Full Changelog**: https://github.com/amit.wagner/pr-reviewer/commits/v${{ steps.version.outputs.VERSION }}"
+        **Full Changelog**: https://github.com/amitwa1/pr-reviewer/commits/v${{ steps.version.outputs.VERSION }}"
 
   update-major-tag:
     runs-on: ubuntu-latest

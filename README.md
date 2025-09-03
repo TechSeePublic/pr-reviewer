@@ -60,7 +60,7 @@ jobs:
         uses: actions/checkout@v4
         
       - name: AI Code Review
-        uses: amit.wagner/pr-reviewer@v1
+        uses: amitwa1/pr-reviewer@v1
         with:
           gh_token: ${{ secrets.GH_TOKEN }}
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
@@ -97,7 +97,7 @@ jobs:
         uses: actions/checkout@v4
         
       - name: AI Code Review (Manual)
-        uses: amit.wagner/pr-reviewer@v1
+        uses: amitwa1/pr-reviewer@v1
         with:
           pr_number: ${{ github.event.inputs.pr_number }}
           gh_token: ${{ secrets.GITHUB_TOKEN }}
@@ -227,7 +227,7 @@ The action can automatically select the best model based on your `review_level`:
 
 ```yaml
 # Automatic model selection
-- uses: amit.wagner/pr-reviewer@v1
+- uses: amitwa1/pr-reviewer@v1
   with:
     model: 'auto'              # Let the action choose
     review_level: 'thorough'   # This will select premium models
@@ -294,13 +294,13 @@ Great work on the new feature! Just a few TypeScript type annotations needed to 
 
 ```yaml
 # Light review - basic rule checking only
-- uses: amit.wagner/pr-reviewer@v1
+- uses: amitwa1/pr-reviewer@v1
   with:
     review_level: 'light'
     inline_severity: 'error'
 
 # Thorough review - comprehensive analysis
-- uses: amit.wagner/pr-reviewer@v1
+- uses: amitwa1/pr-reviewer@v1
   with:
     review_level: 'thorough'
     inline_severity: 'info'
@@ -311,7 +311,7 @@ Great work on the new feature! Just a few TypeScript type annotations needed to 
 
 ```yaml
 # Review only TypeScript files
-- uses: amit.wagner/pr-reviewer@v1
+- uses: amitwa1/pr-reviewer@v1
   with:
     include_patterns: '**/*.ts,**/*.tsx'
     exclude_patterns: '**/*.test.ts,**/*.spec.ts'
@@ -321,28 +321,28 @@ Great work on the new feature! Just a few TypeScript type annotations needed to 
 
 ```yaml
 # Use latest GPT-4 model for premium quality
-- uses: amit.wagner/pr-reviewer@v1
+- uses: amitwa1/pr-reviewer@v1
   with:
     ai_provider: 'openai'
     model: 'gpt-4o'
     openai_api_key: ${{ secrets.OPENAI_API_KEY }}
 
 # Use cost-effective model for large PRs
-- uses: amit.wagner/pr-reviewer@v1
+- uses: amitwa1/pr-reviewer@v1
   with:
     ai_provider: 'openai'
     model: 'gpt-5-nano'
     openai_api_key: ${{ secrets.OPENAI_API_KEY }}
 
 # Use latest Claude model for complex analysis
-- uses: amit.wagner/pr-reviewer@v1
+- uses: amitwa1/pr-reviewer@v1
   with:
     ai_provider: 'anthropic'
     model: 'claude-4-opus'
     anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 
 # Use Azure OpenAI for enterprise compliance
-- uses: amit.wagner/pr-reviewer@v1
+- uses: amitwa1/pr-reviewer@v1
   with:
     ai_provider: 'azure'
     model: 'gpt-5'
@@ -351,7 +351,7 @@ Great work on the new feature! Just a few TypeScript type annotations needed to 
     azure_openai_api_version: '2024-10-21'
 
 # Azure OpenAI with custom deployment names
-- uses: amit.wagner/pr-reviewer@v1
+- uses: amitwa1/pr-reviewer@v1
   with:
     ai_provider: 'azure'
     model: 'my-reasoning-model-prod'      # Custom deployment name
@@ -364,7 +364,7 @@ Great work on the new feature! Just a few TypeScript type annotations needed to 
 
 ```yaml
 # Auto-select best model based on review level
-- uses: amit.wagner/pr-reviewer@v1
+- uses: amitwa1/pr-reviewer@v1
   with:
     ai_provider: 'auto'           # Choose provider automatically
     model: 'auto'                 # Choose model based on review_level
@@ -379,7 +379,7 @@ Great work on the new feature! Just a few TypeScript type annotations needed to 
 
 ```yaml
 # Prefer Anthropic, fallback to OpenAI
-- uses: amit.wagner/pr-reviewer@v1
+- uses: amitwa1/pr-reviewer@v1
   with:
     ai_provider: 'anthropic'
     anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -435,7 +435,7 @@ Implement proper error handling
 
 ```bash
 # Clone the repository
-git clone https://github.com/amit.wagner/pr-reviewer.git
+git clone https://github.com/amitwa1/pr-reviewer.git
 cd pr-reviewer
 
 # Install dependencies
@@ -518,8 +518,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- 🐛 [Issue Tracker](https://github.com/amit.wagner/pr-reviewer/issues)
-- 💬 [Discussions](https://github.com/amit.wagner/pr-reviewer/discussions)
+- 🐛 [Issue Tracker](https://github.com/amitwa1/pr-reviewer/issues)
+- 💬 [Discussions](https://github.com/amitwa1/pr-reviewer/discussions)
 
 ---
 
@@ -527,6 +527,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Made with ❤️ by the Techsee**
 
-[⭐ Star this repo](https://github.com/amit.wagner/pr-reviewer) • [🐛 Report bug](https://github.com/amit.wagner/pr-reviewer/issues) • [✨ Request feature](https://github.com/amit.wagner/pr-reviewer/issues)
+[⭐ Star this repo](https://github.com/amitwa1/pr-reviewer) • [🐛 Report bug](https://github.com/amitwa1/pr-reviewer/issues) • [✨ Request feature](https://github.com/amitwa1/pr-reviewer/issues)
 
 </div>
