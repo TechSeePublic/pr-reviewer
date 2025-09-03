@@ -63,7 +63,7 @@ inputs:
   include_patterns:
     description: 'File patterns to include in review (comma-separated)'
     required: false
-    default: '**/*.ts,**/*.tsx,**/*.js,**/*.jsx,**/*.py,**/*.go,**/*.rs,**/*.java,**/*.cs'
+    default: '**/*.ts,**/*.tsx,**/*.js,**/*.jsx,**/*.py,**/*.go,**/*.rs,**/*.java,**/*.cs,**/*.md,**/*.mdc'
     
   exclude_patterns:
     description: 'File patterns to exclude from review (comma-separated)'

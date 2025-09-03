@@ -61,6 +61,8 @@ export class FlowDiagramGenerator {
         '.cs',
         '.vue',
         '.svelte',
+        '.md',
+        '.mdc',
       ],
       excludeFileTypes: [
         '.test.',

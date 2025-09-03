@@ -491,6 +491,19 @@ export class OpenAIProvider implements AIProvider {
           return file;
         }
       }
+
+      // Markdown/Documentation patterns
+      if (fileName.includes('.md') || fileName.includes('.mdc')) {
+        if (
+          lowerMessage.includes('markdown') ||
+          lowerMessage.includes('documentation') ||
+          lowerMessage.includes('readme') ||
+          lowerMessage.includes('doc') ||
+          lowerMessage.includes('md')
+        ) {
+          return file;
+        }
+      }
     }
 
     return null;
@@ -856,6 +869,19 @@ export class AnthropicProvider implements AIProvider {
       // Test file patterns
       if (fileName.includes('.test.') || fileName.includes('.spec.')) {
         if (lowerMessage.includes('test') || lowerMessage.includes('spec')) {
+          return file;
+        }
+      }
+
+      // Markdown/Documentation patterns
+      if (fileName.includes('.md') || fileName.includes('.mdc')) {
+        if (
+          lowerMessage.includes('markdown') ||
+          lowerMessage.includes('documentation') ||
+          lowerMessage.includes('readme') ||
+          lowerMessage.includes('doc') ||
+          lowerMessage.includes('md')
+        ) {
           return file;
         }
       }
@@ -1373,6 +1399,19 @@ export class AzureOpenAIProvider implements AIProvider {
       // Test file patterns
       if (fileName.includes('.test.') || fileName.includes('.spec.')) {
         if (lowerMessage.includes('test') || lowerMessage.includes('spec')) {
+          return file;
+        }
+      }
+
+      // Markdown/Documentation patterns
+      if (fileName.includes('.md') || fileName.includes('.mdc')) {
+        if (
+          lowerMessage.includes('markdown') ||
+          lowerMessage.includes('documentation') ||
+          lowerMessage.includes('readme') ||
+          lowerMessage.includes('doc') ||
+          lowerMessage.includes('md')
+        ) {
           return file;
         }
       }

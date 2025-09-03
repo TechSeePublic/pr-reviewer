@@ -138,7 +138,7 @@ The bot automatically detects and applies Cursor rules from:
 | `log_level` | Min severity level for posting comments (`error`, `warning`, `info`, `all`) | `error` | ❌ |
 | `summary_format` | Summary format (`brief`, `detailed`, `minimal`) | `detailed` | ❌ |
 | `enable_suggestions` | Enable suggestion code blocks in inline comments | `true` | ❌ |
-| `include_patterns` | File patterns to include (comma-separated) | `**/*.ts,**/*.tsx,**/*.js,**/*.jsx,**/*.py,**/*.go,**/*.rs,**/*.java,**/*.cs` | ❌ |
+| `include_patterns` | File patterns to include (comma-separated) | `**/*.ts,**/*.tsx,**/*.js,**/*.jsx,**/*.py,**/*.go,**/*.rs,**/*.java,**/*.cs,**/*.md,**/*.mdc` | ❌ |
 | `exclude_patterns` | File patterns to exclude (comma-separated) | `node_modules/**,dist/**,build/**,coverage/**,*.min.js,*.bundle.js` | ❌ |
 | `max_files` | Maximum files to review | `50` | ❌ |
 

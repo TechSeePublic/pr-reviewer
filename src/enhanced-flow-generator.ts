@@ -902,6 +902,8 @@ Focus on clarity and logical flow. Avoid technical jargon.
         '.rb',
         '.swift',
         '.kt',
+        '.md',
+        '.mdc',
       ];
 
       return includeExtensions.some(ext => filename.endsWith(ext));

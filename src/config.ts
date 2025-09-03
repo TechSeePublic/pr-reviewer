@@ -39,6 +39,8 @@ export function getActionInputs(): ActionInputs {
             '**/*.rs',
             '**/*.java',
             '**/*.cs',
+            '**/*.md',
+            '**/*.mdc',
           ],
     excludePatterns:
       excludePatterns.length > 0
