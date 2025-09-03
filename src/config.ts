@@ -22,7 +22,7 @@ export function getActionInputs(): ActionInputs {
     githubToken: core.getInput('gh_token', { required: true }),
     prNumber: core.getInput('pr_number'),
     aiProvider:
-      (core.getInput('ai_provider') as 'openai' | 'anthropic' | 'gemini' | 'azure' | 'auto') ||
+      (core.getInput('ai_provider') as 'openai' | 'anthropic' | 'gemini' | 'azure' | 'bedrock' | 'auto') ||
       'auto',
     model: core.getInput('model') || 'auto',
     reviewLevel: (core.getInput('review_level') as 'light' | 'standard' | 'thorough') || 'standard',
@@ -95,6 +95,26 @@ export function getActionInputs(): ActionInputs {
     inputs.azureOpenaiRealModel = azureOpenaiRealModel;
   }
 
+  const bedrockRegion = core.getInput('bedrock_region');
+  if (bedrockRegion) {
+    inputs.bedrockRegion = bedrockRegion;
+  }
+
+  const bedrockAccessKeyId = core.getInput('bedrock_access_key_id');
+  if (bedrockAccessKeyId) {
+    inputs.bedrockAccessKeyId = bedrockAccessKeyId;
+  }
+
+  const bedrockSecretAccessKey = core.getInput('bedrock_secret_access_key');
+  if (bedrockSecretAccessKey) {
+    inputs.bedrockSecretAccessKey = bedrockSecretAccessKey;
+  }
+
+  const bedrockAnthropicVersion = core.getInput('bedrock_anthropic_version');
+  if (bedrockAnthropicVersion) {
+    inputs.bedrockAnthropicVersion = bedrockAnthropicVersion;
+  }
+
   const rulesPath = core.getInput('rules_path');
   if (rulesPath) {
     inputs.rulesPath = rulesPath;
@@ -119,14 +139,21 @@ export function validateInputs(inputs: ActionInputs): void {
     );
   }
 
+  if (inputs.aiProvider === 'bedrock' && !inputs.bedrockRegion) {
+    throw new Error(
+      'Bedrock region is required when ai_provider is set to "bedrock"'
+    );
+  }
+
   if (
     inputs.aiProvider === 'auto' &&
     !inputs.openaiApiKey &&
     !inputs.anthropicApiKey &&
-    !inputs.azureOpenaiApiKey
+    !inputs.azureOpenaiApiKey &&
+    !inputs.bedrockRegion
   ) {
     throw new Error(
-      'At least one AI provider API key is required (openai_api_key, anthropic_api_key, or azure_openai_api_key)'
+      'At least one AI provider configuration is required (openai_api_key, anthropic_api_key, azure_openai_api_key, or bedrock_region)'
     );
   }
 
@@ -197,16 +224,19 @@ export function getRecommendedModel(provider: string, reviewLevel: string): stri
       openai: 'gpt-5-nano',
       anthropic: 'claude-3-haiku',
       azure: 'gpt-5-nano',
+      bedrock: 'anthropic.claude-3-haiku-20240307-v1:0',
     },
     standard: {
       openai: 'gpt-5-mini',
       anthropic: 'claude-4-sonnet',
       azure: 'gpt-5-mini',
+      bedrock: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
     },
     thorough: {
       openai: 'gpt-5',
       anthropic: 'claude-4-opus',
       azure: 'o3',
+      bedrock: 'anthropic.claude-3-opus-20240229-v1:0',
     },
   };
 
@@ -225,6 +255,7 @@ export const DEFAULT_MODELS = {
   openai: 'gpt-5-mini', // Use gpt-5-mini - latest cost-effective model with enhanced capabilities
   anthropic: 'claude-4-sonnet',
   azure: 'gpt-5-mini', // Azure uses same models as OpenAI
+  bedrock: 'anthropic.claude-3-5-sonnet-20241022-v2:0', // Default Claude 3.5 Sonnet on Bedrock
 } as const;
 
 // Supported models by provider
@@ -278,6 +309,42 @@ export const SUPPORTED_MODELS = {
     'gpt-4-turbo',
     'gpt-4',
     'gpt-35-turbo', // Azure uses gpt-35-turbo instead of gpt-3.5-turbo
+  ] as string[],
+  bedrock: [
+    // Claude models on Bedrock
+    'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    'anthropic.claude-3-5-sonnet-20240620-v1:0',
+    'anthropic.claude-3-opus-20240229-v1:0',
+    'anthropic.claude-3-sonnet-20240229-v1:0',
+    'anthropic.claude-3-haiku-20240307-v1:0',
+    // Llama models on Bedrock
+    'meta.llama3-2-90b-instruct-v1:0',
+    'meta.llama3-2-11b-instruct-v1:0',
+    'meta.llama3-2-3b-instruct-v1:0',
+    'meta.llama3-2-1b-instruct-v1:0',
+    'meta.llama3-1-405b-instruct-v1:0',
+    'meta.llama3-1-70b-instruct-v1:0',
+    'meta.llama3-1-8b-instruct-v1:0',
+    // Amazon Titan models
+    'amazon.titan-text-premier-v1:0',
+    'amazon.titan-text-express-v1',
+    'amazon.titan-text-lite-v1',
+    // AI21 Labs models
+    'ai21.jamba-1-5-large-v1:0',
+    'ai21.jamba-1-5-mini-v1:0',
+    'ai21.j2-ultra-v1',
+    'ai21.j2-mid-v1',
+    // Cohere models
+    'cohere.command-r-plus-v1:0',
+    'cohere.command-r-v1:0',
+    'cohere.command-text-v14',
+    'cohere.command-light-text-v14',
+    // Mistral models
+    'mistral.mistral-large-2407-v1:0',
+    'mistral.mistral-large-2402-v1:0',
+    'mistral.mistral-small-2402-v1:0',
+    'mistral.mixtral-8x7b-instruct-v0:1',
+    'mistral.mistral-7b-instruct-v0:2',
   ] as string[],
 };
 
@@ -438,6 +505,37 @@ export const MODEL_CAPABILITIES = {
     tier: 'standard',
     description: 'Fast and reliable for most code reviews (Azure)',
     bestFor: ['quick-reviews', 'standard-reviews'],
+  },
+  // AWS Bedrock models
+  'anthropic.claude-3-5-sonnet-20241022-v2:0': {
+    provider: 'bedrock',
+    tier: 'premium',
+    description: 'Latest Claude 3.5 Sonnet on Bedrock with enhanced reasoning',
+    bestFor: ['complex-code-analysis', 'detailed-reviews', 'architectural-review'],
+  },
+  'anthropic.claude-3-opus-20240229-v1:0': {
+    provider: 'bedrock',
+    tier: 'premium',
+    description: 'Most capable Claude model on Bedrock for complex reasoning',
+    bestFor: ['thorough-reviews', 'complex-reasoning', 'architectural-analysis'],
+  },
+  'anthropic.claude-3-haiku-20240307-v1:0': {
+    provider: 'bedrock',
+    tier: 'standard',
+    description: 'Fast and cost-effective Claude model on Bedrock',
+    bestFor: ['quick-reviews', 'large-prs', 'cost-effective-analysis'],
+  },
+  'meta.llama3-2-90b-instruct-v1:0': {
+    provider: 'bedrock',
+    tier: 'premium',
+    description: 'Large Llama 3.2 model with strong reasoning capabilities',
+    bestFor: ['complex-analysis', 'thorough-reviews', 'code-generation'],
+  },
+  'amazon.titan-text-premier-v1:0': {
+    provider: 'bedrock',
+    tier: 'premium',
+    description: 'Amazon Titan Premier model with advanced text generation',
+    bestFor: ['text-generation', 'documentation-review', 'content-analysis'],
   },
 } as const;
 

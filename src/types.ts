@@ -12,7 +12,11 @@ export interface ActionInputs {
   azureOpenaiEndpoint?: string;
   azureOpenaiApiVersion?: string;
   azureOpenaiRealModel?: string;
-  aiProvider: 'openai' | 'anthropic' | 'gemini' | 'azure' | 'auto';
+  bedrockRegion?: string;
+  bedrockAccessKeyId?: string;
+  bedrockSecretAccessKey?: string;
+  bedrockAnthropicVersion?: string;
+  aiProvider: 'openai' | 'anthropic' | 'gemini' | 'azure' | 'bedrock' | 'auto';
   model: string;
   reviewLevel: 'light' | 'standard' | 'thorough';
   rulesPath?: string;

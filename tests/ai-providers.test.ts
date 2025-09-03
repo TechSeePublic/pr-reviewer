@@ -2,7 +2,7 @@
  * Tests for AI providers
  */
 
-import { OpenAIProvider, AnthropicProvider, AIProviderFactory } from '../src/ai-providers';
+import { AIProviderFactory, AnthropicProvider, OpenAIProvider } from '../src/ai';
 import { ActionInputs, CursorRule } from '../src/types';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
@@ -92,7 +92,7 @@ describe('AI Providers', () => {
     it('should handle malformed JSON responses in non-deterministic mode', async () => {
       // Create provider with deterministic mode disabled
       const nonDeterministicProvider = new OpenAIProvider('test-api-key', 'gpt-4', false);
-      
+
       const mockResponse = {
         choices: [{
           message: {
@@ -126,7 +126,7 @@ describe('AI Providers', () => {
         fileChanges: [],
         cursorRules: { projectRules: [] },
       } as any;
-      
+
       const summary = await provider.generateSummary([], mockContext);
 
       expect(summary).toBe('Review summary with key findings');

@@ -299,6 +299,18 @@ CRITICAL RULES:
       }
 
       return result.text;
+    } else if (this.aiProvider.name === 'bedrock' && 'invokeModel' in this.aiProvider) {
+      // Bedrock provider
+      const bedrockProvider = this.aiProvider as any;
+
+      // Use the Bedrock provider's invokeModel method directly
+      const result = await bedrockProvider.invokeModel(userPrompt, systemPrompt);
+      
+      if (!result) {
+        throw new Error('No response from Bedrock for Mermaid generation');
+      }
+
+      return result;
     } else {
       // For custom providers, fall back to a modified reviewCode approach
       logger.warn(

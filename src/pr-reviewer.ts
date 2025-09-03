@@ -22,7 +22,7 @@ import {
 } from './types';
 import { CursorRulesParser } from './cursor-parser';
 import { GitHubClient } from './github-client';
-import { AIProviderFactory } from './ai-providers';
+import { AIProviderFactory } from './ai/factory';
 import { CommentManager } from './comment-manager';
 import { AutoFixManager } from './auto-fix-manager';
 import { PromptTemplates } from './prompt-templates';

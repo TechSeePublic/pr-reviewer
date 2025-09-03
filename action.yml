@@ -41,13 +41,30 @@ inputs:
     description: 'Real model name for Azure OpenAI when using custom deployment names (e.g., gpt-4o, o1-preview)'
     required: false
     
+  bedrock_region:
+    description: 'AWS Bedrock region (e.g., us-east-1, us-west-2). Required when using Bedrock provider.'
+    required: false
+    
+  bedrock_access_key_id:
+    description: 'AWS Access Key ID for Bedrock (optional if using IAM roles or environment variables)'
+    required: false
+    
+  bedrock_secret_access_key:
+    description: 'AWS Secret Access Key for Bedrock (optional if using IAM roles or environment variables)'
+    required: false
+    
+  bedrock_anthropic_version:
+    description: 'Anthropic API version for Claude models on Bedrock (e.g., bedrock-2023-05-31)'
+    required: false
+    default: 'bedrock-2023-05-31'
+    
   ai_provider:
-    description: 'AI provider to use (openai, anthropic, azure, or auto)'
+    description: 'AI provider to use (openai, anthropic, azure, bedrock, or auto)'
     required: false
     default: 'auto'
     
   model:
-    description: 'AI model to use. OpenAI: gpt-4o, gpt-4, gpt-4o-mini, gpt-3.5-turbo, etc. Anthropic: claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-haiku-20240307, etc. Use "auto" for intelligent selection based on review_level.'
+    description: 'AI model to use. OpenAI: gpt-4o, gpt-4, gpt-4o-mini, gpt-3.5-turbo, etc. Anthropic: claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-haiku-20240307, etc. Bedrock: anthropic.claude-3-5-sonnet-20241022-v2:0, meta.llama3-2-90b-instruct-v1:0, amazon.titan-text-premier-v1:0, etc. Use "auto" for intelligent selection based on review_level.'
     required: false
     default: 'auto'
     
