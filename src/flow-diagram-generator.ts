@@ -522,10 +522,9 @@ ${prPlan.keyChanges.join('\n')}
 ## Files Modified:
 ${fileList}
 
-YOUR GOAL: Show users and stakeholders WHAT this new feature does and HOW users will interact with it.
+YOUR GOAL: Show devlopers and stakeholders WHAT this new feature does and HOW users will interact with it.
 
 **MANDATORY REQUIREMENTS - YOUR DIAGRAM MUST INCLUDE:**
-1. **AT LEAST 3 DECISION POINTS** using diamond shapes {Is condition met?}
 2. **MULTIPLE BRANCHING PATHS** - success/error/alternative flows
 3. **CONDITIONAL ARROWS** with labels like -->|Yes| or -->|No|
 4. **ERROR HANDLING FLOWS** showing what happens when things go wrong
