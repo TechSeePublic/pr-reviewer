@@ -228,30 +228,22 @@ export class CommentManager {
       }
       const originalLine = parseInt(lineStr, 10);
 
-      // Find the actual line to comment on
-      logger.info(`\n=== VALIDATING LINE LOCATION ===`);
+      // Convert diff line number to actual file line number
+      logger.info(`\n=== CONVERTING DIFF LINE TO FILE LINE ===`);
       logger.info(`File: ${file}`);
-      logger.info(`AI reported line: ${originalLine}`);
+      logger.info(`AI reported diff line: ${originalLine}`);
       logger.info(`Issue: ${locationIssues[0]?.message}`);
 
-      const validLocation = this.findValidCommentLocation(file, originalLine, fileChanges);
-      if (!validLocation) {
+      const actualFileLineNumber = this.convertDiffLineToFileLine(file, originalLine, fileChanges);
+      if (!actualFileLineNumber) {
         logger.warn(
-          `❌ Skipping inline comment for ${file}:${originalLine} - no valid location found in PR diff`
+          `❌ Skipping inline comment for ${file}:${originalLine} - could not convert diff line to file line`
         );
-
-        // Show what lines ARE available for debugging
-        const fileChange = fileChanges.find(fc => fc.filename === file);
-        if (fileChange?.patch) {
-          const validLines = this.parseValidLinesFromPatch(fileChange.patch);
-          logger.warn(`Available lines for comments: [${validLines.join(', ')}]`);
-          logger.warn(`Requested line ${originalLine} is not in the diff`);
-        }
         continue;
       }
 
-      logger.info(`✅ Valid location found: line ${validLocation.line} (${validLocation.reason})`);
-      logger.info(`=================================\n`);
+      logger.info(`✅ Converted diff line ${originalLine} to file line ${actualFileLineNumber}`);
+      logger.info(`=============================================\n`);
 
       // Create inline comment
       if (locationIssues.length === 0) {
@@ -263,7 +255,7 @@ export class CommentManager {
         body: this.formatInlineCommentBody(locationIssues),
         location: {
           file,
-          line: validLocation.line,
+          line: actualFileLineNumber,
           side: 'RIGHT', // Always comment on new code
         },
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -271,27 +263,26 @@ export class CommentManager {
       };
 
       // Debug: Log the exact line number being sent to GitHub
-      logger.debug(
-        `📍 Original calculation: line ${validLocation.line} for issue at AI-reported line ${originalLine}`
+      logger.info(
+        `📍 FINAL LINE SELECTION: AI diff line ${originalLine} → GitHub comment line ${actualFileLineNumber} (direct mapping)`
       );
 
       // Check if we should update existing comment
       const existingComment = existingComments.find(
-        c => c.location.file === file && c.location.line === validLocation.line
+        c => c.location.file === file && c.location.line === actualFileLineNumber
       );
 
       try {
         logger.info(`\n=== POSTING INLINE COMMENT ===`);
         logger.info(`File: ${file}`);
-        logger.info(`AI suggested line: ${originalLine}`);
-        logger.info(`Validated line: ${validLocation.line}`);
-        logger.info(`Adjustment reason: ${validLocation.reason}`);
+        logger.info(`AI diff line: ${originalLine}`);
+        logger.info(`GitHub file line: ${actualFileLineNumber}`);
         logger.info(`Issue type: ${locationIssues[0]?.type} - ${locationIssues[0]?.message}`);
         logger.info(`==============================\n`);
 
         await this.githubClient.postInlineComment(comment, existingComment?.id);
       } catch (error) {
-        logger.warn(`Failed to post inline comment for ${file}:${validLocation.line}:`, error);
+        logger.warn(`Failed to post inline comment for ${file}:${actualFileLineNumber}:`, error);
       }
     }
   }
@@ -461,6 +452,87 @@ export class CommentManager {
     logger.debug(`Valid lines were: [${validLines.join(', ')}]`);
     logger.debug(`Max distance allowed: ${maxDistance}`);
     logger.debug(`----------------------------\n`);
+    return null;
+  }
+
+  /**
+   * Convert diff line number (from AI) to actual file line number (for GitHub)
+   * This is the key method that maps AI's numbered diff to GitHub's file line numbers
+   */
+  private convertDiffLineToFileLine(
+    file: string,
+    diffLineNumber: number,
+    fileChanges: FileChange[]
+  ): number | null {
+    const fileChange = fileChanges.find(fc => fc.filename === file);
+    if (!fileChange || !fileChange.patch) {
+      logger.warn(`No file change found for ${file}`);
+      return null;
+    }
+
+    const lines = fileChange.patch.split('\n');
+    let currentDiffLine = 0;
+    let currentFileLine = 0;
+
+    logger.debug(`\n=== DIFF LINE TO FILE LINE CONVERSION ===`);
+    logger.debug(`Target diff line: ${diffLineNumber}`);
+    logger.debug(`Parsing patch for ${file}`);
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line) continue; // Skip empty lines
+
+      // Skip file headers
+      if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('diff --git')) {
+        continue;
+      }
+
+      if (line.startsWith('@@')) {
+        // Parse hunk header: @@ -oldStart,oldLines +newStart,newLines @@
+        const match = line.match(/\+(\d+)/);
+        if (match && match[1]) {
+          currentFileLine = parseInt(match[1], 10) - 1; // Will increment for first content line
+          logger.debug(`Hunk header: ${line} → setting currentFileLine to ${currentFileLine}`);
+        }
+      } else if (line.startsWith('+') && !line.startsWith('+++')) {
+        // Added line
+        currentDiffLine++;
+        currentFileLine++;
+        logger.debug(`Diff line ${currentDiffLine} (added) → File line ${currentFileLine}`);
+
+        if (currentDiffLine === diffLineNumber) {
+          logger.debug(
+            `✅ Match found: Diff line ${diffLineNumber} = File line ${currentFileLine}`
+          );
+          return currentFileLine;
+        }
+      } else if (line.startsWith(' ')) {
+        // Context line
+        currentDiffLine++;
+        currentFileLine++;
+        logger.debug(`Diff line ${currentDiffLine} (context) → File line ${currentFileLine}`);
+
+        if (currentDiffLine === diffLineNumber) {
+          logger.debug(
+            `✅ Match found: Diff line ${diffLineNumber} = File line ${currentFileLine}`
+          );
+          return currentFileLine;
+        }
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        // Deleted line - include in diff numbering but don't increment file line
+        currentDiffLine++;
+        logger.debug(`Diff line ${currentDiffLine} (deleted) → No file line (deleted)`);
+
+        if (currentDiffLine === diffLineNumber) {
+          logger.warn(`❌ Cannot comment on deleted line ${diffLineNumber}`);
+          return null;
+        }
+      }
+    }
+
+    logger.warn(`❌ Diff line ${diffLineNumber} not found in patch`);
+    logger.debug(`Total diff lines processed: ${currentDiffLine}`);
+    logger.debug(`=========================================\n`);
     return null;
   }
 

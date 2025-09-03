@@ -63,18 +63,19 @@ You are a professional code reviewer.
 - **CRITICAL**: Check documentation quality - typos, spelling errors, and grammar issues in comments, string literals, documentation files, and code identifiers (these impact user experience and code maintainability)
 
 ### 💡 Feedback Quality
-- **CRITICAL**: Provide accurate line numbers from the COMPLETE FILE CONTENT (not diff line numbers)
+- **CRITICAL**: Provide accurate line numbers from the NUMBERED DIFF (not the context file)
 - Only report issues for lines that are actually modified or added in the diff
 - Focus on critical issues that need fixing
 - Explain the potential impact of identified issues
 - Skip minor style or preference issues
 
 ### 📍 Line Number Guidelines - CRITICAL FOR ACCURACY
-- **MANDATORY**: Use the exact line numbers shown in the numbered file content below
-- The line numbers are displayed as "123| code content" - use the number before the "|"
-- **NEVER estimate or count lines manually** - always reference the provided line numbers
+- **MANDATORY**: Use ONLY the line numbers shown in the numbered diff section
+- The line numbers are displayed as "1|", "2|", "3|" etc. in the diff
+- **NEVER use line numbers from the context file** - only from the numbered diff
+- **NEVER estimate or count lines manually** - always reference the numbered diff
 - If an issue spans multiple lines, use the line number where the issue starts
-- Double-check your line number against the provided numbered content before submitting
+- Double-check your line number against the numbered diff before submitting
 
 ### 📝 Response Format
 ${jsonInstructions}
@@ -486,30 +487,37 @@ Keep it professional and concise. Only report actual problems.`;
 - **Status**: ${fileChange.status}
 - **Changes**: +${fileChange.additions} -${fileChange.deletions} (${fileChange.changes} total)
 
-**IMPORTANT**: You will receive the COMPLETE FILE CONTENT below for context, but only review the specific changes shown in the diff.
-
 `;
 
-    // Include patch information for context
-    if (fileChange.patch) {
-      context += `### What Changed (Review These Areas Only)
-The following diff shows EXACTLY what was modified. Focus your analysis ONLY on these changes:
+    // First provide the complete file as context
+    context += `### Complete File Context (For Understanding Only)
+The following shows the CURRENT state of the file after changes. Use this to understand the overall code structure and logic:
 
-\`\`\`diff
-${fileChange.patch}
+\`\`\`${this.getLanguageFromFilename(fileChange.filename)}
+${fileContent}
 \`\`\`
 
 `;
 
-      // Extract and highlight changed line numbers
-      const changedLines = this.extractChangedLines(fileChange.patch);
-      if (changedLines.length > 0) {
-        context += `### Changed Lines to Review
-**ONLY analyze these line numbers from the complete file below**: ${changedLines.join(', ')}
-**These are the ONLY lines where issues should be reported**
+    // Then provide the numbered diff for precise line reporting
+    if (fileChange.patch) {
+      const numberedDiff = this.createNumberedDiff(fileChange.patch);
+      context += `### Changes to Review (Report Issues Using These Line Numbers)
+**CRITICAL**: When reporting issues, use ONLY the line numbers shown below (1, 2, 3, etc.)
+These line numbers correspond directly to GitHub's commenting system.
+
+\`\`\`diff
+${numberedDiff}
+\`\`\`
+
+**LINE REPORTING RULES**:
+1. ✅ **Use line numbers from the diff above** (1, 2, 3, etc.)
+2. ✅ **Report issues on lines marked with +** (added lines)  
+3. ✅ **Report issues on context lines** (unmarked lines in diff)
+4. ❌ **Never report issues on lines marked with -** (deleted lines - mention in description instead)
+5. ❌ **Never use line numbers from the context section above**
 
 `;
-      }
     }
 
     context += `### Review Guidelines
@@ -518,6 +526,7 @@ ${fileChange.patch}
 - ✅ **Added lines** (marked with + in diff)
 - ✅ **Modified lines** and their immediate context
 - ✅ **Logic affected** by the changes
+- ✅ **Deleted code impact** (what was removed and why)
 - ❌ **Unchanged pre-existing code** (unless directly impacted)
 
 **WHAT TO LOOK FOR**:
@@ -537,28 +546,11 @@ ${fileChange.patch}
     - Variable names, function names, class names, and other identifiers
 11. **Internationalization Issues** - Hard-coded strings, locale problems, encoding issues
 12. **Rule Violations** - Violations of provided Cursor rules
+13. **Deletion Analysis** - Check if deleted code should have been modified instead of removed
 
 ${this.getLanguageSpecificGuidelines(fileChange.filename)}
 
-**CONTEXT**: The complete file content below provides context to understand the changes, but focus your review only on the modified areas shown in the diff above.
-
-### Complete File Content (with line numbers)
-**CRITICAL FOR ACCURACY**: 
-1. When reporting issues, use the EXACT line numbers shown below (format: "123| code")
-2. ONLY report issues for lines that appear in the diff above (lines marked with + or context)
-3. DO NOT report issues for unchanged lines not shown in the diff
-4. **CROSS-REFERENCE**: Match the numbered lines below with the diff lines above to ensure accuracy
-
-\`\`\`${this.getLanguageFromFilename(fileChange.filename)}
-${this.addLineNumbers(fileContent)}
-\`\`\`
-
-**MANDATORY VALIDATION STEPS**:
-1. Find the issue in the numbered file content above
-2. Note the line number (e.g., "139| language: Joi.string().default('en')" = line 139)
-3. Verify this line appears in the diff with + or as context
-4. Use that exact line number in your response
-5. **DOUBLE-CHECK**: Does your reported line number match both the numbered content AND the diff?
+**REMEMBER**: Use the context section to understand the code, but report line numbers ONLY from the numbered diff section.
 
 `;
 
@@ -576,6 +568,37 @@ ${this.addLineNumbers(fileContent)}
         return `${lineNumber}| ${line}`;
       })
       .join('\n');
+  }
+
+  /**
+   * Create a numbered version of the diff for precise line reporting
+   * This creates a direct mapping between AI line numbers and GitHub comment positions
+   */
+  private static createNumberedDiff(patch: string): string {
+    const lines = patch.split('\n');
+    const numberedLines: string[] = [];
+    let lineNumber = 0;
+
+    for (const line of lines) {
+      // Skip file headers (---, +++, diff --git)
+      if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('diff --git')) {
+        continue;
+      }
+
+      // Skip hunk headers but don't number them
+      if (line.startsWith('@@')) {
+        continue;
+      }
+
+      // Number all content lines (added, deleted, context)
+      if (line.startsWith('+') || line.startsWith('-') || line.startsWith(' ')) {
+        lineNumber++;
+        const paddedNumber = lineNumber.toString().padStart(2, ' ');
+        numberedLines.push(`${paddedNumber}|${line}`);
+      }
+    }
+
+    return numberedLines.join('\n');
   }
 
   /**
