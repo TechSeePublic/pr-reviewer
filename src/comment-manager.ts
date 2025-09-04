@@ -958,7 +958,8 @@ export class CommentManager {
     if (nonArchitecturalIssues.length > 0) {
       // Show detailed issues only
       if (this.inputs.summaryFormat === 'detailed' && nonArchitecturalIssues.length <= 15) {
-        body += `### 📋 **Code Issues**\n\n`;
+        body += `### 📋 **Code Issues**\n`;
+        body += `*Click on each issue link below to see full details and suggestions in the inline comments.*\n\n`;
 
         // Show detailed issues
         logger.debug(`Posted comments map for summary links: ${JSON.stringify(Array.from(postedComments?.entries() || []))}`);
@@ -975,21 +976,8 @@ export class CommentManager {
               // Debug: Log what we're linking to
               logger.debug(`Summary link: ${issue.file}:${issue.line} -> ${fileURL}`);
 
+              // CONCISE: Just show file, line, and brief message with link to full details
               body += `- ${typeIcon} **[${issue.file}:${issue.line || '?'}](${fileURL})** - ${issue.message}\n`;
-
-              // Add description if it's different from message and provides additional context
-              if (
-                issue.description &&
-                issue.description !== issue.message &&
-                issue.description.length > 0
-              ) {
-                body += `  - *${issue.description}*\n`;
-              }
-
-              // Add suggestion if available
-              if (issue.suggestion && issue.suggestion.length > 0) {
-                body += `  - 💡 **Suggestion:** ${issue.suggestion}\n`;
-              }
             }
             body += '\n';
           }
