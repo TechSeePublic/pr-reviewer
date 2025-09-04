@@ -64,20 +64,28 @@ export class CommentManager {
   private generateGitHubFileURL(fileName: string, lineNumber?: number, fileChanges?: FileChange[], postedComments?: Map<string, number>): string {
     const baseURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}`;
 
+    logger.debug(`🔍 generateGitHubFileURL called: ${fileName}:${lineNumber}`);
+    logger.debug(`📋 Available posted comments: ${JSON.stringify(Array.from(postedComments?.entries() || []))}`);
+
     // PRIORITY 1: Link to the inline comment if one was posted for this exact location
     if (lineNumber && postedComments) {
       const commentKey = `${fileName}:${lineNumber}`;
       const commentId = postedComments.get(commentKey);
+
+      logger.debug(`🔎 Looking for exact match: ${commentKey} -> ${commentId || 'NOT FOUND'}`);
+
       if (commentId) {
-        logger.debug(`✅ Linking to inline comment ${commentId} for ${commentKey}`);
-        return `${baseURL}#issuecomment-${commentId}`;
+        const commentURL = `${baseURL}#issuecomment-${commentId}`;
+        logger.debug(`✅ Linking to inline comment ${commentId} for ${commentKey} -> ${commentURL}`);
+        return commentURL;
       }
 
       // Also try to find any comment for this file (in case line numbers don't match exactly)
       for (const [key, commentId] of postedComments.entries()) {
         if (key.startsWith(`${fileName}:`)) {
-          logger.debug(`✅ Found related inline comment ${commentId} for ${fileName} (fallback)`);
-          return `${baseURL}#issuecomment-${commentId}`;
+          const commentURL = `${baseURL}#issuecomment-${commentId}`;
+          logger.debug(`✅ Found related inline comment ${commentId} for ${fileName} (fallback) -> ${commentURL}`);
+          return commentURL;
         }
       }
 
@@ -85,8 +93,10 @@ export class CommentManager {
     }
 
     // FALLBACK: Link to the file in the diff view
-    logger.debug(`📁 Linking to file anchor for ${fileName}`);
-    return `${baseURL}/files#diff-${Buffer.from(fileName).toString('hex')}`;
+    const fileHash = Buffer.from(fileName).toString('hex');
+    const fileURL = `${baseURL}/files#diff-${fileHash}`;
+    logger.debug(`📁 Linking to file anchor for ${fileName} -> ${fileURL}`);
+    return fileURL;
   }
 
   /**
@@ -171,7 +181,20 @@ export class CommentManager {
       );
     }
 
-    // Post summary comment - only skip if there are no file changes to review
+    // Post architectural comment SECOND (after inline comments)
+    const architecturalIssues = reviewResult.issues.filter(issue => issue.reviewType === 'architectural');
+    if (architecturalIssues.length > 0) {
+      logger.info(`🏗️ Posting architectural comment for ${architecturalIssues.length} architectural issues...`);
+      try {
+        await this.postArchitecturalComment(architecturalIssues, fileChanges);
+        logger.info('✅ Architectural comment posted successfully');
+      } catch (error) {
+        logger.error('❌ Failed to post architectural comment:', error);
+        // Don't throw - architectural comment is optional
+      }
+    }
+
+    // Post summary comment LAST - only skip if there are no file changes to review
     if (shouldPostSummary) {
       if (fileChanges.length === 0) {
         logger.info('❌ Summary comment skipped - no file changes to review');
@@ -196,19 +219,6 @@ export class CommentManager {
       }
     } else {
       logger.info('❌ Summary comment skipped due to commentStyle configuration');
-    }
-
-    // Post architectural comment AFTER summary comment (so it appears before in GitHub)
-    const architecturalIssues = reviewResult.issues.filter(issue => issue.reviewType === 'architectural');
-    if (architecturalIssues.length > 0) {
-      logger.info(`🏗️ Posting architectural comment for ${architecturalIssues.length} architectural issues...`);
-      try {
-        await this.postArchitecturalComment(architecturalIssues, fileChanges);
-        logger.info('✅ Architectural comment posted successfully');
-      } catch (error) {
-        logger.error('❌ Failed to post architectural comment:', error);
-        // Don't throw - architectural comment is optional
-      }
     }
   }
 
@@ -910,8 +920,31 @@ export class CommentManager {
           body += `</details>\n\n`;
         }
       } catch (error) {
-        logger.warn('Failed to generate flow diagram:', error);
-        // Continue without diagram
+        logger.warn('Failed to generate flow diagram (attempt 1):', error);
+
+        // Retry once more
+        try {
+          logger.info('🔄 Retrying flow diagram generation...');
+          const retryFlowDiagram = await this.flowDiagramGenerator.generateFlowDiagram(fileChanges, prPlan);
+          if (retryFlowDiagram) {
+            body += `### 🔄 **Flow Diagram**\n\n`;
+            body += `<details>\n`;
+            body += `<summary><b>📊 Click to view the flow diagram for this PR</b></summary>\n\n`;
+            body += `This diagram shows the logical flow and relationships between the changes in this PR:\n\n`;
+            body += `${retryFlowDiagram}\n\n`;
+            body += `**🔍 How to read this diagram:**\n`;
+            body += `- **📦 Rectangles** \`[]\`: Components, functions, or processes being modified\n`;
+            body += `- **💭 Diamonds** \`{}\`: Decision points where the system chooses what to do next\n`;
+            body += `- **🎯 Rounded rectangles** \`()\`: Starting points or final outcomes\n`;
+            body += `- **➡️ Arrows** \`-->\`: Shows what happens next in the flow\n`;
+            body += `- **🏷️ Arrow labels** \`-->|condition|\`: Explains when a specific path is taken\n\n`;
+            body += `**💡 Pro tip:** Start from the top and follow the arrows to understand the complete user journey and business logic behind these changes.\n\n`;
+            body += `</details>\n\n`;
+          }
+        } catch (retryError) {
+          logger.warn('Failed to generate flow diagram (attempt 2):', retryError);
+          // Continue without diagram after retry
+        }
       }
     }
 
