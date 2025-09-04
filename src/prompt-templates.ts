@@ -983,6 +983,19 @@ Your primary focus is on **STRUCTURAL and DESIGN ISSUES** that affect the overal
 3. **Design Consistency**: Check for consistent design patterns and approaches
 4. **Maintainability Impact**: Assess how changes affect long-term code maintainability
 
+## REPORTING GUIDELINES
+
+**For Multi-File Issues:**
+- Use the relatedFiles array to list all affected files
+- Set file to the primary or most representative file (or "Multiple Files" if no primary file)
+- Do NOT include line numbers - architectural issues are high-level
+- Focus on cross-file relationships and patterns
+
+**For Single-File Issues:**
+- Set file to the specific file
+- Use relatedFiles only if other files are indirectly affected
+- Do NOT include line numbers - architectural issues are conceptual
+
 ## CURSOR RULES CONSIDERATION
 
 ${rules.length > 0 ? 'Apply these project-specific architectural rules:' : 'No specific architectural rules provided - focus on general best practices.'}

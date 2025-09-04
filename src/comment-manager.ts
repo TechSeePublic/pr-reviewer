@@ -64,11 +64,12 @@ export class CommentManager {
    */
   private generateGitHubFileURL(fileName: string, lineNumber?: number, fileChanges?: FileChange[]): string {
     const baseURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`;
+
     if (lineNumber && fileChanges) {
       // Validate input
       if (lineNumber <= 0) {
         logger.warn(`Invalid line number for URL generation: ${lineNumber} (must be > 0)`);
-        return baseURL;
+        return this.generateFileAnchorURL(baseURL, fileName);
       }
 
       // Convert AI's diff line number to actual file line number for GitHub anchor
@@ -78,10 +79,21 @@ export class CommentManager {
         logger.debug(`Generated URL anchor: ${fileName}:${lineNumber} (diff) → line ${actualFileLineNumber} (file)`);
         return `${baseURL}#diff-${Buffer.from(fileName).toString('hex')}R${actualFileLineNumber}`;
       }
-      // Fallback: if conversion fails, link to the file without line anchor
-      logger.warn(`Could not convert diff line ${lineNumber} to valid file line for URL anchor in ${fileName}`);
+
+      // Better fallback: link to the file itself (without line anchor)
+      logger.info(`Could not convert diff line ${lineNumber} to file line for ${fileName}, linking to file instead`);
+      return this.generateFileAnchorURL(baseURL, fileName);
     }
+
     return baseURL;
+  }
+
+  /**
+   * Generate URL that links to a specific file in the PR (without line anchor)
+   */
+  private generateFileAnchorURL(baseURL: string, fileName: string): string {
+    // Generate anchor that scrolls to the file in the PR
+    return `${baseURL}#diff-${Buffer.from(fileName).toString('hex')}`;
   }
 
   /**
@@ -804,8 +816,26 @@ export class CommentManager {
               body += `**${categoryIcon} ${this.formatCategoryName(category)} (${categoryIssues.length})**\n`;
               for (const issue of categoryIssues) {
                 const typeIcon = this.getIssueIcon(issue.type);
-                const fileURL = this.generateGitHubFileURL(issue.file, issue.line, fileChanges);
-                body += `- ${typeIcon} **[${issue.file}:${issue.line || '?'}](${fileURL})** - ${issue.message}\n`;
+
+                // Architectural issues: handle multi-file vs single-file appropriately
+                if (issue.relatedFiles && issue.relatedFiles.length > 1) {
+                  // Multi-file architectural issue: show all related files
+                  const overviewURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`;
+                  const fileList = issue.relatedFiles.slice(0, 3).join(', ') +
+                    (issue.relatedFiles.length > 3 ? `, +${issue.relatedFiles.length - 3} more` : '');
+                  body += `- ${typeIcon} **[${fileList}](${overviewURL})** - ${issue.message}\n`;
+                } else if (issue.file && issue.file !== 'Multiple Files' && issue.file !== 'unknown') {
+                  // Single-file architectural issue: link to specific file
+                  const fileURL = this.generateFileAnchorURL(
+                    `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`,
+                    issue.file
+                  );
+                  body += `- ${typeIcon} **[${issue.file}](${fileURL})** - ${issue.message}\n`;
+                } else {
+                  // General architectural issue: link to PR overview
+                  const overviewURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`;
+                  body += `- ${typeIcon} **[Architecture](${overviewURL})** - ${issue.message}\n`;
+                }
 
                 // Add description if it's different from message and provides additional context
                 if (
