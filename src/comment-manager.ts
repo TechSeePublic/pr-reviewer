@@ -59,41 +59,46 @@ export class CommentManager {
   }
 
   /**
-   * Generate GitHub URL for summary links - Use EXACT same logic as inline comments!
+   * Generate GitHub URL for summary links - SIMPLE approach that should work
    */
   private generateGitHubFileURL(fileName: string, lineNumber?: number, fileChanges?: FileChange[], _postedComments?: Map<string, number>): string {
     const baseURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}`;
 
-    logger.debug(`🔍 generateGitHubFileURL called: ${fileName}:${lineNumber} (AI diff line)`);
+    logger.debug(`🔍 generateGitHubFileURL called: ${fileName}:${lineNumber}`);
 
-    // THE BUG WAS HERE! Summary was using AI diff lines, but inline comments use ACTUAL file lines
-    // Let's use the EXACT same conversion logic that inline comments use
+    // SIMPLE APPROACH: Use GitHub's commit view instead of trying to guess diff hashes
+    // This should be more reliable than trying to reverse-engineer GitHub's diff anchor algorithm
 
-    if (lineNumber && lineNumber > 0 && fileChanges) {
+    if (fileChanges) {
       const fileChange = fileChanges.find(fc => fc.filename === fileName);
-      if (fileChange?.patch) {
-        // Use THE SAME conversion logic as inline comments
-        const actualFileLineNumber = this.convertDiffLineToFileLine(fileName, lineNumber, fileChanges);
+      if (fileChange) {
+        logger.debug(`📁 Found file in changes: ${fileName}`);
 
-        logger.debug(`🔢 CONVERSION: AI diff line ${lineNumber} -> Actual file line ${actualFileLineNumber} for ${fileName}`);
+        // Use the commit SHA to create a reliable link to the specific file
+        const commitURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/blob/${this.prContext.sha}/${fileName}`;
 
-        if (actualFileLineNumber && actualFileLineNumber > 0) {
-          // Simple approach: Use GitHub's basic diff anchor format (same as what works for inline comments)
-          const diffURL = `${baseURL}/files#diff-${Buffer.from(fileName).toString('hex')}R${actualFileLineNumber}`;
+        if (lineNumber && lineNumber > 0) {
+          const actualFileLineNumber = this.convertDiffLineToFileLine(fileName, lineNumber, fileChanges);
+          logger.debug(`🔢 Line conversion: AI diff line ${lineNumber} -> File line ${actualFileLineNumber}`);
 
-          logger.debug(`📁 Generated diff URL: ${diffURL}`);
-          return diffURL;
-        } else {
-          logger.debug(`⚠️ Could not convert AI line ${lineNumber} to file line for ${fileName}`);
+          if (actualFileLineNumber && actualFileLineNumber > 0) {
+            const commitLineURL = `${commitURL}#L${actualFileLineNumber}`;
+            logger.debug(`📍 Generated commit+line URL: ${commitLineURL}`);
+            return commitLineURL;
+          }
         }
+
+        // File without line number
+        logger.debug(`📄 Generated commit file URL: ${commitURL}`);
+        return commitURL;
       } else {
-        logger.debug(`⚠️ No patch found for ${fileName}`);
+        logger.debug(`⚠️ File ${fileName} not found in PR changes`);
       }
     }
 
-    // Fallback: Just link to files page
+    // Fallback: PR files page
     const filesURL = `${baseURL}/files`;
-    logger.debug(`📁 Fallback to files page: ${filesURL}`);
+    logger.debug(`📁 Fallback to PR files page: ${filesURL}`);
     return filesURL;
   }
 
