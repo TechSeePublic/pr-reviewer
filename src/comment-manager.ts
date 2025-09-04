@@ -59,33 +59,23 @@ export class CommentManager {
   }
 
   /**
-   * Generate GitHub URL for a file in the PR with optional line number
-   * Converts AI's diff line numbers to actual file line numbers for correct anchoring
+   * Generate GitHub URL for an issue - tries to link to inline comment first, then file
    */
-  private generateGitHubFileURL(fileName: string, lineNumber?: number, fileChanges?: FileChange[]): string {
-    const baseURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`;
+  private generateGitHubFileURL(fileName: string, lineNumber?: number, fileChanges?: FileChange[], postedComments?: Map<string, number>): string {
+    const baseURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}`;
 
-    if (lineNumber && fileChanges) {
-      // Validate input
-      if (lineNumber <= 0) {
-        logger.warn(`Invalid line number for URL generation: ${lineNumber} (must be > 0)`);
-        return this.generateFileAnchorURL(baseURL, fileName);
+    // First try to link to the inline comment if one was posted for this location
+    if (lineNumber && postedComments) {
+      const commentKey = `${fileName}:${lineNumber}`;
+      const commentId = postedComments.get(commentKey);
+      if (commentId) {
+        logger.debug(`Linking to inline comment ${commentId} for ${commentKey}`);
+        return `${baseURL}#issuecomment-${commentId}`;
       }
-
-      // Convert AI's diff line number to actual file line number for GitHub anchor
-      const actualFileLineNumber = this.convertDiffLineToFileLine(fileName, lineNumber, fileChanges);
-      if (actualFileLineNumber && actualFileLineNumber > 0) {
-        // Generate anchor for the specific line in the file (not diff)
-        logger.debug(`Generated URL anchor: ${fileName}:${lineNumber} (diff) → line ${actualFileLineNumber} (file)`);
-        return `${baseURL}#diff-${Buffer.from(fileName).toString('hex')}R${actualFileLineNumber}`;
-      }
-
-      // Better fallback: link to the file itself (without line anchor)
-      logger.info(`Could not convert diff line ${lineNumber} to file line for ${fileName}, linking to file instead`);
-      return this.generateFileAnchorURL(baseURL, fileName);
     }
 
-    return baseURL;
+    // Fallback: link to the file in the diff view
+    return `${baseURL}/files#diff-${Buffer.from(fileName).toString('hex')}`;
   }
 
   /**
@@ -104,6 +94,8 @@ export class CommentManager {
     fileChanges: FileChange[],
     prPlan?: PRPlan
   ): Promise<void> {
+    // Track posted inline comments for summary links
+    const postedComments = new Map<string, number>();
     const shouldPostInline =
       this.inputs.commentStyle === 'inline' || this.inputs.commentStyle === 'both';
     const shouldPostSummary =
@@ -163,8 +155,22 @@ export class CommentManager {
       await this.postInlineComments(
         filteredIssuesForInline,
         fileChanges,
-        existingComments.inlineComments
+        existingComments.inlineComments,
+        postedComments
       );
+    }
+
+    // Post architectural comment if there are architectural issues
+    const architecturalIssues = reviewResult.issues.filter(issue => issue.reviewType === 'architectural');
+    if (architecturalIssues.length > 0) {
+      logger.info(`🏗️ Posting architectural comment for ${architecturalIssues.length} architectural issues...`);
+      try {
+        await this.postArchitecturalComment(architecturalIssues, fileChanges);
+        logger.info('✅ Architectural comment posted successfully');
+      } catch (error) {
+        logger.error('❌ Failed to post architectural comment:', error);
+        // Don't throw - continue with summary comment
+      }
     }
 
     // Post summary comment - only skip if there are no file changes to review
@@ -182,7 +188,8 @@ export class CommentManager {
           reviewResult,
           fileChanges,
           existingComments.summaryComment,
-          prPlan
+          prPlan,
+          postedComments
         );
         logger.info('✅ Summary comment posted successfully');
       } catch (error) {
@@ -195,12 +202,30 @@ export class CommentManager {
   }
 
   /**
+   * Post dedicated architectural comment
+   */
+  private async postArchitecturalComment(
+    architecturalIssues: CodeIssue[],
+    fileChanges: FileChange[]
+  ): Promise<void> {
+    const body = this.formatArchitecturalCommentBody(architecturalIssues, fileChanges);
+
+    const comment = {
+      body,
+      reviewResult: { issues: architecturalIssues } as ReviewResult, // Simplified for architectural comment
+    };
+
+    await this.githubClient.postSummaryComment(comment);
+  }
+
+  /**
    * Post inline comments for specific issues
    */
   private async postInlineComments(
     issues: CodeIssue[],
     fileChanges: FileChange[],
-    existingComments: InlineComment[]
+    existingComments: InlineComment[],
+    postedComments: Map<string, number>
   ): Promise<void> {
     // Filter issues based on severity
     const filteredIssues = this.filterIssuesBySeverity(issues);
@@ -326,7 +351,14 @@ export class CommentManager {
         logger.info(`Issue type: ${locationIssues[0]?.type} - ${locationIssues[0]?.message}`);
         logger.info(`==============================\n`);
 
-        await this.githubClient.postInlineComment(comment, existingComment?.id);
+        const commentId = await this.githubClient.postInlineComment(comment, existingComment?.id);
+
+        // Track the posted comment for summary links
+        if (commentId) {
+          const commentKey = `${file}:${originalLine}`;
+          postedComments.set(commentKey, commentId);
+          logger.debug(`Tracked comment ${commentId} for ${commentKey}`);
+        }
       } catch (error) {
         logger.warn(`Failed to post inline comment for ${file}:${actualFileLineNumber}:`, error);
       }
@@ -340,10 +372,11 @@ export class CommentManager {
     reviewResult: ReviewResult,
     fileChanges: FileChange[],
     existingComment?: SummaryComment,
-    prPlan?: PRPlan
+    prPlan?: PRPlan,
+    postedComments?: Map<string, number>
   ): Promise<void> {
     const comment: SummaryComment = {
-      body: await this.formatSummaryCommentBody(reviewResult, fileChanges, prPlan),
+      body: await this.formatSummaryCommentBody(reviewResult, fileChanges, prPlan, postedComments),
       reviewResult,
     };
 
@@ -353,6 +386,81 @@ export class CommentManager {
       logger.error('Failed to post summary comment:', error);
       throw error;
     }
+  }
+
+  /**
+   * Format architectural comment body - clear and easy to understand
+   */
+  private formatArchitecturalCommentBody(
+    architecturalIssues: CodeIssue[],
+    _fileChanges: FileChange[]
+  ): string {
+    let body = `## 🏗️ Architectural Review\n\n`;
+    body += `*This comment focuses on high-level code structure, design patterns, and maintainability concerns that affect the overall codebase.*\n\n`;
+
+    // Overview
+    body += `### 📊 Overview\n`;
+    body += `Found **${architecturalIssues.length}** architectural concern${architecturalIssues.length > 1 ? 's' : ''} that may impact long-term maintainability.\n\n`;
+
+    // Group by category for better organization
+    const issuesByCategory = this.groupIssuesByCategory(architecturalIssues);
+
+    for (const [category, categoryIssues] of Object.entries(issuesByCategory)) {
+      if (categoryIssues.length === 0) continue;
+
+      const categoryIcon = this.getCategoryIcon(category);
+      const categoryName = this.formatCategoryName(category);
+
+      body += `### ${categoryIcon} ${categoryName}\n\n`;
+
+      categoryIssues.forEach((issue, index) => {
+        const severityIcon = issue.severity === 'high' ? '🚨' : issue.severity === 'medium' ? '⚠️' : 'ℹ️';
+
+        body += `#### ${index + 1}. ${severityIcon} ${issue.message}\n\n`;
+
+        // Add description with better formatting
+        if (issue.description && issue.description !== issue.message) {
+          body += `**What's the concern?**\n`;
+          body += `${issue.description}\n\n`;
+        }
+
+        // Show affected files in a clear way
+        if (issue.relatedFiles && issue.relatedFiles.length > 1) {
+          body += `**Affected files:**\n`;
+          issue.relatedFiles.forEach(file => {
+            const fileURL = this.generateFileAnchorURL(
+              `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`,
+              file
+            );
+            body += `- [${file}](${fileURL})\n`;
+          });
+          body += '\n';
+        } else if (issue.file && issue.file !== 'Multiple Files' && issue.file !== 'unknown') {
+          const fileURL = this.generateFileAnchorURL(
+            `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`,
+            issue.file
+          );
+          body += `**File:** [${issue.file}](${fileURL})\n\n`;
+        }
+
+        // Add suggestion if available
+        if (issue.suggestion) {
+          body += `**💡 Recommendation:**\n`;
+          body += `${issue.suggestion}\n\n`;
+        }
+
+        body += `---\n\n`;
+      });
+    }
+
+    // Footer
+    body += `### 🎯 Next Steps\n\n`;
+    body += `These architectural concerns are suggestions for improving code quality and maintainability. `;
+    body += `Consider addressing them to make the codebase easier to understand, modify, and extend in the future.\n\n`;
+
+    body += `*<img src="https://raw.githubusercontent.com/amitwa1/pr-reviewer/main/assets/techsee-logo.png" width="16" height="16" alt="TechSee"> Generated by [TechSee AI PR Reviewer](https://github.com/amitwa1/pr-reviewer) - Architectural Analysis*`;
+
+    return body;
   }
 
   /**
@@ -718,7 +826,8 @@ export class CommentManager {
   private async formatSummaryCommentBody(
     reviewResult: ReviewResult,
     fileChanges: FileChange[],
-    prPlan?: PRPlan
+    prPlan?: PRPlan,
+    postedComments?: Map<string, number>
   ): Promise<string> {
     const { issues, filesReviewed, totalFiles, rulesApplied, status } = reviewResult;
 
@@ -795,101 +904,43 @@ export class CommentManager {
       }
     }
 
-    // Issues found
-    if (issues.length > 0) {
-      const architecturalIssues = issues.filter(issue => issue.reviewType === 'architectural');
-      const detailedIssues = issues.filter(issue => issue.reviewType === 'detailed');
+    // Issues found (excluding architectural issues - they get their own comment)
+    const nonArchitecturalIssues = issues.filter(issue => issue.reviewType !== 'architectural');
 
-      // Show all issues directly
-      if (this.inputs.summaryFormat === 'detailed' && issues.length <= 15) {
-        body += `### 📋 **All Issues**\n\n`;
+    if (nonArchitecturalIssues.length > 0) {
+      // Show detailed issues only
+      if (this.inputs.summaryFormat === 'detailed' && nonArchitecturalIssues.length <= 15) {
+        body += `### 📋 **Code Issues**\n\n`;
 
-        // Show architectural issues first if they exist
-        if (architecturalIssues.length > 0) {
-          body += `#### 🏗️ **Architectural Issues** (${architecturalIssues.length})\n`;
-          body += `*High-level structural and design concerns affecting maintainability*\n\n`;
+        // Show detailed issues
+        const detailedIssuesByCategory = this.groupIssuesByCategory(nonArchitecturalIssues);
+        for (const [category, categoryIssues] of Object.entries(detailedIssuesByCategory)) {
+          if (categoryIssues.length > 0) {
+            const categoryIcon = this.getCategoryIcon(category);
+            body += `**${categoryIcon} ${this.formatCategoryName(category)} (${categoryIssues.length})**\n`;
+            for (const issue of categoryIssues) {
+              const typeIcon = this.getIssueIcon(issue.type);
+              const fileURL = this.generateGitHubFileURL(issue.file, issue.line, fileChanges, postedComments);
+              body += `- ${typeIcon} **[${issue.file}:${issue.line || '?'}](${fileURL})** - ${issue.message}\n`;
 
-          const archIssuesByCategory = this.groupIssuesByCategory(architecturalIssues);
-          for (const [category, categoryIssues] of Object.entries(archIssuesByCategory)) {
-            if (categoryIssues.length > 0) {
-              const categoryIcon = this.getCategoryIcon(category);
-              body += `**${categoryIcon} ${this.formatCategoryName(category)} (${categoryIssues.length})**\n`;
-              for (const issue of categoryIssues) {
-                const typeIcon = this.getIssueIcon(issue.type);
-
-                // Architectural issues: handle multi-file vs single-file appropriately
-                if (issue.relatedFiles && issue.relatedFiles.length > 1) {
-                  // Multi-file architectural issue: show all related files
-                  const overviewURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`;
-                  const fileList = issue.relatedFiles.slice(0, 3).join(', ') +
-                    (issue.relatedFiles.length > 3 ? `, +${issue.relatedFiles.length - 3} more` : '');
-                  body += `- ${typeIcon} **[${fileList}](${overviewURL})** - ${issue.message}\n`;
-                } else if (issue.file && issue.file !== 'Multiple Files' && issue.file !== 'unknown') {
-                  // Single-file architectural issue: link to specific file
-                  const fileURL = this.generateFileAnchorURL(
-                    `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`,
-                    issue.file
-                  );
-                  body += `- ${typeIcon} **[${issue.file}](${fileURL})** - ${issue.message}\n`;
-                } else {
-                  // General architectural issue: link to PR overview
-                  const overviewURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`;
-                  body += `- ${typeIcon} **[Architecture](${overviewURL})** - ${issue.message}\n`;
-                }
-
-                // Add description if it's different from message and provides additional context
-                if (
-                  issue.description &&
-                  issue.description !== issue.message &&
-                  issue.description.length > 0
-                ) {
-                  body += `  - *${issue.description}*\n`;
-                }
-
-                // Add suggestion if available
-                if (issue.suggestion && issue.suggestion.length > 0) {
-                  body += `  - 💡 **Suggestion:** ${issue.suggestion}\n`;
-                }
+              // Add description if it's different from message and provides additional context
+              if (
+                issue.description &&
+                issue.description !== issue.message &&
+                issue.description.length > 0
+              ) {
+                body += `  - *${issue.description}*\n`;
               }
-              body += '\n';
+
+              // Add suggestion if available
+              if (issue.suggestion && issue.suggestion.length > 0) {
+                body += `  - 💡 **Suggestion:** ${issue.suggestion}\n`;
+              }
             }
+            body += '\n';
           }
         }
-
-        // Show detailed issues if they exist
-        if (detailedIssues.length > 0) {
-          body += `#### 🔍 **Detailed Issues** (${detailedIssues.length})\n`;
-          body += `*Code-level issues and rule violations*\n\n`;
-
-          const detailedIssuesByCategory = this.groupIssuesByCategory(detailedIssues);
-          for (const [category, categoryIssues] of Object.entries(detailedIssuesByCategory)) {
-            if (categoryIssues.length > 0) {
-              const categoryIcon = this.getCategoryIcon(category);
-              body += `**${categoryIcon} ${this.formatCategoryName(category)} (${categoryIssues.length})**\n`;
-              for (const issue of categoryIssues) {
-                const typeIcon = this.getIssueIcon(issue.type);
-                const fileURL = this.generateGitHubFileURL(issue.file, issue.line, fileChanges);
-                body += `- ${typeIcon} **[${issue.file}:${issue.line || '?'}](${fileURL})** - ${issue.message}\n`;
-
-                // Add description if it's different from message and provides additional context
-                if (
-                  issue.description &&
-                  issue.description !== issue.message &&
-                  issue.description.length > 0
-                ) {
-                  body += `  - *${issue.description}*\n`;
-                }
-
-                // Add suggestion if available
-                if (issue.suggestion && issue.suggestion.length > 0) {
-                  body += `  - 💡 **Suggestion:** ${issue.suggestion}\n`;
-                }
-              }
-              body += '\n';
-            }
-          }
-        }
-      } else if (issues.length > 15) {
+      } else if (nonArchitecturalIssues.length > 15) {
         body += `### 📋 **Issue Summary**\n`;
         body += `*Too many issues to display individually. Please check inline comments for details.*\n\n`;
       }

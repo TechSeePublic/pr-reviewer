@@ -255,7 +255,7 @@ export class GitHubClient {
   /**
    * Post or update inline comment
    */
-  async postInlineComment(comment: InlineComment, existingCommentId?: number): Promise<void> {
+  async postInlineComment(comment: InlineComment, existingCommentId?: number): Promise<number | null> {
     try {
       const body = this.formatInlineComment(comment);
 
@@ -267,12 +267,13 @@ export class GitHubClient {
           comment_id: existingCommentId,
           body,
         });
+        return existingCommentId;
       } else {
         await this.applyRateLimit();
         logger.debug(
           `Creating review comment at ${comment.location.file}:${comment.location.line} (${comment.location.side})`
         );
-        await this.octokit.rest.pulls.createReviewComment({
+        const response = await this.octokit.rest.pulls.createReviewComment({
           owner: this.context.owner,
           repo: this.context.repo,
           pull_number: this.context.pullNumber,
@@ -285,6 +286,7 @@ export class GitHubClient {
         logger.info(
           `✅ Successfully posted inline comment at ${comment.location.file}:${comment.location.line}`
         );
+        return response.data.id;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -307,6 +309,7 @@ export class GitHubClient {
       }
 
       // Don't throw - inline comments might fail due to line positioning
+      return null;
     }
   }
 
