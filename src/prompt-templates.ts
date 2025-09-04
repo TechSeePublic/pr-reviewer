@@ -988,13 +988,16 @@ Your primary focus is on **STRUCTURAL and DESIGN ISSUES** that affect the overal
 **For Multi-File Issues:**
 - Use the relatedFiles array to list all affected files
 - Set file to the primary or most representative file (or "Multiple Files" if no primary file)
-- Do NOT include line numbers - architectural issues are high-level
+- NEVER include line numbers - architectural issues are high-level structural concerns
 - Focus on cross-file relationships and patterns
 
 **For Single-File Issues:**
 - Set file to the specific file
 - Use relatedFiles only if other files are indirectly affected
-- Do NOT include line numbers - architectural issues are conceptual
+- NEVER include line numbers - architectural issues are conceptual and file-level
+- If you must reference a specific area, use general descriptions like "in the main function" or "near the class definition"
+
+**CRITICAL**: The "line" field should ALWAYS be null or undefined for architectural issues. These are high-level concerns, not line-specific issues.
 
 ## CURSOR RULES CONSIDERATION
 
@@ -1026,14 +1029,19 @@ ${rule.globs ? `**Applies to**: ${rule.globs.join(', ')}` : ''}
 `;
 
       if (file.patch) {
-        // Truncate very long patches for architectural review
-        const patchPreview =
-          file.patch.length > 3000
-            ? file.patch.substring(0, 3000) + '\n... (truncated for architectural review)'
-            : file.patch;
-        prompt += `**Changes Summary**:
+        // Use numbered diff for architectural review (same as detailed review)
+        // This ensures AI reports correct diff line numbers, not actual file line numbers
+        const numberedDiff = this.createNumberedDiff(file.patch);
+
+        // Truncate very long numbered diffs for architectural review
+        const diffPreview =
+          numberedDiff.length > 3000
+            ? numberedDiff.substring(0, 3000) + '\n... (truncated for architectural review)'
+            : numberedDiff;
+
+        prompt += `**Changes Summary** (numbered diff - use these line numbers in your response):
 \`\`\`diff
-${patchPreview}
+${diffPreview}
 \`\`\`
 
 `;
@@ -1059,7 +1067,7 @@ Your response MUST be a valid JSON object with this exact structure:
       "ruleId": "cursor_rule_id or 'architectural_review'",
       "ruleName": "Architectural Review or specific rule name",
       "file": "EXACT filename where the issue is primarily located",
-      "line": "Primary line number (if applicable)",
+      "line": null,  // ALWAYS null for architectural issues - these are file-level, not line-specific
       "severity": "high|medium|low",
       "relatedFiles": ["file1.ts", "file2.ts"],
       "reviewType": "architectural"
