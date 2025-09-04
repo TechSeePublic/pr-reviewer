@@ -501,9 +501,9 @@ ${fileContent}
       const numberedDiff = this.createNumberedDiff(fileChange.patch);
 
       // Debug: Log the numbered diff to see what AI receives
-      logger.debug(`\n=== NUMBERED DIFF FOR ${fileChange.filename} ===`);
-      logger.debug(numberedDiff);
-      logger.debug('=== END NUMBERED DIFF ===\n');
+      logger.info(`\n=== NUMBERED DIFF FOR ${fileChange.filename} (SINGLE FILE MODE) ===`);
+      logger.info(numberedDiff);
+      logger.info('=== END NUMBERED DIFF ===\n');
 
       context += `### Changes to Review (Report Issues Using These Line Numbers)
 **CRITICAL**: When reporting issues, use ONLY the line numbers shown below (1, 2, 3, etc.)
@@ -869,10 +869,26 @@ ${
 `;
 
       if (file.patch) {
-        prompt += `**Code Changes**:
+        // Use numbered diff for consistent line reporting, just like single file review
+        const numberedDiff = this.createNumberedDiff(file.patch);
+
+        // Debug: Log what AI receives in batch mode
+        logger.info(`\n=== NUMBERED DIFF FOR ${file.filename} (BATCH MODE) ===`);
+        logger.info(numberedDiff);
+        logger.info('=== END NUMBERED DIFF ===\n');
+
+        prompt += `**Code Changes (Report Issues Using These Line Numbers)**:
+**CRITICAL**: When reporting issues, use ONLY the line numbers shown below (1, 2, 3, etc.)
+
 \`\`\`diff
-${file.patch}
+${numberedDiff}
 \`\`\`
+
+**LINE REPORTING RULES**:
+1. ✅ **Use line numbers from the diff above** (1, 2, 3, etc.)
+2. ✅ **Report issues on lines marked with +** (added lines)  
+3. ✅ **Report issues on context lines** (unmarked lines in diff)
+4. ❌ **Never report issues on lines marked with -** (deleted lines)
 
 `;
       }

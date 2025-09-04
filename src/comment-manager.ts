@@ -60,12 +60,26 @@ export class CommentManager {
 
   /**
    * Generate GitHub URL for a file in the PR with optional line number
+   * Converts AI's diff line numbers to actual file line numbers for correct anchoring
    */
-  private generateGitHubFileURL(fileName: string, lineNumber?: number): string {
+  private generateGitHubFileURL(fileName: string, lineNumber?: number, fileChanges?: FileChange[]): string {
     const baseURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`;
-    if (lineNumber) {
-      // Generate anchor for the specific line in the diff
-      return `${baseURL}#diff-${Buffer.from(fileName).toString('hex')}R${lineNumber}`;
+    if (lineNumber && fileChanges) {
+      // Validate input
+      if (lineNumber <= 0) {
+        logger.warn(`Invalid line number for URL generation: ${lineNumber} (must be > 0)`);
+        return baseURL;
+      }
+
+      // Convert AI's diff line number to actual file line number for GitHub anchor
+      const actualFileLineNumber = this.convertDiffLineToFileLine(fileName, lineNumber, fileChanges);
+      if (actualFileLineNumber && actualFileLineNumber > 0) {
+        // Generate anchor for the specific line in the file (not diff)
+        logger.debug(`Generated URL anchor: ${fileName}:${lineNumber} (diff) → line ${actualFileLineNumber} (file)`);
+        return `${baseURL}#diff-${Buffer.from(fileName).toString('hex')}R${actualFileLineNumber}`;
+      }
+      // Fallback: if conversion fails, link to the file without line anchor
+      logger.warn(`Could not convert diff line ${lineNumber} to valid file line for URL anchor in ${fileName}`);
     }
     return baseURL;
   }
@@ -234,31 +248,29 @@ export class CommentManager {
       logger.info(`AI reported diff line: ${originalLine}`);
       logger.info(`Issue: ${locationIssues[0]?.message}`);
 
+      // Validate input
+      if (originalLine <= 0) {
+        logger.warn(`❌ Invalid diff line number: ${originalLine} (must be > 0)`);
+        continue;
+      }
+
       let actualFileLineNumber = this.convertDiffLineToFileLine(file, originalLine, fileChanges);
 
-      // Fallback: If conversion fails, AI might still be using old file line numbers
-      // This is a temporary bridge while AI adapts to new format
+      // If conversion fails, try to find the closest valid line
       if (!actualFileLineNumber) {
-        logger.warn(
-          `⚠️  Diff line conversion failed for line ${originalLine}. Checking if it's a valid file line...`
-        );
-
-        // Check if the reported line is actually a valid file line in the diff
-        const validLines = this.parseValidLinesFromPatch(
-          fileChanges.find(fc => fc.filename === file)?.patch || ''
-        );
-        if (validLines.includes(originalLine)) {
-          logger.warn(`📍 FALLBACK: AI reported file line ${originalLine} directly, using as-is`);
-          actualFileLineNumber = originalLine;
+        logger.warn(`⚠️  Diff line conversion failed for line ${originalLine}. Finding closest valid line...`);
+        const validLocation = this.findValidCommentLocation(file, originalLine, fileChanges);
+        if (validLocation) {
+          actualFileLineNumber = validLocation.line;
+          logger.info(`🔧 Adjusted comment from diff line ${originalLine} to file line ${actualFileLineNumber} (${validLocation.reason})`);
         } else {
-          logger.warn(
-            `❌ Skipping inline comment for ${file}:${originalLine} - not a valid line number in any format`
-          );
+          logger.warn(`❌ Skipping inline comment for ${file}:${originalLine} - no valid line found`);
           continue;
         }
       }
 
       logger.info(`✅ Converted diff line ${originalLine} to file line ${actualFileLineNumber}`);
+      logger.info(`✅ SUCCESS: AI line ${originalLine} → GitHub line ${actualFileLineNumber} for ${file}`);
       logger.info(`=============================================\n`);
 
       // Create inline comment
@@ -278,9 +290,15 @@ export class CommentManager {
         issue: locationIssues[0]!, // Store primary issue for reference (already validated above)
       };
 
+      // Validate final line number before sending to GitHub
+      if (actualFileLineNumber <= 0) {
+        logger.warn(`❌ Invalid final line number: ${actualFileLineNumber} (must be > 0)`);
+        continue;
+      }
+
       // Debug: Log the exact line number being sent to GitHub
       logger.info(
-        `📍 FINAL LINE SELECTION: AI diff line ${originalLine} → GitHub comment line ${actualFileLineNumber} (direct mapping)`
+        `📍 FINAL LINE SELECTION: AI diff line ${originalLine} → GitHub comment line ${actualFileLineNumber}`
       );
 
       // Check if we should update existing comment
@@ -397,11 +415,12 @@ export class CommentManager {
   }
 
   /**
-   * Find the best valid location for a comment, with fallback options
+   * Find the best valid location for a comment when direct conversion fails
+   * This method assumes requestedLine is a diff line number, so it looks for nearby file line numbers
    */
   private findValidCommentLocation(
     file: string,
-    requestedLine: number,
+    requestedDiffLine: number,
     fileChanges: FileChange[]
   ): { line: number; reason: string } | null {
     const fileChange = fileChanges.find(fc => fc.filename === file);
@@ -418,62 +437,56 @@ export class CommentManager {
       return null;
     }
 
-    logger.debug(`\n--- LINE VALIDATION DEBUG ---`);
-    logger.debug(`Requested line: ${requestedLine}`);
-    logger.debug(`Valid lines in diff: [${validLines.join(', ')}]`);
+    logger.debug(`\n--- FINDING VALID COMMENT LOCATION ---`);
+    logger.debug(`Requested diff line: ${requestedDiffLine}`);
+    logger.debug(`Valid file lines in diff: [${validLines.join(', ')}]`);
     logger.debug(`File: ${file}`);
 
-    // If requested line is valid, use it
-    if (validLines.includes(requestedLine)) {
-      logger.debug(`✅ Exact match: line ${requestedLine} is in diff`);
-      return { line: requestedLine, reason: 'exact_match' };
+    // Try to map nearby diff lines to file lines
+    // Look at diff lines around the requested one
+    for (let offset = 0; offset <= 5; offset++) {
+      for (const direction of [1, -1]) {
+        if (offset === 0 && direction === -1) continue; // Skip duplicate at offset 0
+        const testDiffLine = requestedDiffLine + (offset * direction);
+        if (testDiffLine <= 0) continue;
+        const mappedFileLine = this.convertDiffLineToFileLine(file, testDiffLine, fileChanges);
+        if (mappedFileLine && validLines.includes(mappedFileLine)) {
+          logger.info(`🔄 Found nearby mapping: diff line ${testDiffLine} → file line ${mappedFileLine} (offset: ${offset * direction})`);
+          return { line: mappedFileLine, reason: 'nearby_diff_mapping' };
+        }
+      }
     }
 
-    logger.debug(`❌ Line ${requestedLine} not in diff, looking for nearby lines...`);
-
-    // Find the closest valid line (within reasonable range)
-    const maxDistance = 10; // Increased from 5 to catch more nearby lines
+    // If no nearby mapping works, use the closest valid file line to the requested diff line number
+    // This is a heuristic fallback
     let closestLine: number | null = null;
     let minDistance = Infinity;
 
     for (const validLine of validLines) {
-      const distance = Math.abs(validLine - requestedLine);
-      logger.debug(`  Line ${validLine}: distance ${distance}`);
-      if (distance <= maxDistance && distance < minDistance) {
+      const distance = Math.abs(validLine - requestedDiffLine);
+      if (distance < minDistance) {
         minDistance = distance;
         closestLine = validLine;
       }
     }
 
     if (closestLine !== null) {
-      logger.info(
-        `🔄 Adjusted comment location from line ${requestedLine} to ${closestLine} (distance: ${minDistance})`
-      );
-      return { line: closestLine, reason: 'nearby_match' };
+      logger.info(`🔧 Using closest file line ${closestLine} for diff line ${requestedDiffLine} (distance: ${minDistance})`);
+      return { line: closestLine, reason: 'closest_file_line' };
     }
 
-    logger.debug(`❌ No lines within ${maxDistance} distance of ${requestedLine}`);
-
-    // As a last resort, use the first valid line in the file (for file-level issues)
-    if (requestedLine <= 10) {
-      // Increased from 5 to handle more cases
-      const firstValidLine = Math.min(...validLines);
-      logger.info(
-        `📌 Using first valid line ${firstValidLine} for file-level issue at line ${requestedLine}`
-      );
-      return { line: firstValidLine, reason: 'file_level_fallback' };
-    }
-
-    logger.warn(`❌ No suitable comment location found for ${file}:${requestedLine}`);
-    logger.debug(`Valid lines were: [${validLines.join(', ')}]`);
-    logger.debug(`Max distance allowed: ${maxDistance}`);
-    logger.debug(`----------------------------\n`);
+    logger.warn(`❌ No suitable comment location found for ${file}:${requestedDiffLine}`);
+    logger.debug(`Valid file lines were: [${validLines.join(', ')}]`);
+    logger.debug(`-----------------------------------------\n`);
     return null;
   }
 
   /**
    * Convert diff line number (from AI) to actual file line number (for GitHub)
-   * This is the key method that maps AI's numbered diff to GitHub's file line numbers
+   * This maps AI's numbered diff lines to GitHub's file line numbers
+   *
+   * The AI receives a numbered diff where all content lines (added, deleted, context) are numbered 1, 2, 3...
+   * But GitHub comments need actual file line numbers (only added and context lines).
    */
   private convertDiffLineToFileLine(
     file: string,
@@ -487,8 +500,8 @@ export class CommentManager {
     }
 
     const lines = fileChange.patch.split('\n');
-    let currentDiffLine = 0;
-    let currentFileLine = 0;
+    let currentDiffLine = 0; // Tracks the numbered lines that AI sees
+    let currentFileLine = 0;  // Tracks actual file line numbers
 
     logger.debug(`\n=== DIFF LINE TO FILE LINE CONVERSION ===`);
     logger.debug(`Target diff line: ${diffLineNumber}`);
@@ -511,32 +524,29 @@ export class CommentManager {
           logger.debug(`Hunk header: ${line} → setting currentFileLine to ${currentFileLine}`);
         }
       } else if (line.startsWith('+') && !line.startsWith('+++')) {
-        // Added line
+        // Added line - exists in both numbered diff and final file
         currentDiffLine++;
         currentFileLine++;
         logger.debug(`Diff line ${currentDiffLine} (added) → File line ${currentFileLine}`);
 
         if (currentDiffLine === diffLineNumber) {
-          logger.debug(
-            `✅ Match found: Diff line ${diffLineNumber} = File line ${currentFileLine}`
-          );
+          logger.debug(`✅ Match found: Diff line ${diffLineNumber} = File line ${currentFileLine}`);
           return currentFileLine;
         }
       } else if (line.startsWith(' ')) {
-        // Context line
+        // Context line - exists in both numbered diff and final file
         currentDiffLine++;
         currentFileLine++;
         logger.debug(`Diff line ${currentDiffLine} (context) → File line ${currentFileLine}`);
 
         if (currentDiffLine === diffLineNumber) {
-          logger.debug(
-            `✅ Match found: Diff line ${diffLineNumber} = File line ${currentFileLine}`
-          );
+          logger.debug(`✅ Match found: Diff line ${diffLineNumber} = File line ${currentFileLine}`);
           return currentFileLine;
         }
       } else if (line.startsWith('-') && !line.startsWith('---')) {
-        // Deleted line - include in diff numbering but don't increment file line
+        // Deleted line - exists in numbered diff but NOT in final file
         currentDiffLine++;
+        // Don't increment currentFileLine because this line doesn't exist in the file
         logger.debug(`Diff line ${currentDiffLine} (deleted) → No file line (deleted)`);
 
         if (currentDiffLine === diffLineNumber) {
@@ -794,7 +804,7 @@ export class CommentManager {
               body += `**${categoryIcon} ${this.formatCategoryName(category)} (${categoryIssues.length})**\n`;
               for (const issue of categoryIssues) {
                 const typeIcon = this.getIssueIcon(issue.type);
-                const fileURL = this.generateGitHubFileURL(issue.file, issue.line);
+                const fileURL = this.generateGitHubFileURL(issue.file, issue.line, fileChanges);
                 body += `- ${typeIcon} **[${issue.file}:${issue.line || '?'}](${fileURL})** - ${issue.message}\n`;
 
                 // Add description if it's different from message and provides additional context
@@ -828,7 +838,7 @@ export class CommentManager {
               body += `**${categoryIcon} ${this.formatCategoryName(category)} (${categoryIssues.length})**\n`;
               for (const issue of categoryIssues) {
                 const typeIcon = this.getIssueIcon(issue.type);
-                const fileURL = this.generateGitHubFileURL(issue.file, issue.line);
+                const fileURL = this.generateGitHubFileURL(issue.file, issue.line, fileChanges);
                 body += `- ${typeIcon} **[${issue.file}:${issue.line || '?'}](${fileURL})** - ${issue.message}\n`;
 
                 // Add description if it's different from message and provides additional context
