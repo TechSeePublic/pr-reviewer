@@ -59,22 +59,33 @@ export class CommentManager {
   }
 
   /**
-   * Generate GitHub URL for an issue - tries to link to inline comment first, then file
+   * Generate GitHub URL for an issue - ALWAYS prioritize linking to inline comment when available
    */
   private generateGitHubFileURL(fileName: string, lineNumber?: number, fileChanges?: FileChange[], postedComments?: Map<string, number>): string {
     const baseURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}`;
 
-    // First try to link to the inline comment if one was posted for this location
+    // PRIORITY 1: Link to the inline comment if one was posted for this exact location
     if (lineNumber && postedComments) {
       const commentKey = `${fileName}:${lineNumber}`;
       const commentId = postedComments.get(commentKey);
       if (commentId) {
-        logger.debug(`Linking to inline comment ${commentId} for ${commentKey}`);
+        logger.debug(`✅ Linking to inline comment ${commentId} for ${commentKey}`);
         return `${baseURL}#issuecomment-${commentId}`;
       }
+
+      // Also try to find any comment for this file (in case line numbers don't match exactly)
+      for (const [key, commentId] of postedComments.entries()) {
+        if (key.startsWith(`${fileName}:`)) {
+          logger.debug(`✅ Found related inline comment ${commentId} for ${fileName} (fallback)`);
+          return `${baseURL}#issuecomment-${commentId}`;
+        }
+      }
+
+      logger.debug(`⚠️ No inline comment found for ${commentKey}, falling back to file anchor`);
     }
 
-    // Fallback: link to the file in the diff view
+    // FALLBACK: Link to the file in the diff view
+    logger.debug(`📁 Linking to file anchor for ${fileName}`);
     return `${baseURL}/files#diff-${Buffer.from(fileName).toString('hex')}`;
   }
 
@@ -160,19 +171,6 @@ export class CommentManager {
       );
     }
 
-    // Post architectural comment if there are architectural issues
-    const architecturalIssues = reviewResult.issues.filter(issue => issue.reviewType === 'architectural');
-    if (architecturalIssues.length > 0) {
-      logger.info(`🏗️ Posting architectural comment for ${architecturalIssues.length} architectural issues...`);
-      try {
-        await this.postArchitecturalComment(architecturalIssues, fileChanges);
-        logger.info('✅ Architectural comment posted successfully');
-      } catch (error) {
-        logger.error('❌ Failed to post architectural comment:', error);
-        // Don't throw - continue with summary comment
-      }
-    }
-
     // Post summary comment - only skip if there are no file changes to review
     if (shouldPostSummary) {
       if (fileChanges.length === 0) {
@@ -198,6 +196,19 @@ export class CommentManager {
       }
     } else {
       logger.info('❌ Summary comment skipped due to commentStyle configuration');
+    }
+
+    // Post architectural comment AFTER summary comment (so it appears before in GitHub)
+    const architecturalIssues = reviewResult.issues.filter(issue => issue.reviewType === 'architectural');
+    if (architecturalIssues.length > 0) {
+      logger.info(`🏗️ Posting architectural comment for ${architecturalIssues.length} architectural issues...`);
+      try {
+        await this.postArchitecturalComment(architecturalIssues, fileChanges);
+        logger.info('✅ Architectural comment posted successfully');
+      } catch (error) {
+        logger.error('❌ Failed to post architectural comment:', error);
+        // Don't throw - architectural comment is optional
+      }
     }
   }
 
@@ -913,6 +924,8 @@ export class CommentManager {
         body += `### 📋 **Code Issues**\n\n`;
 
         // Show detailed issues
+        logger.debug(`Posted comments map for summary links: ${JSON.stringify(Array.from(postedComments?.entries() || []))}`);
+
         const detailedIssuesByCategory = this.groupIssuesByCategory(nonArchitecturalIssues);
         for (const [category, categoryIssues] of Object.entries(detailedIssuesByCategory)) {
           if (categoryIssues.length > 0) {
@@ -921,6 +934,10 @@ export class CommentManager {
             for (const issue of categoryIssues) {
               const typeIcon = this.getIssueIcon(issue.type);
               const fileURL = this.generateGitHubFileURL(issue.file, issue.line, fileChanges, postedComments);
+
+              // Debug: Log what we're linking to
+              logger.debug(`Summary link: ${issue.file}:${issue.line} -> ${fileURL}`);
+
               body += `- ${typeIcon} **[${issue.file}:${issue.line || '?'}](${fileURL})** - ${issue.message}\n`;
 
               // Add description if it's different from message and provides additional context
@@ -1251,3 +1268,4 @@ export class CommentManager {
     }
   }
 }
+
