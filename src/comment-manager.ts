@@ -17,6 +17,7 @@ import {
 import { GitHubClient } from './github-client';
 import { SEVERITY_LEVELS } from './config';
 import { logger } from './logger';
+import * as crypto from 'crypto';
 import { FlowDiagramGenerator } from './flow-diagram-generator';
 import { AutoFixManager } from './auto-fix-manager';
 
@@ -59,44 +60,55 @@ export class CommentManager {
   }
 
   /**
-   * Generate GitHub URL for an issue - ALWAYS prioritize linking to inline comment when available
+   * Generate GitHub URL for summary links - ALWAYS link to files in diff view, not comments
    */
-  private generateGitHubFileURL(fileName: string, lineNumber?: number, fileChanges?: FileChange[], postedComments?: Map<string, number>): string {
+  private generateGitHubFileURL(fileName: string, lineNumber?: number, _fileChanges?: FileChange[], _postedComments?: Map<string, number>): string {
     const baseURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}`;
 
     logger.debug(`🔍 generateGitHubFileURL called: ${fileName}:${lineNumber}`);
-    logger.debug(`📋 Available posted comments: ${JSON.stringify(Array.from(postedComments?.entries() || []))}`);
 
-    // PRIORITY 1: Link to the inline comment if one was posted for this exact location
-    if (lineNumber && postedComments) {
-      const commentKey = `${fileName}:${lineNumber}`;
-      const commentId = postedComments.get(commentKey);
+    // SIMPLEST APPROACH: Just link to the files page, let GitHub handle the scrolling
+    // This is the most reliable way to ensure users can find the file
+    const filesURL = `${baseURL}/files`;
 
-      logger.debug(`🔎 Looking for exact match: ${commentKey} -> ${commentId || 'NOT FOUND'}`);
+    // If we have line number info, we could try different anchor formats
+    if (lineNumber && lineNumber > 0) {
+      // Let's try a few different formats that GitHub might use
+      const attempts = [
+        `${filesURL}#diff-${Buffer.from(fileName).toString('hex')}L${lineNumber}`,    // Hex + Line
+        `${filesURL}#diff-${crypto.createHash('md5').update(fileName).digest('hex')}L${lineNumber}`,  // MD5 + Line
+        `${filesURL}#${fileName.replace(/[^a-zA-Z0-9]/g, '-')}-L${lineNumber}`,       // Sanitized + Line
+        filesURL,  // Fallback to just files page
+      ];
 
-      if (commentId) {
-        const commentURL = `${baseURL}#issuecomment-${commentId}`;
-        logger.debug(`✅ Linking to inline comment ${commentId} for ${commentKey} -> ${commentURL}`);
-        return commentURL;
-      }
-
-      // Also try to find any comment for this file (in case line numbers don't match exactly)
-      for (const [key, commentId] of postedComments.entries()) {
-        if (key.startsWith(`${fileName}:`)) {
-          const commentURL = `${baseURL}#issuecomment-${commentId}`;
-          logger.debug(`✅ Found related inline comment ${commentId} for ${fileName} (fallback) -> ${commentURL}`);
-          return commentURL;
-        }
-      }
-
-      logger.debug(`⚠️ No inline comment found for ${commentKey}, falling back to file anchor`);
+      const attemptURL = attempts[0] || filesURL;
+      logger.debug(`📁 Generated file+line URL: ${attemptURL}`);
+      logger.debug(`🧪 File: ${fileName}, Line: ${lineNumber}`);
+      return attemptURL;
     }
 
-    // FALLBACK: Link to the file in the diff view
-    const fileHash = Buffer.from(fileName).toString('hex');
-    const fileURL = `${baseURL}/files#diff-${fileHash}`;
-    logger.debug(`📁 Linking to file anchor for ${fileName} -> ${fileURL}`);
-    return fileURL;
+    // No line number - just link to files page
+    logger.debug(`📁 Generated files page URL: ${filesURL}`);
+    logger.debug(`🧪 File: ${fileName} (no line number)`);
+    return filesURL;
+  }
+
+  /**
+   * Generate proper GitHub diff anchor URL
+   */
+  private generateDiffAnchorURL(baseURL: string, fileName: string, lineNumber?: number): string {
+    // GitHub diff anchors use a specific format
+    // Option 1: Try the standard hex encoding of the filename
+    const filePathHex = Buffer.from(fileName).toString('hex');
+
+    if (lineNumber && lineNumber > 0) {
+      // Try to link to specific line in diff (R for right side, L for left side)
+      // Format: #diff-{filehash}R{lineNumber}
+      return `${baseURL}/files#diff-${filePathHex}R${lineNumber}`;
+    } else {
+      // Link to the file header in diff
+      return `${baseURL}/files#diff-${filePathHex}`;
+    }
   }
 
   /**
