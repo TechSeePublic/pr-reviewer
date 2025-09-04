@@ -17,7 +17,6 @@ import {
 import { GitHubClient } from './github-client';
 import { SEVERITY_LEVELS } from './config';
 import { logger } from './logger';
-import * as crypto from 'crypto';
 import { FlowDiagramGenerator } from './flow-diagram-generator';
 import { AutoFixManager } from './auto-fix-manager';
 
@@ -60,36 +59,41 @@ export class CommentManager {
   }
 
   /**
-   * Generate GitHub URL for summary links - ALWAYS link to files in diff view, not comments
+   * Generate GitHub URL for summary links - Use EXACT same logic as inline comments!
    */
-  private generateGitHubFileURL(fileName: string, lineNumber?: number, _fileChanges?: FileChange[], _postedComments?: Map<string, number>): string {
+  private generateGitHubFileURL(fileName: string, lineNumber?: number, fileChanges?: FileChange[], _postedComments?: Map<string, number>): string {
     const baseURL = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}`;
 
-    logger.debug(`🔍 generateGitHubFileURL called: ${fileName}:${lineNumber}`);
+    logger.debug(`🔍 generateGitHubFileURL called: ${fileName}:${lineNumber} (AI diff line)`);
 
-    // SIMPLEST APPROACH: Just link to the files page, let GitHub handle the scrolling
-    // This is the most reliable way to ensure users can find the file
-    const filesURL = `${baseURL}/files`;
+    // THE BUG WAS HERE! Summary was using AI diff lines, but inline comments use ACTUAL file lines
+    // Let's use the EXACT same conversion logic that inline comments use
 
-    // If we have line number info, we could try different anchor formats
-    if (lineNumber && lineNumber > 0) {
-      // Let's try a few different formats that GitHub might use
-      const attempts = [
-        `${filesURL}#diff-${Buffer.from(fileName).toString('hex')}L${lineNumber}`,    // Hex + Line
-        `${filesURL}#diff-${crypto.createHash('md5').update(fileName).digest('hex')}L${lineNumber}`,  // MD5 + Line
-        `${filesURL}#${fileName.replace(/[^a-zA-Z0-9]/g, '-')}-L${lineNumber}`,       // Sanitized + Line
-        filesURL,  // Fallback to just files page
-      ];
+    if (lineNumber && lineNumber > 0 && fileChanges) {
+      const fileChange = fileChanges.find(fc => fc.filename === fileName);
+      if (fileChange?.patch) {
+        // Use THE SAME conversion logic as inline comments
+        const actualFileLineNumber = this.convertDiffLineToFileLine(fileName, lineNumber, fileChanges);
 
-      const attemptURL = attempts[0] || filesURL;
-      logger.debug(`📁 Generated file+line URL: ${attemptURL}`);
-      logger.debug(`🧪 File: ${fileName}, Line: ${lineNumber}`);
-      return attemptURL;
+        logger.debug(`🔢 CONVERSION: AI diff line ${lineNumber} -> Actual file line ${actualFileLineNumber} for ${fileName}`);
+
+        if (actualFileLineNumber && actualFileLineNumber > 0) {
+          // Simple approach: Use GitHub's basic diff anchor format (same as what works for inline comments)
+          const diffURL = `${baseURL}/files#diff-${Buffer.from(fileName).toString('hex')}R${actualFileLineNumber}`;
+
+          logger.debug(`📁 Generated diff URL: ${diffURL}`);
+          return diffURL;
+        } else {
+          logger.debug(`⚠️ Could not convert AI line ${lineNumber} to file line for ${fileName}`);
+        }
+      } else {
+        logger.debug(`⚠️ No patch found for ${fileName}`);
+      }
     }
 
-    // No line number - just link to files page
-    logger.debug(`📁 Generated files page URL: ${filesURL}`);
-    logger.debug(`🧪 File: ${fileName} (no line number)`);
+    // Fallback: Just link to files page
+    const filesURL = `${baseURL}/files`;
+    logger.debug(`📁 Fallback to files page: ${filesURL}`);
     return filesURL;
   }
 
