@@ -73,10 +73,13 @@ You are a professional code reviewer.
 ### 📍 Line Number Guidelines - CRITICAL FOR ACCURACY
 - **MANDATORY**: Use ONLY the line numbers shown in the numbered diff section
 - The line numbers are displayed as "1|", "2|", "3|" etc. in the diff
+- **VALID RANGE**: Line numbers should typically be between 1-50 (most diffs are small)
+- **INVALID**: Line numbers above 100 indicate you're using wrong source - these will be rejected
 - **NEVER use line numbers from the context file** - only from the numbered diff
 - **NEVER estimate or count lines manually** - always reference the numbered diff
 - If an issue spans multiple lines, use the line number where the issue starts
 - Double-check your line number against the numbered diff before submitting
+- **VALIDATION**: Your line numbers will be validated - invalid ones will be discarded
 
 ### 📝 Response Format
 ${jsonInstructions}
@@ -884,11 +887,13 @@ ${
 ${numberedDiff}
 \`\`\`
 
-**LINE REPORTING RULES**:
-1. ✅ **Use line numbers from the diff above** (1, 2, 3, etc.)
-2. ✅ **Report issues on lines marked with +** (added lines)  
-3. ✅ **Report issues on context lines** (unmarked lines in diff)
-4. ❌ **Never report issues on lines marked with -** (deleted lines)
+**LINE REPORTING RULES** (STRICTLY ENFORCED):
+1. ✅ **Use ONLY line numbers from the diff above** (1, 2, 3, etc.)
+2. ✅ **Valid range**: Typically 1-50 (line numbers >100 will be REJECTED)
+3. ✅ **Report issues on lines marked with +** (added lines)  
+4. ✅ **Report issues on context lines** (unmarked lines in diff)
+5. ❌ **Never report issues on lines marked with -** (deleted lines)
+6. ❌ **Never use actual file line numbers** - only numbered diff lines
 
 `;
       }

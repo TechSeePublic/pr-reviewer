@@ -43,7 +43,12 @@ export class AIProviderUtils {
       }
 
       const parsed: AIResponse = JSON.parse(cleanedResponse);
-      return parsed.issues || [];
+      const rawIssues = parsed.issues || [];
+
+      // Validate and fix line numbers from AI
+      const validatedIssues = this.validateAndFixLineNumbers(rawIssues);
+
+      return validatedIssues;
     } catch (error) {
       logger.warn('Failed to parse AI response as JSON:', error);
       logger.warn('Response content:', response.substring(0, 500) + '...');
@@ -57,6 +62,55 @@ export class AIProviderUtils {
       // Try to extract issues from malformed JSON
       return this.extractIssuesFromText(response);
     }
+  }
+
+  /**
+   * Validate and fix line numbers reported by AI
+   * AI should only report line numbers from numbered diffs (typically 1-50)
+   * High line numbers (>100) indicate AI is using actual file line numbers
+   */
+  static validateAndFixLineNumbers(issues: CodeIssue[]): CodeIssue[] {
+    const validatedIssues: CodeIssue[] = [];
+
+    for (const issue of issues) {
+      const lineNumber = issue.line;
+
+      // Check if line number is suspiciously high (likely actual file line, not diff line)
+      if (lineNumber && lineNumber > 100) {
+        logger.warn(
+          `🚨 AI reported suspiciously high line number: ${lineNumber} for ${issue.file}`
+        );
+        logger.warn(
+          `   This suggests AI is using actual file lines instead of numbered diff lines`
+        );
+        logger.warn(`   Issue: ${issue.message}`);
+        logger.warn(`   🔧 SKIPPING this issue to prevent wrong comment location`);
+
+        // Skip this issue rather than place it incorrectly
+        continue;
+      }
+
+      // Check for reasonable diff line numbers (most diffs are < 50 lines)
+      if (lineNumber && lineNumber > 50) {
+        logger.warn(
+          `⚠️  AI reported line ${lineNumber} for ${issue.file} - this may be too high for a diff`
+        );
+        logger.warn(`   Issue: ${issue.message}`);
+        logger.warn(`   🔧 Including but flagging for review`);
+      }
+
+      // Include valid issues
+      validatedIssues.push(issue);
+    }
+
+    if (issues.length !== validatedIssues.length) {
+      const skipped = issues.length - validatedIssues.length;
+      logger.info(
+        `📋 Line number validation: ${validatedIssues.length} valid issues, ${skipped} skipped due to invalid line numbers`
+      );
+    }
+
+    return validatedIssues;
   }
 
   /**
