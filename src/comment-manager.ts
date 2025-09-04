@@ -116,14 +116,6 @@ export class CommentManager {
   }
 
   /**
-   * Generate URL that links to a specific file in the PR (without line anchor)
-   */
-  private generateFileAnchorURL(baseURL: string, fileName: string): string {
-    // Generate anchor that scrolls to the file in the PR
-    return `${baseURL}#diff-${Buffer.from(fileName).toString('hex')}`;
-  }
-
-  /**
    * Post all review comments (inline and summary)
    */
   async postReviewComments(
@@ -430,7 +422,7 @@ export class CommentManager {
    */
   private formatArchitecturalCommentBody(
     architecturalIssues: CodeIssue[],
-    _fileChanges: FileChange[]
+    fileChanges: FileChange[]
   ): string {
     let body = `## 🏗️ Architectural Review\n\n`;
     body += `*This comment focuses on high-level code structure, design patterns, and maintainability concerns that affect the overall codebase.*\n\n`;
@@ -465,18 +457,14 @@ export class CommentManager {
         if (issue.relatedFiles && issue.relatedFiles.length > 1) {
           body += `**Affected files:**\n`;
           issue.relatedFiles.forEach(file => {
-            const fileURL = this.generateFileAnchorURL(
-              `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`,
-              file
-            );
+            // Use the SAME method as summary links (with proper line conversion)
+            const fileURL = this.generateGitHubFileURL(file, undefined, fileChanges);
             body += `- [${file}](${fileURL})\n`;
           });
           body += '\n';
         } else if (issue.file && issue.file !== 'Multiple Files' && issue.file !== 'unknown') {
-          const fileURL = this.generateFileAnchorURL(
-            `https://github.com/${this.prContext.owner}/${this.prContext.repo}/pull/${this.prContext.pullNumber}/files`,
-            issue.file
-          );
+          // Use the SAME method as summary links (with proper line conversion)
+          const fileURL = this.generateGitHubFileURL(issue.file, issue.line, fileChanges);
           body += `**File:** [${issue.file}](${fileURL})\n\n`;
         }
 
