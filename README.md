@@ -278,10 +278,12 @@ If you encounter authentication errors with AWS Bedrock, follow these steps:
      }
      ```
 
-5. **Model Access**
-   - Enable model access in AWS Bedrock console
-   - Go to AWS Console → Bedrock → Model access
-   - Request access for the models you want to use
+5. **Model Access** ⚠️ **CRITICAL**
+   - **You MUST enable model access in AWS Bedrock console before using any models**
+   - Go to AWS Console → Bedrock → Model access → Manage model access
+   - Request access for the models you want to use (e.g., Claude 3.5 Sonnet, Claude 3 Haiku)
+   - Wait for approval (usually instant for most models)
+   - **Common Error**: `AccessDeniedException: Your account does not have an agreement to this model`
 
 **Debug Steps**:
 1. Test AWS credentials locally: `aws sts get-caller-identity`

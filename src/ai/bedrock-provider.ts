@@ -24,6 +24,7 @@ export class BedrockProvider extends BaseAIProvider {
   private stsClient: STSClient;
   private region: string;
   private anthropicVersion: string;
+  private apiKey?: string;
   private static credentialsValidated = false;
 
   /**
@@ -50,6 +51,9 @@ export class BedrockProvider extends BaseAIProvider {
     this.model = model || DEFAULT_MODELS.bedrock;
     this.region = region;
     this.anthropicVersion = anthropicVersion;
+    if (apiKey) {
+      this.apiKey = apiKey;
+    }
 
     // Validate region
     if (!region) {
@@ -62,9 +66,11 @@ export class BedrockProvider extends BaseAIProvider {
     // Priority: API Key > Access Keys > Default credential chain
     if (apiKey) {
       logger.info('Using AWS Bedrock API Key for authentication (July 2025 feature)');
-      clientConfig.credentials = {
-        apiKey,
-      };
+      // Set the API key as AWS_BEARER_TOKEN_BEDROCK environment variable
+      // This is the correct way to use Bedrock API keys according to AWS documentation
+      process.env.AWS_BEARER_TOKEN_BEDROCK = apiKey;
+      logger.info('Set AWS_BEARER_TOKEN_BEDROCK environment variable for Bedrock authentication');
+      // Don't set any credentials - let AWS SDK use the bearer token
     } else if (accessKeyId && secretAccessKey) {
       logger.info('Using explicit AWS Access Key credentials for Bedrock');
       clientConfig.credentials = {
@@ -119,9 +125,12 @@ export class BedrockProvider extends BaseAIProvider {
   }
 
   private async invokeModel(prompt: string, systemPrompt?: string): Promise<string> {
-    // Validate credentials on first API call
-    if (!BedrockProvider.credentialsValidated) {
+    // Validate credentials on first API call (skip for API keys as they don't work with STS)
+    if (!BedrockProvider.credentialsValidated && !this.apiKey) {
       await this.validateCredentials();
+      BedrockProvider.credentialsValidated = true;
+    } else if (this.apiKey) {
+      logger.info('Skipping STS validation for API key authentication');
       BedrockProvider.credentialsValidated = true;
     }
 
