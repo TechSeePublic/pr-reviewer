@@ -65,7 +65,9 @@ export class BedrockProvider extends BaseAIProvider {
         secretAccessKey,
       };
     } else {
-      logger.info('Using default AWS credential chain for Bedrock (IAM roles, environment variables, etc.)');
+      logger.info(
+        'Using default AWS credential chain for Bedrock (IAM roles, environment variables, etc.)'
+      );
     }
 
     try {
@@ -87,16 +89,22 @@ export class BedrockProvider extends BaseAIProvider {
       logger.info('Validating AWS credentials...');
       const command = new GetCallerIdentityCommand({});
       const response = await this.stsClient.send(command);
-      logger.info(`AWS credentials validated. Account: ${response.Account}, User/Role: ${response.Arn}`);
+      logger.info(
+        `AWS credentials validated. Account: ${response.Account}, User/Role: ${response.Arn}`
+      );
     } catch (error: any) {
       logger.error('AWS credential validation failed:', error);
 
       if (error?.name === 'UnrecognizedClientException') {
-        throw new Error(`AWS credentials are invalid or expired: ${error.message}. Please check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.`);
+        throw new Error(
+          `AWS credentials are invalid or expired: ${error.message}. Please check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.`
+        );
       }
 
       if (error?.name === 'AccessDenied') {
-        throw new Error(`AWS credentials lack STS permissions: ${error.message}. The credentials need sts:GetCallerIdentity permission.`);
+        throw new Error(
+          `AWS credentials lack STS permissions: ${error.message}. The credentials need sts:GetCallerIdentity permission.`
+        );
       }
 
       throw new Error(`AWS credential validation failed: ${error?.message || error}`);
@@ -201,19 +209,27 @@ Troubleshooting steps:
       }
 
       if (error?.name === 'AccessDeniedException') {
-        throw new Error(`AWS Bedrock access denied: ${error.message}. Check IAM permissions for bedrock:InvokeModel and model access for ${this.model}`);
+        throw new Error(
+          `AWS Bedrock access denied: ${error.message}. Check IAM permissions for bedrock:InvokeModel and model access for ${this.model}`
+        );
       }
 
       if (error?.name === 'ValidationException') {
-        throw new Error(`AWS Bedrock validation error: ${error.message}. Check model ID and request parameters for ${this.model}`);
+        throw new Error(
+          `AWS Bedrock validation error: ${error.message}. Check model ID and request parameters for ${this.model}`
+        );
       }
 
       if (error?.name === 'ThrottlingException') {
-        throw new Error(`AWS Bedrock throttling: ${error.message}. Too many requests, please retry later`);
+        throw new Error(
+          `AWS Bedrock throttling: ${error.message}. Too many requests, please retry later`
+        );
       }
 
       if (error?.name === 'ServiceUnavailableException') {
-        throw new Error(`AWS Bedrock service unavailable: ${error.message}. The service may be temporarily down`);
+        throw new Error(
+          `AWS Bedrock service unavailable: ${error.message}. The service may be temporarily down`
+        );
       }
 
       // Generic error fallback
