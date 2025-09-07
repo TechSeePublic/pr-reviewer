@@ -138,8 +138,9 @@ export class BedrockProvider extends BaseAIProvider {
       let body: Record<string, unknown>;
 
       // Handle different model families
-      if (this.model.startsWith('anthropic.claude')) {
-        // Claude models on Bedrock
+      if (this.model.startsWith('anthropic.claude') || this.model.startsWith('us.anthropic.claude')) {
+        // Claude models on Bedrock - different formats for direct vs inference profile models
+        // All Claude models use the same format now
         body = {
           anthropic_version: this.anthropicVersion,
           max_tokens: 8000,
@@ -191,7 +192,7 @@ export class BedrockProvider extends BaseAIProvider {
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
       // Extract text based on model family
-      if (this.model.startsWith('anthropic.claude')) {
+      if (this.model.startsWith('anthropic.claude') || this.model.startsWith('us.anthropic.claude')) {
         return responseBody.content?.[0]?.text || '';
       } else if (this.model.startsWith('meta.llama')) {
         return responseBody.generation || '';
