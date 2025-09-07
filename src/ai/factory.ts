@@ -53,7 +53,8 @@ export class AIProviderFactory {
         inputs.deterministicMode,
         inputs.bedrockAccessKeyId,
         inputs.bedrockSecretAccessKey,
-        inputs.bedrockAnthropicVersion
+        inputs.bedrockAnthropicVersion,
+        inputs.bedrockApiKey
       );
     }
 
@@ -72,7 +73,7 @@ export class AIProviderFactory {
         provider = 'anthropic';
       } else if (inputs.azureOpenaiApiKey && inputs.azureOpenaiEndpoint) {
         provider = 'azure';
-      } else if (inputs.bedrockRegion || inputs.bedrockAccessKeyId) {
+      } else if (inputs.bedrockRegion || inputs.bedrockAccessKeyId || inputs.bedrockApiKey) {
         provider = 'bedrock';
       } else {
         throw new Error('No AI provider API key available');

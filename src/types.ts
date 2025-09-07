@@ -15,6 +15,7 @@ export interface ActionInputs {
   bedrockRegion?: string;
   bedrockAccessKeyId?: string;
   bedrockSecretAccessKey?: string;
+  bedrockApiKey?: string;
   bedrockAnthropicVersion?: string;
   aiProvider: 'openai' | 'anthropic' | 'gemini' | 'azure' | 'bedrock' | 'auto';
   model: string;

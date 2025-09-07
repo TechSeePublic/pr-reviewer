@@ -53,6 +53,10 @@ inputs:
     description: 'AWS Secret Access Key for Bedrock (optional if using IAM roles or environment variables)'
     required: false
     
+  bedrock_api_key:
+    description: 'AWS Bedrock API Key for simplified authentication (alternative to access keys, introduced July 2025)'
+    required: false
+    
   bedrock_anthropic_version:
     description: 'Anthropic API version for Claude models on Bedrock (e.g., bedrock-2023-05-31)'
     required: false

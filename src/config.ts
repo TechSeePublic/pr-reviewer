@@ -110,6 +110,11 @@ export function getActionInputs(): ActionInputs {
     inputs.bedrockSecretAccessKey = bedrockSecretAccessKey;
   }
 
+  const bedrockApiKey = core.getInput('bedrock_api_key');
+  if (bedrockApiKey) {
+    inputs.bedrockApiKey = bedrockApiKey;
+  }
+
   const bedrockAnthropicVersion = core.getInput('bedrock_anthropic_version');
   if (bedrockAnthropicVersion) {
     inputs.bedrockAnthropicVersion = bedrockAnthropicVersion;
@@ -145,12 +150,19 @@ export function validateInputs(inputs: ActionInputs): void {
     );
   }
 
+  if (inputs.aiProvider === 'bedrock' && !inputs.bedrockApiKey && (!inputs.bedrockAccessKeyId || !inputs.bedrockSecretAccessKey)) {
+    throw new Error(
+      'Bedrock authentication is required: either provide bedrock_api_key OR both bedrock_access_key_id and bedrock_secret_access_key'
+    );
+  }
+
   if (
     inputs.aiProvider === 'auto' &&
     !inputs.openaiApiKey &&
     !inputs.anthropicApiKey &&
     !inputs.azureOpenaiApiKey &&
-    !inputs.bedrockRegion
+    !inputs.bedrockRegion &&
+    !inputs.bedrockApiKey
   ) {
     throw new Error(
       'At least one AI provider configuration is required (openai_api_key, anthropic_api_key, azure_openai_api_key, or bedrock_region)'

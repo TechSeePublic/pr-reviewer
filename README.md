@@ -135,8 +135,9 @@ The bot automatically detects and applies Cursor rules from:
 | `azure_openai_api_version` | Azure OpenAI API version | `2024-10-21` | ❌ |
 | `azure_openai_real_model` | Real model name for custom Azure deployments | - | ❌ |
 | `bedrock_region` | AWS Bedrock region (e.g., us-east-1, us-west-2) | - | ❌ |
-| `bedrock_access_key_id` | AWS Access Key ID for Bedrock | - | ❌ |
-| `bedrock_secret_access_key` | AWS Secret Access Key for Bedrock | - | ❌ |
+| `bedrock_api_key` | AWS Bedrock API Key (July 2025 feature, recommended) | - | ❌ |
+| `bedrock_access_key_id` | AWS Access Key ID for Bedrock (legacy) | - | ❌ |
+| `bedrock_secret_access_key` | AWS Secret Access Key for Bedrock (legacy) | - | ❌ |
 | `ai_provider` | AI provider (`openai`, `anthropic`, `azure`, `bedrock`, `auto`) | `auto` | ❌ |
 | `model` | AI model to use | `auto` | ❌ |
 | `review_level` | Review intensity (`light`, `standard`, `thorough`) | `standard` | ❌ |
@@ -211,7 +212,18 @@ For AWS Bedrock, you'll need:
     model: 'anthropic.claude-3-5-sonnet-20241022-v2:0'
 ```
 
-#### Access Key Setup
+#### API Key Setup (Recommended - New in July 2025)
+
+```yaml
+- uses: amitwa1/pr-reviewer@v1
+  with:
+    ai_provider: 'bedrock'
+    bedrock_region: 'us-east-1'
+    bedrock_api_key: ${{ secrets.BEDROCK_API_KEY }}
+    model: 'anthropic.claude-3-5-sonnet-20241022-v2:0'
+```
+
+#### Access Key Setup (Legacy)
 
 ```yaml
 - uses: amitwa1/pr-reviewer@v1
@@ -239,7 +251,8 @@ If you encounter authentication errors with AWS Bedrock, follow these steps:
    - Regenerate credentials if needed
 
 2. **Missing Credentials**
-   - Ensure `bedrock_access_key_id` and `bedrock_secret_access_key` are set in GitHub Secrets
+   - **NEW (July 2025)**: Use `bedrock_api_key` for simplified authentication
+   - **Legacy**: Ensure `bedrock_access_key_id` and `bedrock_secret_access_key` are set in GitHub Secrets
    - Or configure IAM roles for GitHub Actions (recommended)
 
 3. **Incorrect Region**

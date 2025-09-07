@@ -31,9 +31,10 @@ export class BedrockProvider extends BaseAIProvider {
    * @param region AWS region for Bedrock (default: us-east-1)
    * @param model Model ID to use (default: from config)
    * @param deterministicMode Whether to use deterministic settings (default: true)
-   * @param accessKeyId AWS access key ID (optional, can use IAM roles)
-   * @param secretAccessKey AWS secret access key (optional, can use IAM roles)
+   * @param accessKeyId AWS access key ID (optional, can use IAM roles or API key)
+   * @param secretAccessKey AWS secret access key (optional, can use IAM roles or API key)
    * @param anthropicVersion Anthropic API version for Claude models (default: bedrock-2023-05-31)
+   * @param apiKey AWS Bedrock API key for simplified authentication (introduced July 2025)
    *                        Check AWS Bedrock documentation for latest supported versions
    */
   constructor(
@@ -42,7 +43,8 @@ export class BedrockProvider extends BaseAIProvider {
     deterministicMode: boolean = true,
     accessKeyId?: string,
     secretAccessKey?: string,
-    anthropicVersion: string = 'bedrock-2023-05-31'
+    anthropicVersion: string = 'bedrock-2023-05-31',
+    apiKey?: string
   ) {
     super(deterministicMode);
     this.model = model || DEFAULT_MODELS.bedrock;
@@ -57,9 +59,14 @@ export class BedrockProvider extends BaseAIProvider {
     // Initialize Bedrock client with optional credentials
     const clientConfig: Record<string, unknown> = { region };
 
-    // If explicit credentials are provided, use them
-    if (accessKeyId && secretAccessKey) {
-      logger.info('Using explicit AWS credentials for Bedrock');
+    // Priority: API Key > Access Keys > Default credential chain
+    if (apiKey) {
+      logger.info('Using AWS Bedrock API Key for authentication (July 2025 feature)');
+      clientConfig.credentials = {
+        apiKey,
+      };
+    } else if (accessKeyId && secretAccessKey) {
+      logger.info('Using explicit AWS Access Key credentials for Bedrock');
       clientConfig.credentials = {
         accessKeyId,
         secretAccessKey,
