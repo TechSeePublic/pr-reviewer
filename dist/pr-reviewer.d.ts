@@ -1,0 +1,96 @@
+/**
+ * Main PR Reviewer orchestrator
+ */
+import { ActionInputs, ReviewResult } from './types';
+export declare class PRReviewer {
+    private inputs;
+    private prContext;
+    private githubClient;
+    private aiProvider;
+    private commentManager;
+    private autoFixManager;
+    private workspacePath;
+    constructor(inputs: ActionInputs, workspacePath?: string);
+    /**
+     * Main review process
+     */
+    reviewPR(): Promise<ReviewResult>;
+    /**
+     * Extract PR context from GitHub environment
+     */
+    private extractPRContext;
+    /**
+     * Parse Cursor rules from repository
+     */
+    private parseCursorRules;
+    /**
+     * Check if review should be skipped
+     */
+    private shouldSkipReview;
+    /**
+     * Filter rules that apply to the changed files
+     */
+    private filterApplicableRules;
+    /**
+     * Generate PR plan by analyzing all changes
+     */
+    private generatePRPlan;
+    /**
+     * Conduct architectural review of all changes
+     */
+    private conductArchitecturalReview;
+    /**
+     * Review files in batches with PR context
+     */
+    private reviewFilesInBatches;
+    /**
+     * Create batches of files for processing
+     */
+    private createFileBatches;
+    /**
+     * Get file contents for a batch of files
+     */
+    private getFilesWithContent;
+    /**
+     * Fallback to single file review when batch review fails
+     */
+    private reviewBatchFallback;
+    /**
+     * Review a single file
+     */
+    private reviewSingleFile;
+    /**
+     * Get file content for review
+     */
+    private getFileContent;
+    /**
+     * Generate comprehensive review result
+     */
+    private generateReviewResult;
+    /**
+     * Determine review status based on issues found
+     * Note: Never returns 'failed' - the PR reviewer should report issues but not fail the PR
+     */
+    private determineReviewStatus;
+    /**
+     * Generate fallback summary if AI summary fails
+     */
+    private generateFallbackSummary;
+    /**
+     * Create result for skipped reviews
+     */
+    private createSkippedResult;
+    /**
+     * Set GitHub Action outputs
+     */
+    private setActionOutputs;
+    /**
+     * Extract changed line numbers from patch
+     */
+    private extractChangedLines;
+    /**
+     * Utility delay function
+     */
+    private delay;
+}
+//# sourceMappingURL=pr-reviewer.d.ts.map
