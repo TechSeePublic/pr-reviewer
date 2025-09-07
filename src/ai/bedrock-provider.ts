@@ -3,6 +3,7 @@
  */
 
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
 import {
   ArchitecturalReviewResult,
   CodeIssue,
@@ -20,8 +21,10 @@ export class BedrockProvider extends BaseAIProvider {
   public readonly name = 'bedrock';
   public readonly model: string;
   private client: BedrockRuntimeClient;
+  private stsClient: STSClient;
   private region: string;
   private anthropicVersion: string;
+  private static credentialsValidated = false;
 
   /**
    * Creates a new BedrockProvider instance
@@ -46,19 +49,67 @@ export class BedrockProvider extends BaseAIProvider {
     this.region = region;
     this.anthropicVersion = anthropicVersion;
 
+    // Validate region
+    if (!region) {
+      throw new Error('AWS Bedrock region is required');
+    }
+
     // Initialize Bedrock client with optional credentials
     const clientConfig: Record<string, unknown> = { region };
+
+    // If explicit credentials are provided, use them
     if (accessKeyId && secretAccessKey) {
+      logger.info('Using explicit AWS credentials for Bedrock');
       clientConfig.credentials = {
         accessKeyId,
         secretAccessKey,
       };
+    } else {
+      logger.info('Using default AWS credential chain for Bedrock (IAM roles, environment variables, etc.)');
     }
 
-    this.client = new BedrockRuntimeClient(clientConfig);
+    try {
+      this.client = new BedrockRuntimeClient(clientConfig);
+      this.stsClient = new STSClient(clientConfig);
+      logger.info(`Bedrock client initialized for region: ${region}, model: ${this.model}`);
+    } catch (error) {
+      logger.error('Failed to initialize Bedrock client:', error);
+      throw new Error(`Failed to initialize Bedrock client: ${error}`);
+    }
+  }
+
+  /**
+   * Validates AWS credentials by making a test STS call
+   * This helps diagnose authentication issues before making Bedrock API calls
+   */
+  private async validateCredentials(): Promise<void> {
+    try {
+      logger.info('Validating AWS credentials...');
+      const command = new GetCallerIdentityCommand({});
+      const response = await this.stsClient.send(command);
+      logger.info(`AWS credentials validated. Account: ${response.Account}, User/Role: ${response.Arn}`);
+    } catch (error: any) {
+      logger.error('AWS credential validation failed:', error);
+
+      if (error?.name === 'UnrecognizedClientException') {
+        throw new Error(`AWS credentials are invalid or expired: ${error.message}. Please check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.`);
+      }
+
+      if (error?.name === 'AccessDenied') {
+        throw new Error(`AWS credentials lack STS permissions: ${error.message}. The credentials need sts:GetCallerIdentity permission.`);
+      }
+
+      throw new Error(`AWS credential validation failed: ${error?.message || error}`);
+    }
   }
 
   private async invokeModel(prompt: string, systemPrompt?: string): Promise<string> {
+    // Validate credentials on first API call
+    if (!BedrockProvider.credentialsValidated) {
+      await this.validateCredentials();
+      BedrockProvider.credentialsValidated = true;
+    }
+
     try {
       let body: Record<string, unknown>;
 
@@ -126,9 +177,47 @@ export class BedrockProvider extends BaseAIProvider {
         // Try common response formats
         return responseBody.completion || responseBody.text || responseBody.generated_text || '';
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Bedrock API error:', error);
-      throw new Error(`Bedrock model invocation failed: ${error}`);
+
+      // Provide specific error messages for common issues
+      if (error?.name === 'UnrecognizedClientException') {
+        const errorMessage = `AWS Bedrock authentication failed: ${error.message}. 
+        
+Possible causes:
+1. Invalid or expired AWS credentials
+2. Missing AWS credentials (check environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+3. Incorrect region configuration (current: ${this.region})
+4. IAM permissions missing for Bedrock service
+5. AWS credentials not configured in GitHub Actions secrets
+
+Troubleshooting steps:
+- Verify AWS credentials are valid and not expired
+- Ensure the IAM user/role has bedrock:InvokeModel permissions
+- Check that the region ${this.region} supports Bedrock
+- For GitHub Actions, verify bedrock_access_key_id and bedrock_secret_access_key secrets are set`;
+
+        throw new Error(errorMessage);
+      }
+
+      if (error?.name === 'AccessDeniedException') {
+        throw new Error(`AWS Bedrock access denied: ${error.message}. Check IAM permissions for bedrock:InvokeModel and model access for ${this.model}`);
+      }
+
+      if (error?.name === 'ValidationException') {
+        throw new Error(`AWS Bedrock validation error: ${error.message}. Check model ID and request parameters for ${this.model}`);
+      }
+
+      if (error?.name === 'ThrottlingException') {
+        throw new Error(`AWS Bedrock throttling: ${error.message}. Too many requests, please retry later`);
+      }
+
+      if (error?.name === 'ServiceUnavailableException') {
+        throw new Error(`AWS Bedrock service unavailable: ${error.message}. The service may be temporarily down`);
+      }
+
+      // Generic error fallback
+      throw new Error(`Bedrock model invocation failed: ${error?.message || error}`);
     }
   }
 

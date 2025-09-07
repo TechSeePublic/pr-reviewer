@@ -225,6 +225,57 @@ For AWS Bedrock, you'll need:
 
 **Available Models**: See the [AWS Bedrock Models](#aws-bedrock-models-2025) section for supported models.
 
+#### Troubleshooting AWS Bedrock Authentication
+
+If you encounter authentication errors with AWS Bedrock, follow these steps:
+
+**Common Error**: `UnrecognizedClientException: The security token included in the request is invalid`
+
+**Possible Causes & Solutions**:
+
+1. **Invalid or Expired Credentials**
+   - Verify your AWS Access Key ID and Secret Access Key are correct
+   - Check if credentials have expired (temporary credentials expire after a set time)
+   - Regenerate credentials if needed
+
+2. **Missing Credentials**
+   - Ensure `bedrock_access_key_id` and `bedrock_secret_access_key` are set in GitHub Secrets
+   - Or configure IAM roles for GitHub Actions (recommended)
+
+3. **Incorrect Region**
+   - Verify the `bedrock_region` matches where Bedrock is available
+   - Common regions: `us-east-1`, `us-west-2`, `eu-west-1`
+   - Check [AWS Bedrock availability](https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-regions.html)
+
+4. **IAM Permissions**
+   - Ensure your IAM user/role has these permissions:
+     ```json
+     {
+       "Version": "2012-10-17",
+       "Statement": [
+         {
+           "Effect": "Allow",
+           "Action": [
+             "bedrock:InvokeModel",
+             "bedrock:ListFoundationModels"
+           ],
+           "Resource": "*"
+         }
+       ]
+     }
+     ```
+
+5. **Model Access**
+   - Enable model access in AWS Bedrock console
+   - Go to AWS Console → Bedrock → Model access
+   - Request access for the models you want to use
+
+**Debug Steps**:
+1. Test AWS credentials locally: `aws sts get-caller-identity`
+2. Verify region availability: Check AWS Bedrock console in your region
+3. Check GitHub Actions logs for detailed error messages
+4. Ensure secrets are properly configured in repository settings
+
 ## 🤖 Supported AI Models
 
 ### OpenAI Models (2025)
