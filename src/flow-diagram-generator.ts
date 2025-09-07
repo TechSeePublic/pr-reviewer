@@ -1065,7 +1065,7 @@ ${changes}${file.patch && file.patch.length > 1000 ? '...' : ''}
     // If no Mermaid code found, fail with detailed logging
     if (!mermaidCode || !mermaidCode.includes('flowchart')) {
       logger.error('Could not extract valid Mermaid code from AI response');
-      logger.error(`Final mermaidCode variable: ${mermaidCode}`);
+      logger.error(`Final mermaidCode length: ${mermaidCode?.length || 0} chars`);
       logger.error(`Response type was: ${typeof response}`);
       if (Array.isArray(response)) {
         logger.error(
