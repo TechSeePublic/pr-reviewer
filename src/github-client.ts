@@ -191,7 +191,7 @@ export class GitHubClient {
       // Find summary comment - look for summary marker OR TechSee AI PR Review header (for backwards compatibility)
       let summaryComment = issueComments
         .filter(comment => comment.body?.includes(COMMENT_MARKERS.BOT_IDENTIFIER))
-        .filter(comment => 
+        .filter(comment =>
           comment.body?.includes(COMMENT_MARKERS.SUMMARY_MARKER) ||
           comment.body?.includes('TechSee AI PR Review Summary') ||
           comment.body?.includes('## 🤖 TechSee AI PR Review Summary') ||
@@ -206,7 +206,7 @@ export class GitHubClient {
       // Find architectural comment - look for architectural marker OR architectural header
       const architecturalComment = issueComments
         .filter(comment => comment.body?.includes(COMMENT_MARKERS.BOT_IDENTIFIER))
-        .filter(comment => 
+        .filter(comment =>
           comment.body?.includes(COMMENT_MARKERS.ARCHITECTURAL_MARKER) ||
           comment.body?.includes('## 🏗️ Architectural Review') ||
           (comment.body?.includes('techsee-ai-pr-reviewer') && comment.body?.includes('Architectural'))
@@ -228,12 +228,12 @@ export class GitHubClient {
       // Find inline comments - look for inline marker OR Code Review Finding header
       const inlineComments = reviewComments
         .filter(comment => comment.body?.includes(COMMENT_MARKERS.BOT_IDENTIFIER))
-        .filter(comment => 
+        .filter(comment =>
           comment.body?.includes(COMMENT_MARKERS.INLINE_MARKER) ||
           comment.body?.includes('## 🤖 Code Review Finding') ||
           comment.body?.includes('Code Review Finding') ||
           (comment.body?.includes('techsee-ai-pr-reviewer') && (
-            comment.body?.includes('ERROR') || 
+            comment.body?.includes('ERROR') ||
             comment.body?.includes('WARNING') ||
             comment.body?.includes('Rule:') ||
             comment.body?.includes('Suggested Fix:')
@@ -271,7 +271,7 @@ export class GitHubClient {
    */
   async logExistingComments(): Promise<void> {
     logger.info(`\n=== EXISTING COMMENTS DEBUG ===`);
-    
+
     try {
       // Get raw comments first for debugging
       await this.applyRateLimit();
@@ -293,10 +293,10 @@ export class GitHubClient {
       logger.info(`  - Review comments found: ${reviewComments.length}`);
 
       // Check which comments have our bot identifier
-      const botIssueComments = issueComments.filter(comment => 
+      const botIssueComments = issueComments.filter(comment =>
         comment.body?.includes(COMMENT_MARKERS.BOT_IDENTIFIER)
       );
-      const botReviewComments = reviewComments.filter(comment => 
+      const botReviewComments = reviewComments.filter(comment =>
         comment.body?.includes(COMMENT_MARKERS.BOT_IDENTIFIER)
       );
 
@@ -327,7 +327,7 @@ export class GitHubClient {
     } catch (error) {
       logger.error(`❌ Error fetching comments for debug: ${error}`);
     }
-    
+
     logger.info(`===============================\n`);
   }
 

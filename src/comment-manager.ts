@@ -148,7 +148,7 @@ export class CommentManager {
     };
 
     logger.info(`🔍 Update existing comments setting: ${this.inputs.updateExistingComments}`);
-    
+
     if (this.inputs.updateExistingComments) {
       logger.info(`📥 Fetching existing bot comments...`);
       existingComments = await this.githubClient.getExistingBotComments();
