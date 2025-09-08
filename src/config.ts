@@ -562,4 +562,5 @@ export const COMMENT_MARKERS = {
   BOT_IDENTIFIER: '<!-- techsee-ai-pr-reviewer -->',
   SUMMARY_MARKER: '<!-- cursor-ai-summary -->',
   INLINE_MARKER: '<!-- cursor-ai-inline -->',
+  ARCHITECTURAL_MARKER: '<!-- cursor-ai-architectural -->',
 } as const;

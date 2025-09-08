@@ -143,12 +143,19 @@ export class CommentManager {
     );
 
     // Get existing comments if we should update them
-    let existingComments: { inlineComments: InlineComment[]; summaryComment?: SummaryComment } = {
+    let existingComments: { inlineComments: InlineComment[]; summaryComment?: SummaryComment; architecturalComment?: SummaryComment } = {
       inlineComments: [],
     };
 
+    logger.info(`🔍 Update existing comments setting: ${this.inputs.updateExistingComments}`);
+    
     if (this.inputs.updateExistingComments) {
+      logger.info(`📥 Fetching existing bot comments...`);
       existingComments = await this.githubClient.getExistingBotComments();
+      // Debug: Log existing comments
+      await this.githubClient.logExistingComments();
+    } else {
+      logger.info(`⏭️ Skipping existing comment lookup (updateExistingComments=false)`);
     }
 
     // Filter issues based on inline severity for inline comments
@@ -199,7 +206,7 @@ export class CommentManager {
     if (architecturalIssues.length > 0) {
       logger.info(`🏗️ Posting architectural comment for ${architecturalIssues.length} architectural issues...`);
       try {
-        await this.postArchitecturalComment(architecturalIssues, fileChanges);
+        await this.postArchitecturalComment(architecturalIssues, fileChanges, existingComments.architecturalComment);
         logger.info('✅ Architectural comment posted successfully');
       } catch (error) {
         logger.error('❌ Failed to post architectural comment:', error);
@@ -240,7 +247,8 @@ export class CommentManager {
    */
   private async postArchitecturalComment(
     architecturalIssues: CodeIssue[],
-    fileChanges: FileChange[]
+    fileChanges: FileChange[],
+    existingComment?: SummaryComment
   ): Promise<void> {
     const body = this.formatArchitecturalCommentBody(architecturalIssues, fileChanges);
 
@@ -249,7 +257,7 @@ export class CommentManager {
       reviewResult: { issues: architecturalIssues } as ReviewResult, // Simplified for architectural comment
     };
 
-    await this.githubClient.postSummaryComment(comment);
+    await this.githubClient.postArchitecturalComment(comment, existingComment?.id);
   }
 
   /**
@@ -376,6 +384,20 @@ export class CommentManager {
       const existingComment = existingComments.find(
         c => c.location.file === file && c.location.line === actualFileLineNumber
       );
+
+      // Log comment matching for debugging
+      if (existingComments.length > 0) {
+        logger.debug(`Looking for existing comment at ${file}:${actualFileLineNumber}`);
+        logger.debug(`Available existing comments in ${file}:`);
+        existingComments
+          .filter(c => c.location.file === file)
+          .forEach(c => logger.debug(`  - Line ${c.location.line} (ID: ${c.id})`));
+        if (existingComment) {
+          logger.info(`🔄 Will update existing comment ${existingComment.id} at ${file}:${actualFileLineNumber}`);
+        } else {
+          logger.info(`➕ Will create new comment at ${file}:${actualFileLineNumber}`);
+        }
+      }
 
       try {
         logger.info(`\n=== POSTING INLINE COMMENT ===`);

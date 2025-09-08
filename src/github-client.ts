@@ -168,6 +168,7 @@ export class GitHubClient {
    */
   async getExistingBotComments(): Promise<{
     summaryComment?: SummaryComment;
+    architecturalComment?: SummaryComment;
     inlineComments: InlineComment[];
   }> {
     try {
@@ -187,18 +188,57 @@ export class GitHubClient {
         pull_number: this.context.pullNumber,
       });
 
-      const summaryComment = issueComments
+      // Find summary comment - look for summary marker OR TechSee AI PR Review header (for backwards compatibility)
+      let summaryComment = issueComments
         .filter(comment => comment.body?.includes(COMMENT_MARKERS.BOT_IDENTIFIER))
-        .filter(comment => comment.body?.includes(COMMENT_MARKERS.SUMMARY_MARKER))
+        .filter(comment => 
+          comment.body?.includes(COMMENT_MARKERS.SUMMARY_MARKER) ||
+          comment.body?.includes('TechSee AI PR Review Summary') ||
+          comment.body?.includes('## 🤖 TechSee AI PR Review Summary') ||
+          (comment.body?.includes('techsee-ai-pr-reviewer') && comment.body?.includes('Review Summary'))
+        )
         .map(comment => ({
           id: comment.id,
           body: comment.body || '',
           reviewResult: {} as ReviewResult, // Will be populated when needed
         }))[0];
 
+      // Find architectural comment - look for architectural marker OR architectural header
+      const architecturalComment = issueComments
+        .filter(comment => comment.body?.includes(COMMENT_MARKERS.BOT_IDENTIFIER))
+        .filter(comment => 
+          comment.body?.includes(COMMENT_MARKERS.ARCHITECTURAL_MARKER) ||
+          comment.body?.includes('## 🏗️ Architectural Review') ||
+          (comment.body?.includes('techsee-ai-pr-reviewer') && comment.body?.includes('Architectural'))
+        )
+        .map(comment => ({
+          id: comment.id,
+          body: comment.body || '',
+          reviewResult: {} as ReviewResult, // Will be populated when needed
+        }))[0];
+
+      // IMPORTANT: If we found an architectural comment but it's the same as the summary comment,
+      // prioritize it as architectural and clear the summary comment
+      // This handles the case where old architectural comments were posted as summary comments
+      if (architecturalComment && summaryComment && architecturalComment.id === summaryComment.id) {
+        logger.info(`🔄 Found architectural comment that was posted as summary comment (ID ${architecturalComment.id})`);
+        summaryComment = undefined; // Clear summary so it will be treated as architectural only
+      }
+
+      // Find inline comments - look for inline marker OR Code Review Finding header
       const inlineComments = reviewComments
         .filter(comment => comment.body?.includes(COMMENT_MARKERS.BOT_IDENTIFIER))
-        .filter(comment => comment.body?.includes(COMMENT_MARKERS.INLINE_MARKER))
+        .filter(comment => 
+          comment.body?.includes(COMMENT_MARKERS.INLINE_MARKER) ||
+          comment.body?.includes('## 🤖 Code Review Finding') ||
+          comment.body?.includes('Code Review Finding') ||
+          (comment.body?.includes('techsee-ai-pr-reviewer') && (
+            comment.body?.includes('ERROR') || 
+            comment.body?.includes('WARNING') ||
+            comment.body?.includes('Rule:') ||
+            comment.body?.includes('Suggested Fix:')
+          ))
+        )
         .map(comment => ({
           id: comment.id,
           body: comment.body || '',
@@ -210,17 +250,85 @@ export class GitHubClient {
           issue: {} as CodeIssue, // Will be populated when needed
         }));
 
-      const result: { summaryComment?: SummaryComment; inlineComments: InlineComment[] } = {
+      const result: { summaryComment?: SummaryComment; architecturalComment?: SummaryComment; inlineComments: InlineComment[] } = {
         inlineComments,
       };
       if (summaryComment) {
         result.summaryComment = summaryComment;
+      }
+      if (architecturalComment) {
+        result.architecturalComment = architecturalComment;
       }
       return result;
     } catch (error) {
       logger.warn('Warning: Could not fetch existing comments:', error);
       return { inlineComments: [] };
     }
+  }
+
+  /**
+   * Log existing comments for debugging
+   */
+  async logExistingComments(): Promise<void> {
+    logger.info(`\n=== EXISTING COMMENTS DEBUG ===`);
+    
+    try {
+      // Get raw comments first for debugging
+      await this.applyRateLimit();
+      const { data: issueComments } = await this.octokit.rest.issues.listComments({
+        owner: this.context.owner,
+        repo: this.context.repo,
+        issue_number: this.context.pullNumber,
+      });
+
+      await this.applyRateLimit();
+      const { data: reviewComments } = await this.octokit.rest.pulls.listReviewComments({
+        owner: this.context.owner,
+        repo: this.context.repo,
+        pull_number: this.context.pullNumber,
+      });
+
+      logger.info(`📊 Raw GitHub data:`);
+      logger.info(`  - Issue comments found: ${issueComments.length}`);
+      logger.info(`  - Review comments found: ${reviewComments.length}`);
+
+      // Check which comments have our bot identifier
+      const botIssueComments = issueComments.filter(comment => 
+        comment.body?.includes(COMMENT_MARKERS.BOT_IDENTIFIER)
+      );
+      const botReviewComments = reviewComments.filter(comment => 
+        comment.body?.includes(COMMENT_MARKERS.BOT_IDENTIFIER)
+      );
+
+      logger.info(`🤖 Bot comments found:`);
+      logger.info(`  - Bot issue comments: ${botIssueComments.length}`);
+      logger.info(`  - Bot review comments: ${botReviewComments.length}`);
+
+      // Show first few characters of each bot comment to see what markers they have
+      botIssueComments.forEach((comment, i) => {
+        const preview = comment.body?.substring(0, 200).replace(/\n/g, '\\n') || '';
+        logger.info(`  Issue Comment ${i + 1} (ID ${comment.id}): "${preview}..."`);
+      });
+
+      botReviewComments.forEach((comment, i) => {
+        const preview = comment.body?.substring(0, 200).replace(/\n/g, '\\n') || '';
+        logger.info(`  Review Comment ${i + 1} (ID ${comment.id}): "${preview}..."`);
+      });
+
+      // Now get parsed comments
+      const existing = await this.getExistingBotComments();
+      logger.info(`\n📋 Parsed results:`);
+      logger.info(`Summary comment: ${existing.summaryComment ? `ID ${existing.summaryComment.id}` : 'None'}`);
+      logger.info(`Architectural comment: ${existing.architecturalComment ? `ID ${existing.architecturalComment.id}` : 'None'}`);
+      logger.info(`Inline comments: ${existing.inlineComments.length} found`);
+      existing.inlineComments.forEach((comment, i) => {
+        logger.info(`  ${i + 1}. ID ${comment.id} at ${comment.location.file}:${comment.location.line}`);
+      });
+    } catch (error) {
+      logger.error(`❌ Error fetching comments for debug: ${error}`);
+    }
+    
+    logger.info(`===============================\n`);
   }
 
   /**
@@ -238,6 +346,7 @@ export class GitHubClient {
           comment_id: existingCommentId,
           body,
         });
+        logger.info(`✅ Updated existing summary comment ${existingCommentId}`);
       } else {
         await this.applyRateLimit();
         await this.octokit.rest.issues.createComment({
@@ -246,9 +355,41 @@ export class GitHubClient {
           issue_number: this.context.pullNumber,
           body,
         });
+        logger.info(`✅ Created new summary comment`);
       }
     } catch (error) {
       throw new Error(`Failed to post summary comment: ${error}`);
+    }
+  }
+
+  /**
+   * Post or update architectural comment
+   */
+  async postArchitecturalComment(comment: SummaryComment, existingCommentId?: number): Promise<void> {
+    try {
+      const body = this.formatArchitecturalComment(comment);
+
+      if (existingCommentId) {
+        await this.applyRateLimit();
+        await this.octokit.rest.issues.updateComment({
+          owner: this.context.owner,
+          repo: this.context.repo,
+          comment_id: existingCommentId,
+          body,
+        });
+        logger.info(`✅ Updated existing architectural comment ${existingCommentId}`);
+      } else {
+        await this.applyRateLimit();
+        await this.octokit.rest.issues.createComment({
+          owner: this.context.owner,
+          repo: this.context.repo,
+          issue_number: this.context.pullNumber,
+          body,
+        });
+        logger.info(`✅ Created new architectural comment`);
+      }
+    } catch (error) {
+      throw new Error(`Failed to post architectural comment: ${error}`);
     }
   }
 
@@ -267,6 +408,7 @@ export class GitHubClient {
           comment_id: existingCommentId,
           body,
         });
+        logger.info(`✅ Updated existing inline comment ${existingCommentId} at ${comment.location.file}:${comment.location.line}`);
         return existingCommentId;
       } else {
         await this.applyRateLimit();
@@ -284,7 +426,7 @@ export class GitHubClient {
           body,
         });
         logger.info(
-          `✅ Successfully posted inline comment at ${comment.location.file}:${comment.location.line}`
+          `✅ Created new inline comment ${response.data.id} at ${comment.location.file}:${comment.location.line}`
         );
         return response.data.id;
       }
@@ -319,6 +461,16 @@ export class GitHubClient {
   private formatSummaryComment(comment: SummaryComment): string {
     return `${COMMENT_MARKERS.BOT_IDENTIFIER}
 ${COMMENT_MARKERS.SUMMARY_MARKER}
+
+${comment.body}`;
+  }
+
+  /**
+   * Format architectural comment with markers
+   */
+  private formatArchitecturalComment(comment: SummaryComment): string {
+    return `${COMMENT_MARKERS.BOT_IDENTIFIER}
+${COMMENT_MARKERS.ARCHITECTURAL_MARKER}
 
 ${comment.body}`;
   }
