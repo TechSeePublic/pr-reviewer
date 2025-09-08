@@ -380,9 +380,12 @@ export class CommentManager {
         `📍 FINAL LINE SELECTION: AI diff line ${originalLine} → GitHub comment line ${actualFileLineNumber}`
       );
 
-      // Check if we should update existing comment
-      const existingComment = existingComments.find(
-        c => c.location.file === file && c.location.line === actualFileLineNumber
+      // Find the best matching existing comment using smart matching
+      const existingComment = this.findBestMatchingComment(
+        file,
+        actualFileLineNumber,
+        locationIssues[0],
+        existingComments
       );
 
       // Log comment matching for debugging
@@ -393,7 +396,7 @@ export class CommentManager {
           .filter(c => c.location.file === file)
           .forEach(c => logger.debug(`  - Line ${c.location.line} (ID: ${c.id})`));
         if (existingComment) {
-          logger.info(`🔄 Will update existing comment ${existingComment.id} at ${file}:${actualFileLineNumber}`);
+          logger.info(`🔄 Will update existing comment ${existingComment.comment.id} at ${file}:${existingComment.comment.location.line} (${existingComment.reason}) -> ${actualFileLineNumber}`);
         } else {
           logger.info(`➕ Will create new comment at ${file}:${actualFileLineNumber}`);
         }
@@ -407,7 +410,7 @@ export class CommentManager {
         logger.info(`Issue type: ${locationIssues[0]?.type} - ${locationIssues[0]?.message}`);
         logger.info(`==============================\n`);
 
-        const commentId = await this.githubClient.postInlineComment(comment, existingComment?.id);
+        const commentId = await this.githubClient.postInlineComment(comment, existingComment?.comment.id);
 
         // Track the posted comment for summary links
         if (commentId) {
@@ -419,6 +422,9 @@ export class CommentManager {
         logger.warn(`Failed to post inline comment for ${file}:${actualFileLineNumber}:`, error);
       }
     }
+
+    // Clean up orphaned comments (comments that no longer have corresponding issues)
+    await this.cleanupOrphanedComments(existingComments, issues, fileChanges);
   }
 
   /**
@@ -441,6 +447,159 @@ export class CommentManager {
     } catch (error) {
       logger.error('Failed to post summary comment:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Find the best matching existing comment for smart updates
+   */
+  private findBestMatchingComment(
+    file: string,
+    newLineNumber: number,
+    newIssue: CodeIssue | undefined,
+    existingComments: InlineComment[]
+  ): { comment: InlineComment; reason: string } | null {
+    if (!newIssue) return null;
+
+    const fileComments = existingComments.filter(c => c.location.file === file);
+    if (fileComments.length === 0) return null;
+
+    // Strategy 1: Exact line match
+    const exactMatch = fileComments.find(c => c.location.line === newLineNumber);
+    if (exactMatch) {
+      return { comment: exactMatch, reason: 'exact_line_match' };
+    }
+
+    // Strategy 2: Nearby line match (within 5 lines) + issue similarity
+    const nearbyMatches = fileComments.filter(c =>
+      Math.abs(c.location.line - newLineNumber) <= 5
+    );
+
+    for (const comment of nearbyMatches) {
+      // Check if the issue types and messages are similar
+      if (this.areIssuesSimilar(newIssue, comment, newLineNumber, comment.location.line)) {
+        const distance = Math.abs(comment.location.line - newLineNumber);
+        return {
+          comment,
+          reason: `nearby_similar_issue (distance: ${distance} lines)`
+        };
+      }
+    }
+
+    // Strategy 3: Same issue type and similar message anywhere in the file
+    for (const comment of fileComments) {
+      if (this.areIssuesSimilar(newIssue, comment, newLineNumber, comment.location.line, true)) {
+        const distance = Math.abs(comment.location.line - newLineNumber);
+        return {
+          comment,
+          reason: `same_file_similar_issue (distance: ${distance} lines)`
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Check if two issues are similar enough to be considered the same
+   */
+  private areIssuesSimilar(
+    newIssue: CodeIssue,
+    existingComment: InlineComment,
+    newLine: number,
+    existingLine: number,
+    allowLargeDistance: boolean = false
+  ): boolean {
+    // If lines are too far apart and we don't allow large distances, not similar
+    if (!allowLargeDistance && Math.abs(newLine - existingLine) > 10) {
+      return false;
+    }
+
+    // Extract issue information from the existing comment body
+    const commentBody = existingComment.body.toLowerCase();
+    const newMessage = newIssue.message.toLowerCase();
+    const newType = newIssue.type.toLowerCase();
+
+    // Check if the issue type matches
+    const hasMatchingType = commentBody.includes(newType) ||
+                           (newType === 'error' && commentBody.includes('❌')) ||
+                           (newType === 'warning' && commentBody.includes('⚠️')) ||
+                           (newType === 'info' && commentBody.includes('ℹ️'));
+
+    // Check message similarity - look for key words
+    const newWords = newMessage.split(' ').filter(word => word.length > 3);
+    const matchingWords = newWords.filter(word => commentBody.includes(word));
+    const similarityRatio = matchingWords.length / Math.max(newWords.length, 1);
+
+    // Consider issues similar if:
+    // 1. Same type AND significant message overlap (>50%)
+    // 2. OR very high message similarity (>80%) regardless of type
+    return (hasMatchingType && similarityRatio > 0.5) || similarityRatio > 0.8;
+  }
+
+  /**
+   * Clean up orphaned comments that no longer have corresponding issues
+   */
+  private async cleanupOrphanedComments(
+    existingComments: InlineComment[],
+    currentIssues: CodeIssue[],
+    fileChanges: FileChange[]
+  ): Promise<void> {
+    if (!this.inputs.updateExistingComments) {
+      return; // Only clean up if we're managing existing comments
+    }
+
+    logger.info(`🧹 Checking for orphaned comments to clean up...`);
+
+    // Get files that are still being changed in this review
+    const changedFiles = new Set(fileChanges.map(fc => fc.filename));
+
+    // Track which existing comments were matched/updated
+    const matchedCommentIds = new Set<number>();
+
+    // For each current issue, find if it matches any existing comment
+    for (const issue of currentIssues) {
+      if (!issue.file || !issue.line) continue;
+
+      const fileComments = existingComments.filter(c => c.location.file === issue.file);
+      const match = this.findBestMatchingComment(issue.file, issue.line, issue, existingComments);
+
+      if (match && match.comment.id) {
+        matchedCommentIds.add(match.comment.id);
+      }
+    }
+
+    // Find orphaned comments (existing comments that weren't matched to any current issue)
+    const orphanedComments = existingComments.filter(comment => {
+      // Only consider comments in files that are still being changed
+      if (!changedFiles.has(comment.location.file)) {
+        return false;
+      }
+
+      // Only consider comments that have an ID
+      if (!comment.id) {
+        return false;
+      }
+
+      // If the comment wasn't matched to any current issue, it's orphaned
+      return !matchedCommentIds.has(comment.id);
+    });
+
+    if (orphanedComments.length > 0) {
+      logger.info(`🗑️ Found ${orphanedComments.length} orphaned comments to clean up`);
+
+      for (const orphanedComment of orphanedComments) {
+        if (!orphanedComment.id) continue; // Safety check
+
+        try {
+          logger.info(`🗑️ Deleting orphaned comment ${orphanedComment.id} at ${orphanedComment.location.file}:${orphanedComment.location.line}`);
+          await this.githubClient.deleteComment(orphanedComment.id, 'review');
+        } catch (error) {
+          logger.warn(`Failed to delete orphaned comment ${orphanedComment.id}:`, error);
+        }
+      }
+    } else {
+      logger.info(`✅ No orphaned comments found`);
     }
   }
 
