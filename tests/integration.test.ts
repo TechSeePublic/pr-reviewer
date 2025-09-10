@@ -41,6 +41,9 @@ describe('PR Reviewer Integration', () => {
     githubRateLimit: 1000,
     deterministicMode: true,
     enableArchitecturalReview: true,
+    enableCommitSuggestions: true,
+    enableCursorIntegration: true,
+    maxFixSize: 10,
   };
 
   beforeEach(() => {
