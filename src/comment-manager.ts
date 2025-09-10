@@ -6,11 +6,14 @@ import {
   ActionInputs,
   AIProvider,
   CodeIssue,
+  CursorLink,
+  EnhancedCommentOptions,
   FileChange,
   InlineComment,
   PRContext,
   PRPlan,
   ReviewResult,
+  SuggestedChange,
   SummaryComment,
   // CursorRule, // Currently unused
 } from './types';
@@ -158,11 +161,14 @@ export class CommentManager {
       logger.info(`⏭️ Skipping existing comment lookup (updateExistingComments=false)`);
     }
 
+    // Enhance issues with original code for commit suggestions
+    const enhancedIssues = this.enhanceIssuesWithOriginalCode(reviewResult.issues, fileChanges);
+
     // Filter issues based on inline severity for inline comments
-    const filteredIssuesForInline = this.filterIssuesBySeverity(reviewResult.issues);
+    const filteredIssuesForInline = this.filterIssuesBySeverity(enhancedIssues);
 
     // Log issue types for debugging
-    const issueTypes = reviewResult.issues.reduce(
+    const issueTypes = enhancedIssues.reduce(
       (acc, issue) => {
         acc[issue.type] = (acc[issue.type] || 0) + 1;
         return acc;
@@ -177,9 +183,9 @@ export class CommentManager {
     );
 
     // Log first few issues for detailed debugging
-    if (reviewResult.issues.length > 0) {
+    if (enhancedIssues.length > 0) {
       logger.info(`Sample issues for debugging:`);
-      reviewResult.issues.slice(0, 3).forEach((issue, i) => {
+      enhancedIssues.slice(0, 3).forEach((issue, i) => {
         logger.info(
           `  Issue ${i + 1}: type="${issue.type}", category="${issue.category}", message="${issue.message}", file="${issue.file}", line=${issue.line}`
         );
@@ -187,7 +193,7 @@ export class CommentManager {
     }
 
     logger.info(
-      `Issue filtering: ${reviewResult.issues.length} total → ${filteredIssuesForInline.length} eligible for inline comments (severity: ${this.inputs.inlineSeverity}+)`
+      `Issue filtering: ${enhancedIssues.length} total → ${filteredIssuesForInline.length} eligible for inline comments (severity: ${this.inputs.inlineSeverity}+)`
     );
 
     // Post inline comments (based on inline_severity setting)
@@ -202,7 +208,7 @@ export class CommentManager {
     }
 
     // Post architectural comment SECOND (after inline comments)
-    const architecturalIssues = reviewResult.issues.filter(issue => issue.reviewType === 'architectural');
+    const architecturalIssues = enhancedIssues.filter(issue => issue.reviewType === 'architectural');
     if (architecturalIssues.length > 0) {
       logger.info(`🏗️ Posting architectural comment for ${architecturalIssues.length} architectural issues...`);
       try {
@@ -222,11 +228,17 @@ export class CommentManager {
       }
 
       logger.info(
-        `📝 Posting summary comment for ${fileChanges.length} file changes and ${reviewResult.issues.length} issues...`
+        `📝 Posting summary comment for ${fileChanges.length} file changes and ${enhancedIssues.length} issues...`
       );
       try {
+        // Create enhanced review result for summary
+        const enhancedReviewResult = {
+          ...reviewResult,
+          issues: enhancedIssues
+        };
+
         await this.postSummaryComment(
-          reviewResult,
+          enhancedReviewResult,
           fileChanges,
           existingComments.summaryComment,
           prPlan,
@@ -424,7 +436,7 @@ export class CommentManager {
     }
 
     // Clean up orphaned comments (comments that no longer have corresponding issues)
-    await this.cleanupOrphanedComments(existingComments, issues, fileChanges);
+    await this.cleanupOrphanedComments(existingComments, filteredIssues, fileChanges);
   }
 
   /**
@@ -985,32 +997,13 @@ export class CommentManager {
       body += `**🔍 Category:** ${primaryIssue.ruleName}\n\n`;
     }
 
-    // Suggestion if available
+    // Enhanced fix display with commit suggestions
     if (primaryIssue.suggestion && this.inputs.enableSuggestions) {
-      // Check if fixedCode is available for better display
-      if (primaryIssue.fixedCode) {
-        body += `**💡 Suggested Fix:**\n\`\`\`${this.getLanguageFromFile(primaryIssue.file)}\n${primaryIssue.fixedCode}\n\`\`\`\n\n`;
-      } else {
-        // Determine if suggestion is code or advice text
-        if (this.isCodeSuggestion(primaryIssue.suggestion)) {
-          const codeLanguage = this.getLanguageFromFile(primaryIssue.file);
-          body += `**💡 Suggested Fix:**\n\`\`\`${codeLanguage}\n${primaryIssue.suggestion}\n\`\`\`\n\n`;
-        } else {
-          // Display as regular text for advice/recommendations
-          body += `**💡 Suggestion:**\n${primaryIssue.suggestion}\n\n`;
-        }
-      }
+      body += this.formatFixSection(primaryIssue);
     }
 
-    // Auto-fix available indicator (commit button functionality removed)
-    if (primaryIssue.fixedCode || primaryIssue.suggestion) {
-      if (this.inputs.enableAutoFix) {
-        const canAutoFix = ['rule_violation', 'best_practice'].includes(primaryIssue.category);
-        if (canAutoFix) {
-          body += `**🤖 Auto-Fix Available:** This issue can be automatically fixed when auto-fix is enabled.\n\n`;
-        }
-      }
-    }
+    // Enhanced action buttons
+    body += this.formatActionButtons(primaryIssue);
 
     // Additional issues at the same location
     if (issues.length > 1) {
@@ -1029,6 +1022,232 @@ export class CommentManager {
     body += `---\n*<img src="https://raw.githubusercontent.com/amitwa1/pr-reviewer/main/assets/techsee-logo.png" width="16" height="16" alt="TechSee"> Generated by [TechSee AI PR Reviewer](https://github.com/amitwa1/pr-reviewer)*`;
 
     return body;
+  }
+
+  /**
+   * Format the fix section with enhanced features
+   */
+  private formatFixSection(issue: CodeIssue): string {
+    let section = '';
+
+    if (issue.fixedCode) {
+      // Check if this is a small fix that qualifies for commit suggestion
+      const isSmallFix = this.isSmallFix(issue);
+
+      if (isSmallFix && this.hasEnhancedCommentsEnabled()) {
+        // Use GitHub suggested changes format for small fixes
+        section += this.formatSuggestedChange(issue);
+      } else {
+        // Use traditional code block format for larger fixes
+        section += `**💡 Suggested Fix:**\n\`\`\`${this.getLanguageFromFile(issue.file)}\n${issue.fixedCode}\n\`\`\`\n\n`;
+      }
+    } else if (issue.suggestion) {
+      // Determine if suggestion is code or advice text
+      if (this.isCodeSuggestion(issue.suggestion)) {
+        const codeLanguage = this.getLanguageFromFile(issue.file);
+        section += `**💡 Suggested Fix:**\n\`\`\`${codeLanguage}\n${issue.suggestion}\n\`\`\`\n\n`;
+      } else {
+        // Display as regular text for advice/recommendations
+        section += `**💡 Suggestion:**\n${issue.suggestion}\n\n`;
+      }
+    }
+
+    return section;
+  }
+
+  /**
+   * Format GitHub suggested changes for small fixes
+   */
+  private formatSuggestedChange(issue: CodeIssue): string {
+    if (!issue.fixedCode || !issue.originalCode) {
+      return `**💡 Suggested Fix:**\n\`\`\`${this.getLanguageFromFile(issue.file)}\n${issue.fixedCode}\n\`\`\`\n\n`;
+    }
+
+    // GitHub suggested changes format
+    let section = `**💡 Suggested Fix:**\n\n`;
+    section += `\`\`\`suggestion\n${issue.fixedCode}\n\`\`\`\n\n`;
+    section += `> 💡 **Quick Apply**: This fix can be committed directly using the "Commit suggestion" button above.\n\n`;
+
+    return section;
+  }
+
+  /**
+   * Format action buttons for enhanced functionality
+   */
+  private formatActionButtons(issue: CodeIssue): string {
+    const buttons: string[] = [];
+
+    // Cursor integration button
+    if (this.hasCursorIntegrationEnabled()) {
+      const cursorLink = this.generateCursorLink(issue);
+      if (cursorLink) {
+        buttons.push(`[🎯 Open in Cursor](${cursorLink})`);
+      }
+    }
+
+    // Auto-fix indicator
+    if (issue.fixedCode || issue.suggestion) {
+      if (this.inputs.enableAutoFix) {
+        const canAutoFix = ['rule_violation', 'best_practice'].includes(issue.category);
+        if (canAutoFix) {
+          buttons.push('🤖 Auto-Fix Available');
+        }
+      }
+    }
+
+    if (buttons.length === 0) {
+      return '';
+    }
+
+    let section = `**🔧 Actions:**\n`;
+    for (const button of buttons) {
+      section += `- ${button}\n`;
+    }
+    section += '\n';
+
+    return section;
+  }
+
+  /**
+   * Check if enhanced comments are enabled
+   */
+  private hasEnhancedCommentsEnabled(): boolean {
+    return (this.inputs as any).enableCommitSuggestions === true;
+  }
+
+  /**
+   * Check if cursor integration is enabled
+   */
+  private hasCursorIntegrationEnabled(): boolean {
+    return (this.inputs as any).enableCursorIntegration === true;
+  }
+
+  /**
+   * Check if a fix is small enough for inline commit suggestion
+   */
+  private isSmallFix(issue: CodeIssue): boolean {
+    if (!issue.fixedCode) return false;
+
+    const maxLines = (this.inputs as any).maxFixSize || 10;
+    const lineCount = issue.fixedCode.split('\n').length;
+
+    // Also check if we have original code for comparison
+    const hasOriginal = issue.originalCode !== undefined;
+
+    return lineCount <= maxLines && hasOriginal;
+  }
+
+  /**
+   * Generate Cursor deep link for opening file at specific location
+   */
+  private generateCursorLink(issue: CodeIssue): string | null {
+    if (!issue.file || !issue.line) return null;
+
+    // Cursor deep link format: cursor://file/{path}:{line}:{column}
+    // For GitHub Actions context, we'll use the repository structure
+    const line = issue.line;
+    const column = issue.column || 1;
+
+    // Construct the Cursor link - this will work if Cursor is installed
+    const cursorLink = `cursor://file/${encodeURIComponent(issue.file)}:${line}:${column}`;
+
+    return cursorLink;
+  }
+
+  /**
+   * Enhance issues with original code detection for small fixes
+   * This method helps identify and populate originalCode for GitHub suggested changes
+   */
+  public enhanceIssuesWithOriginalCode(issues: CodeIssue[], fileChanges: FileChange[]): CodeIssue[] {
+    return issues.map(issue => {
+      // Skip if already has original code or no fixed code
+      if (issue.originalCode || !issue.fixedCode || !issue.line) {
+        return issue;
+      }
+
+      // Try to extract original code from file changes
+      const originalCode = this.extractOriginalCodeFromDiff(issue, fileChanges);
+      if (originalCode) {
+        return {
+          ...issue,
+          originalCode,
+          isSmallFix: this.isSmallFix({ ...issue, originalCode })
+        };
+      }
+
+      return issue;
+    });
+  }
+
+  /**
+   * Extract original code from diff for a specific issue
+   */
+  private extractOriginalCodeFromDiff(issue: CodeIssue, fileChanges: FileChange[]): string | null {
+    const fileChange = fileChanges.find(fc => fc.filename === issue.file);
+    if (!fileChange || !fileChange.patch) {
+      return null;
+    }
+
+    try {
+      // Parse the patch to find the original line
+      const lines = fileChange.patch.split('\n');
+      let currentDiffLine = 0;
+      let currentFileLine = 0;
+      const targetLine = issue.line;
+
+      for (const line of lines) {
+        if (line.startsWith('@@')) {
+          // Parse hunk header
+          const match = line.match(/\+(\d+)/);
+          if (match && match[1]) {
+            currentFileLine = parseInt(match[1], 10) - 1;
+          }
+        } else if (line.startsWith('+') && !line.startsWith('+++')) {
+          // Added line
+          currentDiffLine++;
+          currentFileLine++;
+
+          if (currentFileLine === targetLine) {
+            // This is a new line, check if we can find corresponding deletion
+            return this.findCorrespondingDeletion(lines, line, currentDiffLine);
+          }
+        } else if (line.startsWith(' ')) {
+          // Context line
+          currentDiffLine++;
+          currentFileLine++;
+
+          if (currentFileLine === targetLine) {
+            // Return the context line without the space prefix
+            return line.substring(1);
+          }
+        } else if (line.startsWith('-') && !line.startsWith('---')) {
+          // Deleted line - might be the original
+          currentDiffLine++;
+        }
+      }
+    } catch (error) {
+      logger.warn(`Failed to extract original code for ${issue.file}:${issue.line}:`, error);
+    }
+
+    return null;
+  }
+
+  /**
+   * Find corresponding deletion for an addition (for replacements)
+   */
+  private findCorrespondingDeletion(lines: string[], addedLine: string, currentIndex: number): string | null {
+    // Look for nearby deletions that might correspond to this addition
+    const searchRange = 5; // Look within 5 lines
+
+    for (let i = Math.max(0, currentIndex - searchRange); i < Math.min(lines.length, currentIndex + searchRange); i++) {
+      const line = lines[i];
+      if (line && line.startsWith('-') && !line.startsWith('---')) {
+        // Return the deleted line without the minus prefix
+        return line.substring(1);
+      }
+    }
+
+    return null;
   }
 
   /**

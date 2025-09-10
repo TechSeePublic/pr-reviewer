@@ -128,6 +128,7 @@ Your response MUST be a valid JSON object with this exact structure:
       "description": "Detailed explanation of the problem and its impact",
       "suggestion": "Brief advice or recommendation text (for general guidance)",
       "fixedCode": "Complete corrected code snippet (for specific code fixes)",
+      "originalCode": "Original code being replaced (required for small fixes to enable commit buttons)",
       "ruleId": "cursor_rule_id or 'general_review'",
       "ruleName": "Human-readable rule name or issue category",
       "file": "EXACT filename from context - NEVER use 'unknown' or 'Multiple Files'",
@@ -147,6 +148,8 @@ Your response MUST be a valid JSON object with this exact structure:
 - Use **"fixedCode"** for specific, complete code that can directly replace the problematic code
 - When providing actual code fixes, always use "fixedCode" - never put code snippets in "suggestion"
 - The "suggestion" field should be human-readable advice, not code blocks
+- For small fixes (≤10 lines), also include **"originalCode"** field with the exact original code being replaced
+- The "originalCode" enables GitHub's suggested changes format with commit buttons
 
 ## ISSUE CLASSIFICATION GUIDE
 

@@ -165,6 +165,21 @@ inputs:
     description: 'Enable architectural review that checks for code duplication, logical problems, and misplaced code'
     required: false
     default: 'true'
+    
+  enable_commit_suggestions:
+    description: 'Enable GitHub suggested changes format with commit button for small fixes'
+    required: false
+    default: 'true'
+    
+  enable_cursor_integration:
+    description: 'Enable Cursor deep link buttons in comments to open files at specific locations'
+    required: false
+    default: 'true'
+    
+  max_fix_size:
+    description: 'Maximum number of lines for inline commit suggestions (larger fixes will use traditional code blocks)'
+    required: false
+    default: '10'
 
 outputs:
   review_summary:
