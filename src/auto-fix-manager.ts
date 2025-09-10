@@ -135,8 +135,21 @@ export class AutoFixManager {
         return false;
       }
 
-      // Only safe categories for auto-fix
-      const safeCategoriesForAutoFix = ['rule_violation'];
+      // Expanded safe categories for auto-fix (prioritizing code fixes)
+      const safeCategoriesForAutoFix = [
+        'rule_violation',
+        'best_practice',
+        'documentation',
+        'maintainability',
+        'performance' // Only simple performance fixes
+      ];
+
+      // Exclude risky categories that could break functionality
+      const riskyCategories = ['security', 'bug', 'architecture'];
+      if (riskyCategories.includes(issue.category)) {
+        return false;
+      }
+
       if (!safeCategoriesForAutoFix.includes(issue.category)) {
         return false;
       }

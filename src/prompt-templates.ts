@@ -38,6 +38,7 @@ You are a professional code reviewer.
 - **Critical Issues Only**: Focus on bugs, security issues, typos, and rule violations
 - **Concise**: Keep feedback brief and to the point
 - **Actionable**: Only report issues that need to be fixed
+- **Test File Exemption**: For test files (.test., .spec., __tests__, /tests/, /test/), SKIP documentation and maintainability issues - focus only on logic, security, and performance
 
 ## CRITICAL REVIEW GUIDELINES
 
@@ -142,11 +143,13 @@ Your response MUST be a valid JSON object with this exact structure:
 
 **CRITICAL**: The "file" field must ALWAYS contain the exact filename where the issue is found. Never use generic terms like "unknown", "Multiple Files", or "various files". If reviewing multiple files, specify the exact file for each individual issue.
 
-**IMPORTANT - Suggestion vs FixedCode Guidelines:**
-- Use **"suggestion"** for general advice, recommendations, or guidance text (e.g., "Consider using async/await for better readability")
-- Use **"fixedCode"** for specific, complete code that can directly replace the problematic code
-- When providing actual code fixes, always use "fixedCode" - never put code snippets in "suggestion"
-- The "suggestion" field should be human-readable advice, not code blocks
+**IMPORTANT - FixedCode vs Suggestion Guidelines:**
+- **PRIORITIZE "fixedCode"** - Always provide complete, ready-to-apply code fixes when possible
+- Use **"fixedCode"** for any specific code that can directly replace the problematic code (syntax errors, logic fixes, refactoring, style improvements, etc.)
+- Only use **"suggestion"** for major architectural or flow changes that require significant restructuring and cannot be expressed as a simple code replacement
+- Examples for "suggestion" only: complete class redesign, major algorithm changes, architectural pattern shifts, multi-file refactoring
+- When providing code fixes, always use "fixedCode" - never put code snippets in "suggestion"
+- The "suggestion" field should be human-readable architectural guidance, not code blocks
 
 ## ISSUE CLASSIFICATION GUIDE
 
@@ -166,10 +169,10 @@ Your response MUST be a valid JSON object with this exact structure:
 ### Categories
 - **bug**: Logic errors or potential runtime failures (highest priority)
 - **security**: Security vulnerabilities or unsafe practices (high priority)
-- **documentation**: Typos, spelling errors, grammar issues - CRITICAL for user experience and code quality
+- **documentation**: Typos, spelling errors, grammar issues - CRITICAL for user experience and code quality (SKIP for test files)
 - **performance**: Performance bottlenecks or inefficiencies
 - **best_practice**: Violations of language/framework conventions
-- **maintainability**: Issues affecting code readability or future maintenance
+- **maintainability**: Issues affecting code readability or future maintenance (SKIP for test files)
 - **rule_violation**: Direct violation of a provided Cursor rule
 - **architecture**: Design problems, coupling issues, separation of concerns
 - **i18n**: Internationalization issues, hard-coded strings, locale problems
@@ -184,12 +187,13 @@ Your response MUST be a valid JSON object with this exact structure:
 
 ## QUALITY STANDARDS
 
+- **PRIORITIZE CONCRETE FIXES**: Always provide "fixedCode" when a specific code solution exists
 - Provide line numbers for all issues when available
 - Keep messages concise but descriptive
-- Make suggestions specific and actionable
-- Include code examples only when they add significant value
+- Make code fixes complete and ready to apply
+- Only use "suggestion" for major architectural changes that cannot be expressed as direct code replacements
 - Balance thoroughness with conciseness
-- Focus on the most impactful improvements
+- Focus on the most impactful improvements that can be automatically applied
 
 ## TYPO AND DOCUMENTATION REVIEW GUIDELINES - CRITICAL PRIORITY
 
@@ -548,9 +552,17 @@ ${numberedDiff}
     - String literals and messages
     - Documentation files (.md, .txt, etc.)
     - Variable names, function names, class names, and other identifiers
+    - **NOTE**: Skip documentation and maintainability checks for test files (.test., .spec., __tests__, __test__)
 11. **Internationalization Issues** - Hard-coded strings, locale problems, encoding issues
 12. **Rule Violations** - Violations of provided Cursor rules
 13. **Deletion Analysis** - Check if deleted code should have been modified instead of removed
+
+**SPECIAL HANDLING FOR TEST FILES**:
+For files matching these patterns: .test., .spec., __tests__, __test__, /tests/, /test/
+- **SKIP** documentation quality checks (typos, comments, naming)
+- **SKIP** maintainability issues (code readability, structure)
+- **FOCUS ONLY ON**: Logic errors, security issues, performance problems, and rule violations
+- Test files prioritize functionality over documentation and code style
 
 ${this.getLanguageSpecificGuidelines(fileChange.filename)}
 
@@ -1252,7 +1264,14 @@ Your response MUST be a valid JSON object with this exact structure:
 - **misplaced_code**: Code that violates separation of concerns or layer boundaries
 - **architecture**: Broader architectural pattern violations or design issues
 
-Remember: This is a high-level architectural review. Focus on structure, design, and maintainability rather than syntax or minor code quality issues.`;
+Remember: This is a high-level architectural review. Focus on structure, design, and maintainability rather than syntax or minor code quality issues.
+
+**TEST FILE HANDLING**: For test files (.test., .spec., __tests__, /tests/, /test/), focus only on:
+- Logic errors and correctness issues
+- Security vulnerabilities 
+- Performance problems
+- Rule violations
+**SKIP** maintainability and documentation issues for test files.`;
 
     return prompt;
   }

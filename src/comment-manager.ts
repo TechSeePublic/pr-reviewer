@@ -561,7 +561,6 @@ export class CommentManager {
     for (const issue of currentIssues) {
       if (!issue.file || !issue.line) continue;
 
-      const fileComments = existingComments.filter(c => c.location.file === issue.file);
       const match = this.findBestMatchingComment(issue.file, issue.line, issue, existingComments);
 
       if (match && match.comment.id) {
