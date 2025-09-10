@@ -1131,13 +1131,22 @@ export class CommentManager {
    * Format action buttons for enhanced functionality
    */
   private formatActionButtons(issue: CodeIssue): string {
-    const buttons: string[] = [];
+    const actionItems: string[] = [];
 
-    // Cursor integration button
+    // Cursor integration with multiple formats
     if (this.hasCursorIntegrationEnabled()) {
-      const cursorLink = this.generateCursorLink(issue);
-      if (cursorLink) {
-        buttons.push(`[🎯 Open in Cursor](${cursorLink})`);
+      const githubLink = this.generateGitHubFileURL(issue.file, issue.line, []);
+      const cursorProtocol = `cursor://file/${issue.file}:${issue.line}:${issue.column || 1}`;
+
+      // Try HTML link first (might work in some contexts)
+      const htmlCursorLink = `<a href="${cursorProtocol}">🎯 Open in Cursor</a>`;
+
+      // Provide multiple options for Cursor integration
+      actionItems.push(`🎯 **Cursor**: ${htmlCursorLink} | Copy: \`${cursorProtocol}\``);
+
+      // Always provide GitHub link as clickable alternative
+      if (githubLink) {
+        actionItems.push(`📂 **View File**: [${issue.file}:${issue.line}](${githubLink})`);
       }
     }
 
@@ -1146,18 +1155,18 @@ export class CommentManager {
       if (this.inputs.enableAutoFix) {
         const canAutoFix = ['rule_violation', 'best_practice'].includes(issue.category);
         if (canAutoFix) {
-          buttons.push('🤖 Auto-Fix Available');
+          actionItems.push('🤖 **Auto-Fix Available**');
         }
       }
     }
 
-    if (buttons.length === 0) {
+    if (actionItems.length === 0) {
       return '';
     }
 
     let section = `**🔧 Actions:**\n`;
-    for (const button of buttons) {
-      section += `- ${button}\n`;
+    for (const item of actionItems) {
+      section += `- ${item}\n`;
     }
     section += '\n';
 
@@ -1199,15 +1208,18 @@ export class CommentManager {
   private generateCursorLink(issue: CodeIssue): string | null {
     if (!issue.file || !issue.line) return null;
 
-    // Cursor deep link format: cursor://file/{path}:{line}:{column}
-    // For GitHub Actions context, we'll use the repository structure
     const line = issue.line;
     const column = issue.column || 1;
 
-    // Construct the Cursor link - this will work if Cursor is installed
-    const cursorLink = `cursor://file/${encodeURIComponent(issue.file)}:${line}:${column}`;
+    // Try different approaches for Cursor integration
+    // Approach 1: Direct cursor:// protocol (works if browser/system supports it)
+    const cursorProtocolLink = `cursor://file/${encodeURIComponent(issue.file)}:${line}:${column}`;
 
-    return cursorLink;
+    // Approach 2: GitHub file link as fallback (always works)
+    const githubFileLink = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/blob/${this.prContext.sha}/${issue.file}#L${line}`;
+
+    // Return the protocol link but we'll enhance the button text to explain
+    return cursorProtocolLink;
   }
 
   /**
