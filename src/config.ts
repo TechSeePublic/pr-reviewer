@@ -62,9 +62,6 @@ export function getActionInputs(): ActionInputs {
     githubRateLimit: parseInt(core.getInput('github_rate_limit') || '1000', 10),
     deterministicMode: core.getBooleanInput('deterministic_mode') ?? true,
     enableArchitecturalReview: core.getBooleanInput('enable_architectural_review') ?? true,
-    enableCommitSuggestions: core.getBooleanInput('enable_commit_suggestions') ?? true,
-    enableCursorIntegration: core.getBooleanInput('enable_cursor_integration') ?? true,
-    maxFixSize: parseInt(core.getInput('max_fix_size') || '10', 10),
   };
 
   // Add optional properties only if they have values
@@ -195,11 +192,6 @@ export function validateInputs(inputs: ActionInputs): void {
   // Validate GitHub rate limit
   if (inputs.githubRateLimit < 0 || inputs.githubRateLimit > 10000) {
     throw new Error('github_rate_limit must be between 0 and 10000 milliseconds');
-  }
-
-  // Validate max fix size
-  if (inputs.maxFixSize < 1 || inputs.maxFixSize > 100) {
-    throw new Error('max_fix_size must be between 1 and 100 lines');
   }
 
   // Validate patterns

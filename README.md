@@ -17,34 +17,6 @@ An AI-powered GitHub Action that automatically reviews pull requests according t
 - 🔄 **Robust Fallback** - Falls back to single-file review if batch processing fails
 - 🏗️ **Architectural Review** - Detects code duplication, logical problems, and misplaced code across files
 - 🎯 **Deterministic Mode** - Consistent results with stable parsing and zero temperature
-- ✨ **Enhanced Interactions** - GitHub suggested changes with commit buttons for small fixes
-- 🎯 **Cursor Integration** - One-click file opening in Cursor editor at specific locations
-
-## 🆕 Enhanced Features
-
-### GitHub Suggested Changes with Commit Buttons
-For small code fixes (≤10 lines), the reviewer now generates GitHub's native "suggested changes" format with **commit buttons**. Apply fixes instantly without copying and pasting!
-
-```markdown
-**💡 Suggested Fix:**
-
-```suggestion
-const correctedCode = 'fixed version';
-```
-
-> 💡 **Quick Apply**: This fix can be committed directly using the "Commit suggestion" button above.
-```
-
-### Cursor Deep Link Integration
-Comments now include **"Open in Cursor"** buttons that open files at the exact location where issues were found:
-
-```markdown
-**🔧 Actions:**
-- [🎯 Open in Cursor](cursor://file/src/example.ts:42:1)
-- 🤖 Auto-Fix Available
-```
-
-> **Configuration**: Both features are enabled by default but can be customized with `enable_commit_suggestions`, `enable_cursor_integration`, and `max_fix_size` options.
 
 ## 🚀 Quick Start
 
@@ -185,9 +157,6 @@ The bot automatically detects and applies Cursor rules from:
 | `github_rate_limit` | Delay in milliseconds between GitHub API calls | `1000` | ❌ |
 | `deterministic_mode` | Force deterministic behavior for consistent results | `true` | ❌ |
 | `enable_architectural_review` | Enable architectural review for code duplication and logical problems | `true` | ❌ |
-| `enable_commit_suggestions` | Enable GitHub suggested changes format with commit button for small fixes | `true` | ❌ |
-| `enable_cursor_integration` | Enable Cursor deep link buttons in comments | `true` | ❌ |
-| `max_fix_size` | Maximum lines for inline commit suggestions (larger fixes use code blocks) | `10` | ❌ |
 
 ⚠️ *At least one AI provider API key is required*
 

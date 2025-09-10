@@ -38,9 +38,6 @@ export interface ActionInputs {
   githubRateLimit: number; // Delay in milliseconds between GitHub API calls (default: 1000ms)
   deterministicMode: boolean; // Force deterministic behavior (temperature=0, stable parsing)
   enableArchitecturalReview: boolean; // Enable architectural review for code duplication, logical problems, and misplaced code
-  enableCommitSuggestions: boolean; // Enable GitHub suggested changes format with commit button
-  enableCursorIntegration: boolean; // Enable Cursor deep link buttons in comments
-  maxFixSize: number; // Maximum lines for inline commit suggestions (default: 10)
 }
 
 export interface PRContext {
@@ -111,8 +108,6 @@ export interface CodeIssue {
   severity: 'high' | 'medium' | 'low';
   relatedFiles?: string[]; // For architectural issues that span multiple files
   reviewType?: 'architectural' | 'detailed'; // Indicates which type of review found this issue
-  isSmallFix?: boolean; // Whether the fix is small enough for inline commit suggestion
-  originalCode?: string; // Original code for GitHub suggested changes format
 }
 
 export interface ReviewResult {
@@ -128,7 +123,7 @@ export interface AIProvider {
   name: string;
   model: string;
   reviewCode(prompt: string, code: string, rules: CursorRule[]): Promise<CodeIssue[]>;
-  reviewBatch(files: FileChange[], rules: CursorRule[], prPlan: PRPlan, existingComments?: InlineComment[]): Promise<CodeIssue[]>;
+  reviewBatch(files: FileChange[], rules: CursorRule[], prPlan: PRPlan): Promise<CodeIssue[]>;
   reviewArchitecture(
     fileChanges: FileChange[],
     rules: CursorRule[]
@@ -274,32 +269,4 @@ export interface MisplacedCodeIssue {
   suggestedFile: string;
   reason: string;
   impact: string;
-}
-
-export interface SuggestedChange {
-  startLine: number;
-  endLine: number;
-  originalCode: string;
-  fixedCode: string;
-  isSmallFix: boolean;
-}
-
-export interface CursorLink {
-  file: string;
-  line?: number;
-  column?: number;
-  selection?: {
-    startLine: number;
-    startColumn: number;
-    endLine: number;
-    endColumn: number;
-  };
-}
-
-export interface EnhancedCommentOptions {
-  enableCommitSuggestions: boolean;
-  enableCursorIntegration: boolean;
-  maxFixSize: number;
-  repoUrl: string;
-  workspacePath?: string;
 }
