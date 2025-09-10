@@ -58,7 +58,7 @@ export function getActionInputs(): ActionInputs {
     enableAutoFix: core.getBooleanInput('enable_auto_fix') ?? false,
     autoFixSeverity: (core.getInput('auto_fix_severity') as 'error' | 'warning' | 'all') || 'error',
     requestDelay: parseInt(core.getInput('request_delay') || '2000', 10),
-    batchSize: parseInt(core.getInput('batch_size') || '1', 10),
+    batchSize: parseInt(core.getInput('batch_size') || '5', 10),
     githubRateLimit: parseInt(core.getInput('github_rate_limit') || '1000', 10),
     deterministicMode: core.getBooleanInput('deterministic_mode') ?? true,
     enableArchitecturalReview: core.getBooleanInput('enable_architectural_review') ?? true,

@@ -3,7 +3,7 @@
  * This module provides consistent, high-quality prompts that work across all AI providers
  */
 
-import { CodeIssue, CursorRule, FileChange, PRPlan, ReviewContext } from './types';
+import { CodeIssue, CursorRule, FileChange, InlineComment, PRPlan, ReviewContext } from './types';
 import { logger } from './logger';
 
 export interface PromptConfig {
@@ -808,9 +808,90 @@ Focus on understanding the **intent**, **impact**, and **broader system implicat
   }
 
   /**
+   * Get language identifier from file extension for syntax highlighting
+   */
+  private static getLanguageFromFile(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'ts': return 'typescript';
+      case 'tsx': return 'typescript';
+      case 'js': return 'javascript';
+      case 'jsx': return 'javascript';
+      case 'py': return 'python';
+      case 'java': return 'java';
+      case 'go': return 'go';
+      case 'rs': return 'rust';
+      case 'cpp': case 'cc': case 'cxx': return 'cpp';
+      case 'c': return 'c';
+      case 'cs': return 'csharp';
+      case 'php': return 'php';
+      case 'rb': return 'ruby';
+      case 'swift': return 'swift';
+      case 'kt': return 'kotlin';
+      case 'vue': return 'vue';
+      case 'svelte': return 'svelte';
+      case 'html': return 'html';
+      case 'css': return 'css';
+      case 'scss': case 'sass': return 'scss';
+      case 'json': return 'json';
+      case 'yaml': case 'yml': return 'yaml';
+      case 'xml': return 'xml';
+      case 'sql': return 'sql';
+      case 'sh': case 'bash': return 'bash';
+      default: return 'text';
+    }
+  }
+
+  /**
+   * Extract code context around a comment location
+   */
+  private static extractCodeContext(file: FileChange, lineNumber: number, contextLines: number = 3): string {
+    if (!file.patch) return 'No code context available';
+
+    try {
+      // Parse the patch to find code around the line
+      const lines = file.patch.split('\n');
+      let currentFileLine = 0;
+      const contextStart = Math.max(1, lineNumber - contextLines);
+      const contextEnd = lineNumber + contextLines;
+      const codeLines: string[] = [];
+
+      for (const line of lines) {
+        if (line.startsWith('@@')) {
+          // Parse hunk header
+          const match = line.match(/\+(\d+)/);
+          if (match && match[1]) {
+            currentFileLine = parseInt(match[1], 10) - 1;
+          }
+        } else if (line.startsWith('+') && !line.startsWith('+++')) {
+          // Added line
+          currentFileLine++;
+          if (currentFileLine >= contextStart && currentFileLine <= contextEnd) {
+            codeLines.push(`${currentFileLine}: ${line.substring(1)}`);
+          }
+        } else if (line.startsWith(' ')) {
+          // Context line
+          currentFileLine++;
+          if (currentFileLine >= contextStart && currentFileLine <= contextEnd) {
+            codeLines.push(`${currentFileLine}: ${line.substring(1)}`);
+          }
+        }
+      }
+
+      if (codeLines.length === 0) {
+        return `No code context found around line ${lineNumber}`;
+      }
+
+      return codeLines.join('\n');
+    } catch (error) {
+      return `Error extracting code context: ${error}`;
+    }
+  }
+
+  /**
    * Build batch review prompt for multiple files with PR context
    */
-  static buildBatchReviewPrompt(files: FileChange[], rules: CursorRule[], prPlan: PRPlan): string {
+  static buildBatchReviewPrompt(files: FileChange[], rules: CursorRule[], prPlan: PRPlan, existingComments?: InlineComment[]): string {
     let prompt = `# Batch Code Review Request
 
 ## PR Context
@@ -858,6 +939,60 @@ ${
 }
 
 **Additional Context**: ${prPlan.context}
+
+${existingComments && existingComments.length > 0 ? `
+## 🚨 EXISTING COMMENTS - AVOID DUPLICATES
+
+**CRITICAL**: The following comments already exist on this PR. You MUST consider them to avoid creating duplicate comments.
+
+**INSTRUCTIONS**:
+- **ANALYZE** each existing comment's full content and code context below
+- **DO NOT** create new comments for issues that are substantially the same as existing ones
+- **FOCUS** on genuinely new issues not already covered
+- **BE SMART** - consider semantic similarity, not just exact text matches
+
+${existingComments.map((comment, index) => {
+  const lines = comment.body.split('\n');
+  const title = lines.find(line => line.includes('##') || line.includes('**')) || lines[0] || 'No title';
+  const issueType = comment.body.includes('ERROR') ? '🔴 ERROR' :
+                   comment.body.includes('WARNING') ? '🟡 WARNING' :
+                   '🔵 INFO';
+
+  // Find the file to get code context
+  const file = files.find(f => f.filename === comment.location.file);
+  const codeContext = file ? PromptTemplates.extractCodeContext(file, comment.location.line) : 'File not in current changes';
+
+  return `
+### Existing Comment ${index + 1}: ${issueType}
+- **Location**: \`${comment.location.file}:${comment.location.line}\`
+- **ID**: ${comment.id}
+- **Title**: ${title.replace(/[#*]/g, '').trim()}
+
+**Full Comment Body**:
+\`\`\`
+${comment.body}
+\`\`\`
+
+**Code Context** (actual code around line ${comment.location.line}):
+\`\`\`${file ? PromptTemplates.getLanguageFromFile(comment.location.file) : 'text'}
+${codeContext}
+\`\`\`
+
+---`;
+}).join('')}
+
+**DECISION FRAMEWORK FOR AVOIDING DUPLICATES**:
+1. **Same Issue Type + Same File + Similar Problem** → **SKIP** (don't create duplicate)
+2. **Different Issue or Different Aspect** → **CREATE** new comment
+3. **Enhanced/Updated Issue** → **CREATE** with reference to existing
+
+**EXAMPLES**:
+- ❌ DON'T create: "Variable 'x' is undefined" if existing comment already says "Variable 'x' is not defined"
+- ❌ DON'T create: "Missing error handling" if existing comment already covers error handling at same location
+- ✅ DO create: Different variable issue, different type of problem, or different file location
+- ✅ DO create: New aspect of existing issue (e.g., performance impact of already-noted bug)
+
+` : ''}
 
 ## Files to Review (${files.length} files):
 
