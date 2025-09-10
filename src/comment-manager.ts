@@ -1133,20 +1133,19 @@ export class CommentManager {
   private formatActionButtons(issue: CodeIssue): string {
     const actionItems: string[] = [];
 
-    // Cursor integration with multiple formats
+    // Editor integration with multiple options
     if (this.hasCursorIntegrationEnabled()) {
-      const githubLink = this.generateGitHubFileURL(issue.file, issue.line, []);
-      const cursorProtocol = `cursor://file/${issue.file}:${issue.line}:${issue.column || 1}`;
+      const editorLinks = this.generateEditorLinks(issue);
 
-      // Try HTML link first (might work in some contexts)
-      const htmlCursorLink = `<a href="${cursorProtocol}">🎯 Open in Cursor</a>`;
+      if (editorLinks) {
+        // VS Code Web - always works in browser (most reliable)
+        actionItems.push(`💻 **Open in VS Code**: [vscode.dev](${editorLinks.vsCodeWeb})`);
 
-      // Provide multiple options for Cursor integration
-      actionItems.push(`🎯 **Cursor**: ${htmlCursorLink} | Copy: \`${cursorProtocol}\``);
+        // Desktop editor options
+        actionItems.push(`🖥️ **Desktop Editors**: [VS Code](${editorLinks.vsCodeDesktop}) | [Cursor](${editorLinks.cursor})`);
 
-      // Always provide GitHub link as clickable alternative
-      if (githubLink) {
-        actionItems.push(`📂 **View File**: [${issue.file}:${issue.line}](${githubLink})`);
+        // GitHub fallback
+        actionItems.push(`📂 **View on GitHub**: [${issue.file}:${issue.line}](${editorLinks.github})`);
       }
     }
 
@@ -1164,7 +1163,7 @@ export class CommentManager {
       return '';
     }
 
-    let section = `**🔧 Actions:**\n`;
+    let section = `**🔧 Quick Actions:**\n`;
     for (const item of actionItems) {
       section += `- ${item}\n`;
     }
@@ -1203,23 +1202,28 @@ export class CommentManager {
   }
 
   /**
-   * Generate Cursor deep link for opening file at specific location
+   * Generate editor deep links for opening file at specific location
    */
-  private generateCursorLink(issue: CodeIssue): string | null {
+  private generateEditorLinks(issue: CodeIssue): { vsCodeWeb: string; vsCodeDesktop: string; cursor: string; github: string } | null {
     if (!issue.file || !issue.line) return null;
 
     const line = issue.line;
     const column = issue.column || 1;
+    const { owner, repo, sha } = this.prContext;
 
-    // Try different approaches for Cursor integration
-    // Approach 1: Direct cursor:// protocol (works if browser/system supports it)
-    const cursorProtocolLink = `cursor://file/${encodeURIComponent(issue.file)}:${line}:${column}`;
+    // VS Code Web (vscode.dev) - works in any browser
+    const vsCodeWeb = `https://vscode.dev/github/${owner}/${repo}/blob/${sha}/${issue.file}#L${line}`;
 
-    // Approach 2: GitHub file link as fallback (always works)
-    const githubFileLink = `https://github.com/${this.prContext.owner}/${this.prContext.repo}/blob/${this.prContext.sha}/${issue.file}#L${line}`;
+    // VS Code Desktop protocol - works if VS Code is installed
+    const vsCodeDesktop = `vscode://file/${encodeURIComponent(issue.file)}:${line}:${column}`;
 
-    // Return the protocol link but we'll enhance the button text to explain
-    return cursorProtocolLink;
+    // Cursor protocol - works if Cursor is installed
+    const cursor = `cursor://file/${encodeURIComponent(issue.file)}:${line}:${column}`;
+
+    // GitHub fallback - always works
+    const github = `https://github.com/${owner}/${repo}/blob/${sha}/${issue.file}#L${line}`;
+
+    return { vsCodeWeb, vsCodeDesktop, cursor, github };
   }
 
   /**

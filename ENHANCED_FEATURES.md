@@ -34,19 +34,23 @@ const correctedCode = 'fixed version';
     max_fix_size: 10                # Maximum lines for suggested changes (default: 10)
 ```
 
-## Cursor Integration
+## Editor Integration
 
 ### What It Does
-Adds "Open in Cursor" buttons to inline comments that create deep links to open files at specific locations in the Cursor editor.
+Provides multiple ways to open files at specific locations in various editors, using proven approaches from VS Code and GitHub integration.
 
 ### How It Works
-Comments now include action buttons like:
-- 🎯 **Open in Cursor** - Opens the file at the exact line where the issue was found
+Comments now include comprehensive action buttons:
+- 💻 **VS Code Web** - Opens in vscode.dev (works in any browser, no installation needed)
+- 🖥️ **Desktop Editors** - Direct links for VS Code and Cursor desktop applications
+- 📂 **GitHub View** - Reliable fallback GitHub file view
 
 ### Example Output
 ```markdown
-**🔧 Actions:**
-- [🎯 Open in Cursor](cursor://file/src/example.ts:42:1)
+**🔧 Quick Actions:**
+- 💻 **Open in VS Code**: [vscode.dev](https://vscode.dev/github/owner/repo/blob/sha/src/example.ts#L42)
+- 🖥️ **Desktop Editors**: [VS Code](vscode://file/src/example.ts:42:1) | [Cursor](cursor://file/src/example.ts:42:1)
+- 📂 **View on GitHub**: [src/example.ts:42](https://github.com/owner/repo/blob/sha/src/example.ts#L42)
 - 🤖 Auto-Fix Available
 ```
 
@@ -54,7 +58,7 @@ Comments now include action buttons like:
 ```yaml
 - uses: amitwa1/pr-reviewer@main
   with:
-    enable_cursor_integration: true  # Enable Cursor deep links (default: true)
+    enable_cursor_integration: true  # Enable editor integration (default: true)
 ```
 
 ## Complete Configuration Example
