@@ -281,6 +281,9 @@ export class CommentManager {
     existingComments: InlineComment[],
     postedComments: Map<string, number>
   ): Promise<void> {
+    // Track which existing comments have been updated to prevent duplicates
+    const updatedCommentIds = new Set<number>();
+    logger.info(`🎯 Starting inline comment processing with ${existingComments.length} existing comments`);
     // Filter issues based on severity
     const filteredIssues = this.filterIssuesBySeverity(issues);
 
@@ -392,27 +395,10 @@ export class CommentManager {
         `📍 FINAL LINE SELECTION: AI diff line ${originalLine} → GitHub comment line ${actualFileLineNumber}`
       );
 
-      // Find the best matching existing comment using smart matching
-      const existingComment = this.findBestMatchingComment(
-        file,
-        actualFileLineNumber,
-        locationIssues[0],
-        existingComments
-      );
-
-      // Log comment matching for debugging
-      if (existingComments.length > 0) {
-        logger.debug(`Looking for existing comment at ${file}:${actualFileLineNumber}`);
-        logger.debug(`Available existing comments in ${file}:`);
-        existingComments
-          .filter(c => c.location.file === file)
-          .forEach(c => logger.debug(`  - Line ${c.location.line} (ID: ${c.id})`));
-        if (existingComment) {
-          logger.info(`🔄 Will update existing comment ${existingComment.comment.id} at ${file}:${existingComment.comment.location.line} (${existingComment.reason}) -> ${actualFileLineNumber}`);
-        } else {
-          logger.info(`➕ Will create new comment at ${file}:${actualFileLineNumber}`);
-        }
-      }
+      // Since the AI now handles deduplication intelligently, we simply create all comments
+      // The AI has already seen existing comments and decided whether to create new ones
+      logger.info(`🤖 AI-driven deduplication: Creating comment at ${file}:${actualFileLineNumber}`);
+      logger.info(`Issue: "${locationIssues[0]?.message}" (${locationIssues[0]?.type})`);
 
       try {
         logger.info(`\n=== POSTING INLINE COMMENT ===`);
@@ -422,7 +408,8 @@ export class CommentManager {
         logger.info(`Issue type: ${locationIssues[0]?.type} - ${locationIssues[0]?.message}`);
         logger.info(`==============================\n`);
 
-        const commentId = await this.githubClient.postInlineComment(comment, existingComment?.comment.id);
+        // Always create new comments since AI handles deduplication
+        const commentId = await this.githubClient.postInlineComment(comment);
 
         // Track the posted comment for summary links
         if (commentId) {
@@ -435,8 +422,8 @@ export class CommentManager {
       }
     }
 
-    // Clean up orphaned comments (comments that no longer have corresponding issues)
-    await this.cleanupOrphanedComments(existingComments, filteredIssues, fileChanges);
+    // Note: Cleanup is no longer needed since AI handles deduplication intelligently
+    logger.info(`✅ AI-driven comment management completed`);
   }
 
   /**
@@ -469,46 +456,86 @@ export class CommentManager {
     file: string,
     newLineNumber: number,
     newIssue: CodeIssue | undefined,
-    existingComments: InlineComment[]
+    existingComments: InlineComment[],
+    updatedCommentIds?: Set<number>
   ): { comment: InlineComment; reason: string } | null {
-    if (!newIssue) return null;
-
-    const fileComments = existingComments.filter(c => c.location.file === file);
-    if (fileComments.length === 0) return null;
-
-    // Strategy 1: Exact line match
-    const exactMatch = fileComments.find(c => c.location.line === newLineNumber);
-    if (exactMatch) {
-      return { comment: exactMatch, reason: 'exact_line_match' };
+    if (!newIssue) {
+      logger.debug(`🔍 No new issue provided for matching`);
+      return null;
     }
 
+    let fileComments = existingComments.filter(c => c.location.file === file);
+
+    // Filter out already updated comments
+    if (updatedCommentIds) {
+      const originalCount = fileComments.length;
+      fileComments = fileComments.filter(c => !c.id || !updatedCommentIds.has(c.id));
+      const filteredCount = originalCount - fileComments.length;
+      if (filteredCount > 0) {
+        logger.debug(`🔍 Filtered out ${filteredCount} already updated comments`);
+      }
+    }
+
+    if (fileComments.length === 0) {
+      logger.debug(`🔍 No available comments in ${file} (${updatedCommentIds ? 'all already updated' : 'none exist'})`);
+      return null;
+    }
+
+    logger.debug(`🔍 Starting smart matching for "${newIssue.message}" at line ${newLineNumber}`);
+
+    // Strategy 1: Exact line match
+    logger.debug(`🔍 Strategy 1: Looking for exact line match at ${newLineNumber}`);
+    const exactMatch = fileComments.find(c => c.location.line === newLineNumber);
+    if (exactMatch) {
+      logger.debug(`✅ Strategy 1 SUCCESS: Found exact line match (ID ${exactMatch.id})`);
+      return { comment: exactMatch, reason: 'exact_line_match' };
+    }
+    logger.debug(`❌ Strategy 1 FAILED: No exact line match`);
+
     // Strategy 2: Nearby line match (within 5 lines) + issue similarity
+    logger.debug(`🔍 Strategy 2: Looking for nearby similar issues (±5 lines)`);
     const nearbyMatches = fileComments.filter(c =>
       Math.abs(c.location.line - newLineNumber) <= 5
     );
+    logger.debug(`🔍 Found ${nearbyMatches.length} nearby comments`);
 
     for (const comment of nearbyMatches) {
-      // Check if the issue types and messages are similar
-      if (this.areIssuesSimilar(newIssue, comment, newLineNumber, comment.location.line)) {
-        const distance = Math.abs(comment.location.line - newLineNumber);
+      const distance = Math.abs(comment.location.line - newLineNumber);
+      logger.debug(`🔍 Checking comment at line ${comment.location.line} (distance: ${distance})`);
+
+      const isSimilar = this.areIssuesSimilar(newIssue, comment, newLineNumber, comment.location.line);
+      logger.debug(`🔍 Similarity check result: ${isSimilar}`);
+
+      if (isSimilar) {
+        logger.debug(`✅ Strategy 2 SUCCESS: Found nearby similar issue (ID ${comment.id})`);
         return {
           comment,
           reason: `nearby_similar_issue (distance: ${distance} lines)`
         };
       }
     }
+    logger.debug(`❌ Strategy 2 FAILED: No nearby similar issues`);
 
     // Strategy 3: Same issue type and similar message anywhere in the file
+    logger.debug(`🔍 Strategy 3: Looking for similar issues anywhere in file`);
     for (const comment of fileComments) {
-      if (this.areIssuesSimilar(newIssue, comment, newLineNumber, comment.location.line, true)) {
-        const distance = Math.abs(comment.location.line - newLineNumber);
+      const distance = Math.abs(comment.location.line - newLineNumber);
+      logger.debug(`🔍 Checking comment at line ${comment.location.line} (distance: ${distance})`);
+
+      const isSimilar = this.areIssuesSimilar(newIssue, comment, newLineNumber, comment.location.line, true);
+      logger.debug(`🔍 File-wide similarity check result: ${isSimilar}`);
+
+      if (isSimilar) {
+        logger.debug(`✅ Strategy 3 SUCCESS: Found similar issue anywhere in file (ID ${comment.id})`);
         return {
           comment,
           reason: `same_file_similar_issue (distance: ${distance} lines)`
         };
       }
     }
+    logger.debug(`❌ Strategy 3 FAILED: No similar issues found anywhere in file`);
 
+    logger.debug(`❌ ALL STRATEGIES FAILED: No matching comment found`);
     return null;
   }
 
@@ -522,15 +549,26 @@ export class CommentManager {
     existingLine: number,
     allowLargeDistance: boolean = false
   ): boolean {
+    const distance = Math.abs(newLine - existingLine);
+
+    logger.debug(`    🔍 Similarity Analysis:`);
+    logger.debug(`       New: "${newIssue.message}" (${newIssue.type}) at line ${newLine}`);
+    logger.debug(`       Old: "${existingComment.body.substring(0, 100)}..." at line ${existingLine}`);
+    logger.debug(`       Distance: ${distance} lines, allowLargeDistance: ${allowLargeDistance}`);
+
     // If lines are too far apart and we don't allow large distances, not similar
-    if (!allowLargeDistance && Math.abs(newLine - existingLine) > 10) {
+    if (!allowLargeDistance && distance > 10) {
+      logger.debug(`       ❌ Distance check FAILED: ${distance} > 10 lines`);
       return false;
     }
+    logger.debug(`       ✅ Distance check PASSED`);
 
     // Extract issue information from the existing comment body
     const commentBody = existingComment.body.toLowerCase();
     const newMessage = newIssue.message.toLowerCase();
     const newType = newIssue.type.toLowerCase();
+
+    logger.debug(`       Comparing: "${newMessage}" vs "${commentBody.substring(0, 50)}..."`);
 
     // Check if the issue type matches
     const hasMatchingType = commentBody.includes(newType) ||
@@ -538,15 +576,33 @@ export class CommentManager {
                            (newType === 'warning' && commentBody.includes('⚠️')) ||
                            (newType === 'info' && commentBody.includes('ℹ️'));
 
+    logger.debug(`       Type match: ${hasMatchingType} (looking for "${newType}")`);
+
     // Check message similarity - look for key words
     const newWords = newMessage.split(' ').filter(word => word.length > 3);
     const matchingWords = newWords.filter(word => commentBody.includes(word));
     const similarityRatio = matchingWords.length / Math.max(newWords.length, 1);
 
+    logger.debug(`       New words: [${newWords.join(', ')}]`);
+    logger.debug(`       Matching words: [${matchingWords.join(', ')}]`);
+    logger.debug(`       Similarity ratio: ${similarityRatio.toFixed(2)} (${matchingWords.length}/${newWords.length})`);
+
     // Consider issues similar if:
     // 1. Same type AND significant message overlap (>50%)
     // 2. OR very high message similarity (>80%) regardless of type
-    return (hasMatchingType && similarityRatio > 0.5) || similarityRatio > 0.8;
+    const result = (hasMatchingType && similarityRatio > 0.5) || similarityRatio > 0.8;
+
+    if (result) {
+      if (hasMatchingType && similarityRatio > 0.5) {
+        logger.debug(`       ✅ SIMILAR: Same type + ${(similarityRatio * 100).toFixed(0)}% message match`);
+      } else {
+        logger.debug(`       ✅ SIMILAR: High message similarity (${(similarityRatio * 100).toFixed(0)}%)`);
+      }
+    } else {
+      logger.debug(`       ❌ NOT SIMILAR: Type=${hasMatchingType}, Similarity=${(similarityRatio * 100).toFixed(0)}%`);
+    }
+
+    return result;
   }
 
   /**
@@ -574,7 +630,7 @@ export class CommentManager {
       if (!issue.file || !issue.line) continue;
 
       const fileComments = existingComments.filter(c => c.location.file === issue.file);
-      const match = this.findBestMatchingComment(issue.file, issue.line, issue, existingComments);
+      const match = this.findBestMatchingComment(issue.file, issue.line, issue, existingComments, undefined);
 
       if (match && match.comment.id) {
         matchedCommentIds.add(match.comment.id);

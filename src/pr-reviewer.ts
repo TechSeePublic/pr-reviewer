@@ -15,6 +15,7 @@ import {
   CursorRulesConfig,
   FileBatch,
   FileChange,
+  InlineComment,
   PRContext,
   PRPlan,
   ReviewContext,
@@ -119,9 +120,13 @@ export class PRReviewer {
         core.info(`Architectural review completed: ${architecturalIssues.length} issues found`);
       }
 
-      // Step 6: Review files in detailed batches with PR context
+      // Step 6: Get existing comments for AI-driven deduplication
+      const existingComments = await this.githubClient.getExistingBotComments();
+      core.info(`📥 Found ${existingComments.inlineComments.length} existing inline comments for AI deduplication`);
+
+      // Step 7: Review files in detailed batches with PR context and existing comments
       core.info('🔍 Reviewing files in detail batches with AI...');
-      const detailedIssues = await this.reviewFilesInBatches(fileChanges, applicableRules, prPlan);
+      const detailedIssues = await this.reviewFilesInBatches(fileChanges, applicableRules, prPlan, existingComments.inlineComments);
 
       // Mark detailed issues and combine with architectural issues
       const markedDetailedIssues = detailedIssues.map(issue => ({
@@ -277,7 +282,8 @@ export class PRReviewer {
   private async reviewFilesInBatches(
     fileChanges: FileChange[],
     rules: CursorRule[],
-    prPlan: PRPlan
+    prPlan: PRPlan,
+    existingComments?: InlineComment[]
   ): Promise<CodeIssue[]> {
     const allIssues: CodeIssue[] = [];
     const batches = this.createFileBatches(fileChanges);
@@ -299,8 +305,8 @@ export class PRReviewer {
         // Get file contents for the batch
         const filesWithContent = await this.getFilesWithContent(batch.files);
 
-        // Review the batch
-        const batchIssues = await this.aiProvider.reviewBatch(filesWithContent, rules, prPlan);
+        // Review the batch with existing comments for AI deduplication
+        const batchIssues = await this.aiProvider.reviewBatch(filesWithContent, rules, prPlan, existingComments);
         allIssues.push(...batchIssues);
 
         // Add delay between batches to respect rate limits

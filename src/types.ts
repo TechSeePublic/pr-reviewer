@@ -128,7 +128,7 @@ export interface AIProvider {
   name: string;
   model: string;
   reviewCode(prompt: string, code: string, rules: CursorRule[]): Promise<CodeIssue[]>;
-  reviewBatch(files: FileChange[], rules: CursorRule[], prPlan: PRPlan): Promise<CodeIssue[]>;
+  reviewBatch(files: FileChange[], rules: CursorRule[], prPlan: PRPlan, existingComments?: InlineComment[]): Promise<CodeIssue[]>;
   reviewArchitecture(
     fileChanges: FileChange[],
     rules: CursorRule[]

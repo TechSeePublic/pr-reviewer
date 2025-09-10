@@ -8,6 +8,7 @@ import {
   CodeIssue,
   CursorRule,
   FileChange,
+  InlineComment,
   PRPlan,
   ReviewContext,
 } from '../types';
@@ -28,7 +29,8 @@ export abstract class BaseAIProvider implements AIProvider {
   abstract reviewBatch(
     files: FileChange[],
     rules: CursorRule[],
-    prPlan: PRPlan
+    prPlan: PRPlan,
+    existingComments?: InlineComment[]
   ): Promise<CodeIssue[]>;
   abstract reviewArchitecture(
     fileChanges: FileChange[],

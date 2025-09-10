@@ -3,7 +3,7 @@
  * This module provides consistent, high-quality prompts that work across all AI providers
  */
 
-import { CodeIssue, CursorRule, FileChange, PRPlan, ReviewContext } from './types';
+import { CodeIssue, CursorRule, FileChange, InlineComment, PRPlan, ReviewContext } from './types';
 import { logger } from './logger';
 
 export interface PromptConfig {
@@ -813,7 +813,7 @@ Focus on understanding the **intent**, **impact**, and **broader system implicat
   /**
    * Build batch review prompt for multiple files with PR context
    */
-  static buildBatchReviewPrompt(files: FileChange[], rules: CursorRule[], prPlan: PRPlan): string {
+  static buildBatchReviewPrompt(files: FileChange[], rules: CursorRule[], prPlan: PRPlan, existingComments?: InlineComment[]): string {
     let prompt = `# Batch Code Review Request
 
 ## PR Context
@@ -861,6 +861,32 @@ ${
 }
 
 **Additional Context**: ${prPlan.context}
+
+${existingComments && existingComments.length > 0 ? `
+## 🚨 EXISTING COMMENTS TO CONSIDER
+
+**IMPORTANT**: The following comments already exist on this PR. Use this information to avoid duplicating existing feedback and to make smarter decisions about what to comment on.
+
+**INSTRUCTIONS**:
+- **DO NOT** create new comments for issues that are already covered by existing comments below
+- **DO UPDATE** existing comments if the issue has changed or needs clarification
+- **FOCUS** on new issues not already addressed by existing comments
+- **REFERENCE** existing comment IDs when you want to update rather than create new ones
+
+**EXISTING COMMENTS** (${existingComments.length} total):
+${existingComments.map((comment, index) => {
+  const preview = comment.body.substring(0, 200).replace(/\n/g, ' ');
+  return `
+${index + 1}. **Comment ID ${comment.id}** at \`${comment.location.file}:${comment.location.line}\`
+   Preview: "${preview}..."
+   ${comment.body.includes('ERROR') ? '🔴 ERROR' : comment.body.includes('WARNING') ? '🟡 WARNING' : '🔵 INFO'}`;
+}).join('')}
+
+**DECISION FRAMEWORK**:
+- If you find an issue that's VERY SIMILAR to an existing comment → **SKIP IT** (don't create duplicate)
+- If you find an issue that's RELATED but DIFFERENT → **CREATE NEW** comment
+- If an existing issue has CHANGED or needs UPDATE → **REFERENCE** the existing comment ID
+` : ''}
 
 ## Files to Review (${files.length} files):
 

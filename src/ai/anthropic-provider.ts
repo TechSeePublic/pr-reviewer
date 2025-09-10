@@ -8,6 +8,7 @@ import {
   CodeIssue,
   CursorRule,
   FileChange,
+  InlineComment,
   PRPlan,
   ReviewContext,
 } from '../types';
@@ -83,10 +84,11 @@ export class AnthropicProvider extends BaseAIProvider {
   async reviewBatch(
     files: FileChange[],
     rules: CursorRule[],
-    prPlan: PRPlan
+    prPlan: PRPlan,
+    existingComments?: InlineComment[]
   ): Promise<CodeIssue[]> {
     try {
-      const prompt = PromptTemplates.buildBatchReviewPrompt(files, rules, prPlan);
+      const prompt = PromptTemplates.buildBatchReviewPrompt(files, rules, prPlan, existingComments);
       const systemPrompt = PromptTemplates.buildCodeReviewSystemPrompt(rules, {
         supportsJsonMode: false,
         provider: this.name,
