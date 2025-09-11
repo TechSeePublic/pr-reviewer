@@ -19,6 +19,7 @@ import { SEVERITY_LEVELS } from './config';
 import { logger } from './logger';
 import { FlowDiagramGenerator } from './flow-diagram-generator';
 import { AutoFixManager } from './auto-fix-manager';
+import { PromptTemplates } from './prompt-templates';
 
 export class CommentManager {
   private githubClient: GitHubClient;
@@ -26,6 +27,7 @@ export class CommentManager {
   private flowDiagramGenerator: FlowDiagramGenerator;
   private prContext: PRContext;
   private autoFixManager: AutoFixManager | undefined;
+  private aiProvider: AIProvider | undefined;
 
   constructor(
     githubClient: GitHubClient,
@@ -36,6 +38,7 @@ export class CommentManager {
   ) {
     this.githubClient = githubClient;
     this.inputs = inputs;
+    this.aiProvider = aiProvider;
     this.flowDiagramGenerator = new FlowDiagramGenerator({}, aiProvider, githubClient);
     this.autoFixManager = autoFixManager;
 
@@ -261,6 +264,140 @@ export class CommentManager {
   }
 
   /**
+   * AI-powered deduplication to filter out duplicate comments before posting
+   */
+  private async deduplicateCommentsWithAI(
+    proposedComments: { file: string; line: number; body: string; issueType: string; message: string; issues: CodeIssue[] }[],
+    existingComments: InlineComment[],
+    fileChanges: FileChange[]
+  ): Promise<{ file: string; line: number; body: string; issueType: string; message: string; issues: CodeIssue[] }[]> {
+    if (!this.aiProvider || proposedComments.length === 0) {
+      logger.info('⏭️ Skipping AI deduplication (no AI provider or no comments)');
+      return proposedComments;
+    }
+
+    logger.info(`🧠 Running AI deduplication check on ${proposedComments.length} proposed comments vs ${existingComments.length} existing comments...`);
+
+    try {
+      // Prepare simplified comment data for AI analysis
+      const newCommentsForAI = proposedComments.map(comment => ({
+        file: comment.file,
+        line: comment.line,
+        body: comment.body,
+        issueType: comment.issueType,
+        message: comment.message
+      }));
+
+      const deduplicationPrompt = PromptTemplates.buildDeduplicationPrompt(
+        newCommentsForAI,
+        existingComments,
+        fileChanges
+      );
+
+      logger.debug('🧠 AI Deduplication Prompt:');
+      logger.debug(deduplicationPrompt);
+
+      // Call AI for deduplication analysis
+      const response = await this.aiProvider.reviewCode(deduplicationPrompt, '', []);
+
+      logger.debug(`🧠 AI Deduplication Response: ${JSON.stringify(response, null, 2)}`);
+
+      // Parse AI response to get indices of comments to keep
+      const deduplicationResult = this.parseDeduplicationResponse(response);
+
+      if (!deduplicationResult) {
+        logger.warn('⚠️ Failed to parse AI deduplication response, keeping all comments');
+        return proposedComments;
+      }
+
+      // Filter out the comments that AI identified as duplicates
+      const filteredComments = proposedComments.filter((_, index) =>
+        !deduplicationResult.commentsToFilter.includes(index)
+      );
+
+      logger.info(`✅ AI Deduplication Results:`);
+      logger.info(`   📥 Proposed: ${proposedComments.length} comments`);
+      logger.info(`   ✅ Keeping: ${filteredComments.length} comments`);
+      logger.info(`   🗑️ Filtered: ${deduplicationResult.commentsToFilter.length} duplicates`);
+
+      // Log detailed reasoning
+      if (deduplicationResult.reasoning) {
+        logger.info(`🧠 AI Reasoning:`);
+        Object.entries(deduplicationResult.reasoning).forEach(([index, reason]) => {
+          const commentIndex = parseInt(index);
+          const action = deduplicationResult.commentsToFilter.includes(commentIndex) ? '🗑️ FILTER' : '✅ KEEP';
+          const comment = proposedComments[commentIndex];
+          logger.info(`   ${action} Comment ${commentIndex}: ${comment?.file}:${comment?.line} - ${reason}`);
+        });
+      }
+
+      // Log which specific comments were filtered out
+      if (deduplicationResult.commentsToFilter.length > 0) {
+        logger.info(`🗑️ Filtered duplicate comments:`);
+        deduplicationResult.commentsToFilter.forEach(index => {
+          const comment = proposedComments[index];
+          if (comment) {
+            logger.info(`   - ${comment.file}:${comment.line} - "${comment.message}"`);
+          }
+        });
+      }
+
+      return filteredComments;
+
+    } catch (error) {
+      logger.error('❌ AI deduplication failed:', error);
+      logger.info('⏭️ Continuing with all proposed comments');
+      return proposedComments;
+    }
+  }
+
+  /**
+   * Parse AI deduplication response to extract filter decisions
+   */
+  private parseDeduplicationResponse(aiResponse: CodeIssue[]): { commentsToFilter: number[]; reasoning?: Record<string, string> } | null {
+    try {
+      // AI returns an array of CodeIssue, but for deduplication we expect a single response
+      // Try to extract JSON from the first response
+      if (aiResponse.length === 0) {
+        return null;
+      }
+
+      // Look for JSON in the description or message
+      const firstResponse = aiResponse[0];
+      if (!firstResponse) {
+        return null;
+      }
+      const responseText = firstResponse.description || firstResponse.message || '';
+
+      // Try to extract JSON from the response
+      const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) ||
+                       responseText.match(/\{[\s\S]*\}/);
+
+      if (!jsonMatch) {
+        logger.warn('No JSON found in AI deduplication response');
+        return null;
+      }
+
+      const jsonStr = jsonMatch[1] || jsonMatch[0];
+      const parsed = JSON.parse(jsonStr.trim());
+
+      if (!parsed.commentsToFilter || !Array.isArray(parsed.commentsToFilter)) {
+        logger.warn('Invalid deduplication response format: missing commentsToFilter array');
+        return null;
+      }
+
+      return {
+        commentsToFilter: parsed.commentsToFilter,
+        reasoning: parsed.reasoning
+      };
+
+    } catch (error) {
+      logger.warn('Failed to parse AI deduplication response:', error);
+      return null;
+    }
+  }
+
+  /**
    * Post inline comments for specific issues
    */
   private async postInlineComments(
@@ -275,43 +412,8 @@ export class CommentManager {
     // Group issues by file and line
     const issuesByLocation = this.groupIssuesByLocation(filteredIssues);
 
-    logger.info(
-      `Processing ${Object.keys(issuesByLocation).length} unique locations for inline comments`
-    );
-
-    // Debug: Show all AI-reported issues and their line numbers
-    logger.info(`\n=== AI REPORTED ISSUES DEBUG ===`);
-    filteredIssues.forEach((issue, index) => {
-      logger.info(`Issue ${index + 1}:`);
-      logger.info(`  File: ${issue.file}`);
-      logger.info(`  Line: ${issue.line} (AI reported)`);
-      logger.info(`  Message: ${issue.message}`);
-      logger.info(`  Type: ${issue.type}`);
-      const issueWithReviewType = issue as CodeIssue & { reviewType?: string };
-      if (issueWithReviewType.reviewType) {
-        logger.info(`  Review Type: ${issueWithReviewType.reviewType}`);
-      }
-
-      // Cross-check with file changes
-      const relatedFileChange = fileChanges.find(fc => fc.filename === issue.file);
-      if (relatedFileChange?.patch) {
-        const validLines = this.parseValidLinesFromPatch(relatedFileChange.patch);
-        const isValidLine = validLines.includes(issue.line || 0);
-        logger.info(`  ✓ Line ${issue.line} valid in diff: ${isValidLine ? 'YES' : 'NO'}`);
-        if (!isValidLine) {
-          logger.warn(`  ⚠️  Available lines in diff: [${validLines.join(', ')}]`);
-          const closestLine = validLines.reduce((prev, curr) =>
-            Math.abs(curr - (issue.line || 0)) < Math.abs(prev - (issue.line || 0)) ? curr : prev
-          );
-          logger.warn(
-            `  🔧 Closest valid line: ${closestLine} (distance: ${Math.abs(closestLine - (issue.line || 0))})`
-          );
-        }
-      } else {
-        logger.warn(`  ❌ No patch found for file ${issue.file}`);
-      }
-    });
-    logger.info(`====================================\n`);
+    // Prepare proposed comments for AI deduplication
+    const proposedComments: { file: string; line: number; body: string; issueType: string; message: string; issues: CodeIssue[] }[] = [];
 
     for (const [locationKey, locationIssues] of Object.entries(issuesByLocation)) {
       const [file, lineStr] = locationKey.split(':');
@@ -322,17 +424,6 @@ export class CommentManager {
       const originalLine = parseInt(lineStr, 10);
 
       // Convert diff line number to actual file line number
-      logger.info(`\n=== CONVERTING DIFF LINE TO FILE LINE ===`);
-      logger.info(`File: ${file}`);
-      logger.info(`AI reported diff line: ${originalLine}`);
-      logger.info(`Issue: ${locationIssues[0]?.message}`);
-
-      // Validate input
-      if (originalLine <= 0) {
-        logger.warn(`❌ Invalid diff line number: ${originalLine} (must be > 0)`);
-        continue;
-      }
-
       let actualFileLineNumber = this.convertDiffLineToFileLine(file, originalLine, fileChanges);
 
       // If conversion fails, try to find the closest valid line
@@ -348,83 +439,86 @@ export class CommentManager {
         }
       }
 
-      logger.info(`✅ Converted diff line ${originalLine} to file line ${actualFileLineNumber}`);
-      logger.info(`✅ SUCCESS: AI line ${originalLine} → GitHub line ${actualFileLineNumber} for ${file}`);
-      logger.info(`=============================================\n`);
-
-      // Create inline comment
-      if (locationIssues.length === 0) {
-        logger.warn(`No issues for location ${locationKey}`);
+      if (locationIssues.length === 0 || actualFileLineNumber <= 0) {
         continue;
       }
 
-      const comment: InlineComment = {
-        body: this.formatInlineCommentBody(locationIssues),
-        location: {
+      // Prepare comment body and metadata
+      const commentBody = this.formatInlineCommentBody(locationIssues);
+      const primaryIssue = locationIssues[0];
+
+      if (primaryIssue) {
+        proposedComments.push({
           file,
           line: actualFileLineNumber,
+          body: commentBody,
+          issueType: primaryIssue.type,
+          message: primaryIssue.message,
+          issues: locationIssues
+        });
+      }
+    }
+
+    logger.info(`📝 Prepared ${proposedComments.length} proposed comments for AI deduplication`);
+
+    // AI DEDUPLICATION LAYER - Filter out duplicates before posting
+    const commentsToPost = await this.deduplicateCommentsWithAI(
+      proposedComments,
+      existingComments,
+      fileChanges
+    );
+
+    logger.info(`📤 Posting ${commentsToPost.length} AI-filtered comments (filtered out ${proposedComments.length - commentsToPost.length} duplicates)`);
+
+    // Post each filtered comment
+    for (const commentData of commentsToPost) {
+      const { file, line, body, issues } = commentData;
+
+      const comment: InlineComment = {
+        body,
+        location: {
+          file,
+          line,
           side: 'RIGHT', // Always comment on new code
         },
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        issue: locationIssues[0]!, // Store primary issue for reference (already validated above)
+        issue: issues[0]!, // Store primary issue for reference
       };
 
-      // Validate final line number before sending to GitHub
-      if (actualFileLineNumber <= 0) {
-        logger.warn(`❌ Invalid final line number: ${actualFileLineNumber} (must be > 0)`);
-        continue;
-      }
-
-      // Debug: Log the exact line number being sent to GitHub
-      logger.info(
-        `📍 FINAL LINE SELECTION: AI diff line ${originalLine} → GitHub comment line ${actualFileLineNumber}`
-      );
-
-      // Find the best matching existing comment using smart matching
+      // Find existing comment for update (if any)
       const existingComment = this.findBestMatchingComment(
         file,
-        actualFileLineNumber,
-        locationIssues[0],
+        line,
+        issues[0],
         existingComments
       );
 
-      // Log comment matching for debugging
-      if (existingComments.length > 0) {
-        logger.debug(`Looking for existing comment at ${file}:${actualFileLineNumber}`);
-        logger.debug(`Available existing comments in ${file}:`);
-        existingComments
-          .filter(c => c.location.file === file)
-          .forEach(c => logger.debug(`  - Line ${c.location.line} (ID: ${c.id})`));
-        if (existingComment) {
-          logger.info(`🔄 Will update existing comment ${existingComment.comment.id} at ${file}:${existingComment.comment.location.line} (${existingComment.reason}) -> ${actualFileLineNumber}`);
-        } else {
-          logger.info(`➕ Will create new comment at ${file}:${actualFileLineNumber}`);
-        }
+      // Log what we're doing
+      if (existingComment) {
+        logger.info(`🔄 Will update existing comment ${existingComment.comment.id} at ${file}:${line}`);
+      } else {
+        logger.info(`➕ Will create new comment at ${file}:${line}`);
       }
 
       try {
-        logger.info(`\n=== POSTING INLINE COMMENT ===`);
-        logger.info(`File: ${file}`);
-        logger.info(`AI diff line: ${originalLine}`);
-        logger.info(`GitHub file line: ${actualFileLineNumber}`);
-        logger.info(`Issue type: ${locationIssues[0]?.type} - ${locationIssues[0]?.message}`);
-        logger.info(`==============================\n`);
-
         const commentId = await this.githubClient.postInlineComment(comment, existingComment?.comment.id);
 
         // Track the posted comment for summary links
         if (commentId) {
-          const commentKey = `${file}:${originalLine}`;
+          // Use original diff line for tracking
+          const originalDiffLine = issues[0]?.line || line;
+          const commentKey = `${file}:${originalDiffLine}`;
           postedComments.set(commentKey, commentId);
           logger.debug(`Tracked comment ${commentId} for ${commentKey}`);
         }
       } catch (error) {
-        logger.warn(`Failed to post inline comment for ${file}:${actualFileLineNumber}:`, error);
+        logger.warn(`Failed to post inline comment for ${file}:${line}:`, error);
       }
     }
 
     // Clean up orphaned comments (comments that no longer have corresponding issues)
     await this.cleanupOrphanedComments(existingComments, issues, fileChanges);
+
+    logger.info(`✅ AI-powered comment posting completed successfully`);
   }
 
   /**
@@ -470,23 +564,20 @@ export class CommentManager {
       return { comment: exactMatch, reason: 'exact_line_match' };
     }
 
-    // Strategy 2: Nearby line match (within 5 lines) + issue similarity
-    const nearbyMatches = fileComments.filter(c =>
-      Math.abs(c.location.line - newLineNumber) <= 5
-    );
-
-    for (const comment of nearbyMatches) {
+    // Strategy 2: Content-based similarity (ignore line proximity - lines can shift)
+    // Check all comments in the file for content similarity
+    for (const comment of fileComments) {
       // Check if the issue types and messages are similar
-      if (this.areIssuesSimilar(newIssue, comment, newLineNumber, comment.location.line)) {
+      if (this.areIssuesSimilar(newIssue, comment, newLineNumber, comment.location.line, true)) {
         const distance = Math.abs(comment.location.line - newLineNumber);
         return {
           comment,
-          reason: `nearby_similar_issue (distance: ${distance} lines)`
+          reason: `content_similar_issue (line distance: ${distance}, but content matches)`
         };
       }
     }
 
-    // Strategy 3: Same issue type and similar message anywhere in the file
+    // Strategy 3: Fallback - any similar issue anywhere in the file
     for (const comment of fileComments) {
       if (this.areIssuesSimilar(newIssue, comment, newLineNumber, comment.location.line, true)) {
         const distance = Math.abs(comment.location.line - newLineNumber);
@@ -502,6 +593,7 @@ export class CommentManager {
 
   /**
    * Check if two issues are similar enough to be considered the same
+   * Focus on content similarity, not line proximity (lines can shift between reviews)
    */
   private areIssuesSimilar(
     newIssue: CodeIssue,
@@ -510,10 +602,8 @@ export class CommentManager {
     existingLine: number,
     allowLargeDistance: boolean = false
   ): boolean {
-    // If lines are too far apart and we don't allow large distances, not similar
-    if (!allowLargeDistance && Math.abs(newLine - existingLine) > 10) {
-      return false;
-    }
+    // Remove line proximity restrictions - focus on content similarity
+    // Lines can shift significantly between reviews as code changes
 
     // Extract issue information from the existing comment body
     const commentBody = existingComment.body.toLowerCase();

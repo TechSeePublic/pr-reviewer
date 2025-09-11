@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "mcpServers": {
+   
+    "atlassian": {
+      "description": "Atlassian services - Jira issue management and Confluence documentation",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@0.1.17",
+        "https://mcp.atlassian.com/v1/sse"
+      ]
+    }
+  
+  }
+}

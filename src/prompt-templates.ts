@@ -1076,6 +1076,122 @@ Remember: You're reviewing the changes as they relate to the overall PR goals, n
   }
 
   /**
+   * Build deduplication prompt to check for duplicate comments before posting
+   */
+  static buildDeduplicationPrompt(
+    newComments: { file: string; line: number; body: string; issueType: string; message: string }[],
+    existingComments: InlineComment[],
+    fileChanges: FileChange[]
+  ): string {
+    const prompt = `# AI Comment Deduplication Analysis
+
+**TASK**: Analyze proposed new comments against existing comments to identify and filter out duplicates or substantially similar issues.
+
+**CRITICAL INSTRUCTIONS**:
+- **VERY STRICT** deduplication - prevent any redundant comments
+- Consider semantic similarity, not just exact text matches
+- A comment is a DUPLICATE if it addresses the same underlying issue, even with different wording
+- Focus on the **core problem** each comment addresses, not surface-level differences
+
+## NEW COMMENTS TO ANALYZE (${newComments.length} comments)
+
+${newComments.map((comment, index) => `
+### New Comment ${index + 1}
+- **File**: \`${comment.file}:${comment.line}\`
+- **Type**: ${comment.issueType}
+- **Issue**: ${comment.message}
+- **Full Comment Body**:
+\`\`\`
+${comment.body}
+\`\`\`
+
+**Code Context** (around line ${comment.line}):
+${(() => {
+  const file = fileChanges.find(f => f.filename === comment.file);
+  return file ? '```' + PromptTemplates.getLanguageFromFile(comment.file) + '\n' +
+    PromptTemplates.extractCodeContext(file, comment.line, 5) + '\n```'
+    : 'Code context not available';
+})()}
+
+---`).join('')}
+
+## EXISTING COMMENTS (${existingComments.length} comments)
+
+${existingComments.length > 0 ? existingComments.map((existing, index) => `
+### Existing Comment ${index + 1}
+- **File**: \`${existing.location.file}:${existing.location.line}\`
+- **ID**: ${existing.id}
+- **Full Comment Body**:
+\`\`\`
+${existing.body}
+\`\`\`
+
+**Code Context** (around line ${existing.location.line}):
+${(() => {
+  const file = fileChanges.find(f => f.filename === existing.location.file);
+  return file ? '```' + PromptTemplates.getLanguageFromFile(existing.location.file) + '\n' +
+    PromptTemplates.extractCodeContext(file, existing.location.line, 5) + '\n```'
+    : 'Code context not available';
+})()}
+
+---`).join('') : 'No existing comments found.'}
+
+## DEDUPLICATION RULES
+
+**CONSIDER AS DUPLICATES** (focus on CONTENT, not location):
+1. **Same Core Issue** - Same underlying problem regardless of line numbers or exact wording
+2. **Semantic Equivalence** - Different descriptions of the same fundamental issue
+3. **Same Variable/Function/Concept** - Comments about the same code elements
+4. **Same Problem Category** - Same type of issue (error handling, validation, etc.) affecting the same logical code area
+
+**EXAMPLES OF DUPLICATES** (regardless of line distance):
+- "Variable 'x' is undefined" vs "Variable 'x' is not declared" → DUPLICATE (same variable issue)
+- "Missing error handling" vs "Should add try-catch block" → DUPLICATE (same error handling concern)
+- "Performance issue with loop" vs "Inefficient iteration" → DUPLICATE (same performance concern)
+- "Function should return boolean" vs "Return type should be boolean" → DUPLICATE (same return type issue)
+
+**NOT DUPLICATES**:
+- Different variables even with same issue type → KEEP BOTH
+- Different functions even with similar issues → KEEP BOTH  
+- Different files → KEEP BOTH (unless truly identical issue)
+- Different aspects of the same logical area → KEEP BOTH
+
+**IMPORTANT**: 
+- **Ignore line number proximity** - code may have shifted between reviews
+- **Focus on semantic content** - what is the actual issue being reported?
+- **Consider the full context** - look at the code snippets to understand what each comment addresses
+
+## REQUIRED RESPONSE FORMAT
+
+Return ONLY a JSON array of new comment indices to FILTER OUT (0-based indexing):
+
+\`\`\`json
+{
+  "commentsToFilter": [1, 4],
+  "reasoning": {
+    "0": "UNIQUE - no existing comment covers this specific variable issue",
+    "1": "DUPLICATE - existing comment already covers this exact error handling issue", 
+    "2": "UNIQUE - different function, different concern",
+    "3": "UNIQUE - new performance issue not covered by existing comments",
+    "4": "DUPLICATE - existing comment #3 addresses the same validation logic"
+  }
+}
+\`\`\`
+
+**ANALYSIS INSTRUCTIONS**:
+1. Compare each new comment against ALL existing comments
+2. **Focus on CONTENT similarity**, NOT line proximity
+3. Look at the actual CODE CONTEXT to understand what each comment addresses
+4. Identify the CORE PROBLEM - is it the same fundamental issue?
+5. Be VERY STRICT about duplicates - if the underlying issue is the same, filter it out
+6. Return indices of comments to FILTER (remove), not keep
+
+Analyze now and return the JSON response:`;
+
+    return prompt;
+  }
+
+  /**
    * Build architectural review prompt for analyzing code structure and patterns
    */
   static buildArchitecturalReviewPrompt(
